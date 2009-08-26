@@ -1,0 +1,164 @@
+#!/usr/bin/perl -w
+
+use DBI;
+use POSIX qw(strftime);
+use IO::Socket;
+    
+my $rsh_local_user="root";
+my $rsh_remote_user="admin";
+
+my $debug=0;
+
+#################################
+# Don't change after this point #
+#################################
+
+my $real_start_port = ($$ & 127) << 1;
+
+print STDERR ">>>>> COM_ACC:[$$] PORT offset $real_start_port\n";
+
+sub rsh {
+	my $rsh_host= $_[0];
+	my $rsh_cmd = $_[1];
+	my $start_port = 512;
+#	my $end_port = 1023;
+	my $end_port = 1023 - $real_start_port;
+	my $try = 1;
+	my $port = $end_port;
+	my $socket;
+
+	while ($try) {
+		last if $port < $start_port;
+		eval {
+			local $SIG{'__DIE__'};
+			$socket = IO::Socket::INET->new(PeerAddr=>$rsh_host,
+							PeerPort=>'514',
+							LocalPort=>$port,
+							Proto=>"tcp");
+		};
+		($@ || (not defined $socket)) ? ($port-=1) : ($try=0);
+	}
+	if ($try) {
+		print STDERR ">>>>> COM_ACC[$$]: All ports in use!\n";
+		return ();
+	}
+
+	print $socket "0\0";
+	print $socket "$rsh_local_user\0";
+	print $socket "$rsh_remote_user\0";
+	print $socket "$rsh_cmd\0";
+	my @c=<$socket>;
+	return @c;
+}
+
+# Check that we're running under OpenRADIUS, interface version 1
+# Check that we're running under OpenRADIUS, interface version 1
+unless ($debug ||
+        $ENV{'RADIUSINTERFACEVERSION'} &&
+        $ENV{'RADIUSINTERFACEVERSION'} == 1) {
+        die("comintel: ERROR: not running under OpenRADIUS, interface v1!\n");
+}
+
+
+# Set record separator to empty line and loop on input.
+$/ = "\n\n";
+$| = 1;			# Important - we're outputting to a pipe
+
+my $dbh = DBI->connect("dbi:Sybase:server=StatServer;language=russian", "cisco", "cisco") or die "Unable to connect. $DBI::errstr\n";
+#my $dbm = DBI->connect("DBI:mysql:database=dhcp;host=localhost","stat","qwe") or die("connect ");
+my %hdrs;
+my @d;
+
+$dbh->do("set dateformat dmy");
+
+while(<STDIN>) {
+
+	# Parse pairs from server's request message
+	chomp;
+	my $ip1; my $ip2; my $ip3; my $ip4;
+	my $name = "";
+	my $iface = 0;
+	my $port = 0;
+	my $date = "";
+	my $time = 0;
+	my $status = 2;
+
+	# Debugging
+	print STDERR ">>>>> COM_ACC[$$]: ACC got request: $_\n >>>>>\n" if $debug;
+
+
+	%hdrs = ();
+        s/^\s*(\S+?)\s*=\s*(.*?)\s*$/$1\n$2/gm;
+	%hdrs = split /\n/;
+	
+	$nas_ip = $hdrs{'IP-Source'};
+
+	$nas_ip =~ /^192\.168\.100\.(12|30)$/ or do {
+		print "int=1\n\n";
+		next;
+	};
+
+	if ($hdrs{'Framed-IP-Address'} && ($hdrs{'Framed-IP-Address'} =~ /^\s*(\d+)\.(\d+)\.(\d+)\.(\d+)\s*$/) ) {
+		$ip1 = $1;
+		$ip2 = $2;
+		$ip2 = 13 if $ip1 == 10;
+		$ip3 = $3;
+		$ip4 = $4;
+	} else {
+		$ip1 = $ip2 = $ip3 = $ip4 = 0;
+	}
+
+	$hdrs{'User-Name'} and $name = $hdrs{'User-Name'};
+	$hdrs{'Acct-Session-Id'} and $iface = $hdrs{'Acct-Session-Id'};
+	$hdrs{'NAS-Port'} and $port = $hdrs{'NAS-Port'};
+	$hdrs{'Timestamp'} and $date = $hdrs{'Timestamp'};
+	$hdrs{'Acct-Session-Time'} and $time = $hdrs{'Acct-Session-Time'};
+	$hdrs{'Acct-Delay-Time'} and ($time > $hdrs{'Acct-Delay-Time'}) and do {
+	    $time -= $hdrs{'Acct-Delay-Time'};
+	};
+	$hdrs{'Acct-Status-Type'} and $status = $hdrs{'Acct-Status-Type'};
+
+	$name =~ /^\s*"?(.*?)"?\s*$/ and $name = $1;
+	$name =~ /^\s*(\S*?)\s*$/ and $name = $1;
+
+	$iface =~ /^\s*"?(.*?)"?\s*$/ and $iface = $1;
+	$iface =~ /^\s*(\S*?)\s*$/ and $iface = $1;
+	$iface = hex $iface;
+
+	$status = ($status == 2) ? 3 : (($status == 3) ? 2 : 1);
+
+#	if ($status > 1) {
+#		my $date2 = strftime "%Y%m%d%H%M%S", localtime($date);
+#		($dbm->do("update mac_user set status=".$status.", d_stop='".$date2."' where status<3 and user='".$name."' and interface=".$iface) > 0)
+#		or ($dbm->do("update mac_user set status=".$status."+12, d_stop='".$date2."' where status > 10 and user='".$name."' and interface=".$iface) > 0)
+#		or do {
+#			$dbm->do("insert into mac_user values('".$name."', ".$iface.", ".$date2.", ".$date2.", ".$status.", NULL, NULL)");
+#			print STDERR "ACCT[$$]: missed ACCT-START user '$name' -- start '$date2'!!!\n";
+#		};			
+#	}
+	@d = ();
+	$date = strftime "%d.%m.%Y %H:%M:%S", localtime($date);
+	$status = 2 if $status == 1;
+
+	if ($status != 3) {
+		my $sth = $dbh->prepare("select status from preparetime where username='$name' and interfacenumber=$iface");
+		do { print STDERR ">>>>> COM_ACC[$$]: !!!!prep"; last; } unless defined($sth);
+		$sth->execute or do { print STDERR ">>>>> COM_ACC[$$]: !!!!exec"; last; };
+		@d = $sth->fetchrow_array;
+		$sth->finish;
+		if (defined($d[0]) && ($d[0] == 4)) {
+			@d = rsh($nas_ip, "s u w | inc $name");
+			if ($d[0] =~ /(Vi\d+)/) {
+				rsh($nas_ip, "cle int ".$1);
+				print STDERR ">>>>> COM_ACC[$$]: DROP // ".$d[0]."\n";
+				print STDERR ">>>>> COM_ACC[$$]: DROP port '$1' // user '$name'\n";
+			}
+		}
+	}
+	$dbh->do("exec WorkPrepareTime $ip1, $ip2, $ip3, $ip4, '$name', $iface, '$date', $time, $status");
+	print STDERR ">>>>> COM_ACC[$$]: $date '$name'\t$ip1.$ip2.$ip3.$ip4\t$time\t$status\t$iface\n";
+	print "int=1\n\n";
+}
+
+#$dbm->disconnect;
+$dbh->disconnect;

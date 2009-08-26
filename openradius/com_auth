@@ -1,0 +1,596 @@
+#!/usr/bin/perl -w
+
+
+use Getopt::Long;
+use DBI;
+use DB_File;
+use POSIX qw(strftime);
+use IO::Socket;
+use cyrillic qw/cset_factory/;
+use locale;
+
+# Switch Control
+require '/usr/local/swctl/conf/config.pl';
+
+my $ver="1.8";
+
+# 0 - без отладочных сообщений, 1 - Включить отладку, 2 - отладка с отображением всех входных параметров
+my $debug = 0;
+
+## Определять точку доступа
+my $AP_get = 1;
+
+## Включить механизм управления точками доступа (работает только с включенной  $AP_get!) 
+my $AP_check = 1;
+
+    
+#my $rsh_host="192.168.128.10";
+#my $rsh_local_user="root";
+#my $rsh_remote_user="admin";
+
+my $w2k = cset_factory 1251, 20866;
+my $k2w = cset_factory 20866, 1251;
+##################
+
+my %NAS_IP2 = (
+        '192.168.100.12', 13,
+        '192.168.100.21', 13,
+        '192.168.100.30', 23,
+);
+
+my %AC = (
+        '192.168.100.12', 1,
+        '192.168.100.30', 2,
+        '192.168.100.21', 0,
+        '192.168.29.21', 0,
+);
+
+my %NAS_Secrets = (
+        '192.168.100.12', '10secret',
+        '192.168.100.30', '7505ppp',
+        '192.168.100.21', '13secret',
+        '192.168.29.21', '13secret',
+);
+#--- last field - type service
+#0 - pppoe
+#1 - pop3
+#2 - ftp
+my %NAS_SQL_Request = (
+        '192.168.100.12', 'exec UserAuth \'$_[0]\', 0',
+        '192.168.100.30', 'exec UserAuth \'$_[0]\', 0',
+        '192.168.100.21', 'exec UserAuth \'$_[0]\', 1',
+        '192.168.29.21',  'exec UserAuth \'$_[0]\', 1',
+);
+#test
+my %NAS_SQL_Reply_Count = (
+        '192.168.100.12', 7,
+        '192.168.100.30', 7,
+        '192.168.100.21', 7,
+        '192.168.29.21', 7,
+);
+my %NAS_Reply = (
+        '192.168.100.12', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.17 77.239.208.17\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Welcome $_[0]\nint=1\n\n',
+        '192.168.100.30', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.17 77.239.208.17\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Welcome $_[0]\nint=1\n\n',
+        '192.168.100.21', 'clear-password=$_[1]\nint=$_[4]\n\n',
+        '192.168.29.21', 'clear-password=$_[1]\nint=$_[4]\n\n',
+# ftp   '82.116.12.44', 'str=$_[3]\nclear-password=$_[1]\nint=$_[4]\n\n',
+);
+my %NAS_Fake_Reply = (
+        '192.168.100.12', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.22 77.239.208.22\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Blocked $_[0]\nint=1\n\n',
+        '192.168.100.30', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.22 77.239.208.22\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Blocked $_[0]\nint=1\n\n',
+        '192.168.100.21', 'int=0\n\n',
+        '192.168.29.21', 'int=0\n\n',
+);
+
+## Если требуется тупо обламывать авторизацию, к примеру при попытке выйти из недоверенной ТД
+my %NAS_Deny_Reply = (
+        '192.168.100.12', 'str=$_[0] blocked in current Access Point\nint=0\n\n',
+        '192.168.100.30', 'str=$_[0] blocked in current Access Point\nint=0\n\n',
+        '192.168.100.21', 'int=0\n\n',
+        '192.168.29.21', 'int=0\n\n',
+);
+#################################
+# Don't change after this point #
+#################################
+
+my $int_r = "1";
+my $real_start_port = ($$ & 127) << 1;
+
+print STDERR "===>> COM_AUTH[$$]: PORT offset $real_start_port\n";
+
+#sub rsh {
+#	my $rsh_host= $_[0];
+#	my $rsh_cmd = $_[1];
+#	my $start_port = 512;
+###	my $end_port = 1023;
+#	my $end_port = 1023 - $real_start_port;
+#	my $try = 1;
+#	my $port = $end_port;
+#	my $socket;
+#
+#	while ($try) {
+#		last if $port < $start_port;
+#		eval {
+#			local $SIG{'__DIE__'};
+#			$socket = IO::Socket::INET->new(PeerAddr=>$rsh_host,
+#							PeerPort=>'514',
+#							LocalPort=>$port,
+#							Proto=>"tcp");
+#		};
+#		($@ || (not defined $socket)) ? ($port-=1) : ($try=0);
+#	}
+#	if ($try) {
+#		print STDERR "===>> COM_AUTH[$$]: All ports in use!\n";
+#		return ();
+#	}
+
+#	print $socket "0\0";
+#	print $socket "$rsh_local_user\0";
+#	print $socket "$rsh_remote_user\0";
+#	print $socket "$rsh_cmd\0";
+#	my @c=<$socket>;
+#	return @c;
+#}
+
+sub expand_string {
+	my $str = shift;
+	eval 'return "' . $str . '"';
+}
+
+# Get options
+Getopt::Long::Configure("bundling");
+GetOptions("h"  => \$usage,
+	   "g+" => \$AP_get,
+	   "c+" => \$AP_check,
+	   "d+" => \$debug);
+if ($usage) { die("Usage: com_auth [-d] [-c] [-g]\n       com_auth -h\n"); }
+
+# Check that we're running under OpenRADIUS, interface version 1
+unless ($debug ||
+	$ENV{'RADIUSINTERFACEVERSION'} &&
+	$ENV{'RADIUSINTERFACEVERSION'} == 1) {
+	die("comintel: ERROR: not running under OpenRADIUS, interface v1!\n");
+}
+
+# Set record separator to empty line and loop on input.
+$/ = "\n\n";
+$| = 1;			# Important - we're outputting to a pipe
+
+my $user; my $nas; my %hdrs; my %pass = (); my $LIB_ACT ='';
+
+tie %pass, 'DB_File', "/usr/local/etc/test.db", O_RDONLY, 0600, $DB_HASH;
+
+### MSSQL Connect
+my $dbh = DBI->connect("dbi:Sybase:server=".$conf{'MSSQL_host'}.";language=russian", $conf{'MSSQL_user'},$conf{'MSSQL_pass'}) or die "Unable to connect MSSQL. $DBI::errstr";
+#my $dbh = DBI->connect("dbi:Sybase:server=StatServer;language=russian", "login", "pass") or die "Unable to connect MSSQL. $DBI::errstr\n";
+$dbh->do("set dateformat dmy");
+
+
+### MYSQL Connect
+my $dbm = DBI->connect("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
+#my $dbm = DBI->connect("DBI:mysql:database=".$DB_base.";host=".$DB_host,$DB_user,$DB_pass) or die("connect");
+$dbm->do("SET NAMES 'koi8r'");
+
+my %link_type = ();
+my @link_types = '';
+my $stm01 = $dbm->prepare("SELECT id, name FROM link_types order by id");
+$stm01->execute();
+while (my $ref01 = $stm01->fetchrow_hashref()) {
+    $link_type{$ref01->{'name'}}=$ref01->{'id'} if defined($ref01->{'name'});
+    $link_types[$ref01->{'id'}]=$ref01->{'name'} if defined($ref01->{'name'});
+}
+$stm01->finish();
+
+my %headinfo = ();
+my $stm = $dbm->prepare("SELECT t.term_ip, t.vlan_zone, t.term_grey_ip2, h.ip, m.lib, m.mon_login, m.mon_pass FROM heads t, hosts h, models m ".
+    " WHERE h.model=m.id and t.l2sw_id=h.id and t.term_ip is not NULL and t.head_type=".$link_type{'pppoe'});
+$stm->execute();
+while (my $ref = $stm->fetchrow_hashref()) {
+    $headinfo{'L2LIB_'.   $ref->{'term_ip'}} = $ref->{'lib'};
+    $headinfo{'L2IP_'.    $ref->{'term_ip'}} = $ref->{'ip'};
+    $headinfo{'MONLOGIN_'.$ref->{'term_ip'}} = $ref->{'mon_login'};
+    $headinfo{'MONPASS_'. $ref->{'term_ip'}} = $ref->{'mon_pass'};
+    $NAS_IP2{$ref->{'term_ip'}} = $ref->{'term_grey_ip2'};
+}
+$stm->finish();
+
+
+while(<STDIN>) {
+
+	# Parse pairs from server's request message
+	chomp;
+	$user = $nas = ""; %hdrs = ();
+
+	# Debugging
+	print STDERR "=========>> COM_AUTH[$$]:  got request: $_\n========>>\n" if $debug>1;
+	s/^\s*(\S+?)\s*=\s*(.*?)\s*$/$1\n$2/gm;
+	%hdrs = split /\n/;
+
+	$user = $hdrs{str} if $hdrs{str};
+	$user =~ /^\s*"?(.*?)"?\s*$/ and $user = $1;
+#	$user =~ /^\s*(\S*?)\s*$/ and $user = $1;
+
+	# Debugging
+	if ($debug>1) {
+		print STDERR "========>> COM_AUTH[$$]: got AVP:\n";
+		while (my($key, $val) = each %hdrs) { print STDERR "\t'$key': '$val'\n"; }
+		print STDERR "========>> COM_AUTH[$$]: got User: $user\n";
+	}
+
+	if ($user =~ /^\s*NAS_IP\s*=\s*(\d+\.\d+\.\d+\.\d+)\s*$/m) {
+		# Accounting
+		$nas = $1;
+		my $secret = $NAS_Secrets{$nas};
+		print STDERR "========>> COM_AUTH[$$]: NAS: $nas, Secret: $secret\n" if $debug>1;
+		$secret and print "Secret=$secret\n";
+		print "int=1\n\n";
+		next;
+	} elsif ($user && $hdrs{'IP-Source'} && $NAS_SQL_Request{$hdrs{'IP-Source'}}) {
+	    if ($user =~ /08RU905/) {
+		print "str=Heal your PC!!!\nint=0\n\n";
+		print STDERR "===>> COM_AUTH[$$]: DIALER!!!!!!\n";
+		next;
+            } elsif ($user =~ /CAX3/) {
+                sleep 5;
+                print "str=Heal your PC!!!\nint=0\n\n";
+                print STDERR "===>> COM_AUTH[$$]: DIALER CAX3 !!!!!!\n";
+                next;
+	    } else {
+
+		#$user = "tux-tm" if ($user eq "comtest1");
+		my $date = strftime "%Y%m%d%H%M%S", localtime($hdrs{'Timestamp'});
+		my $nas_ip = $hdrs{'IP-Source'};
+		my $nas_port = $hdrs{'NAS-Port'};
+		my $doit = 1;
+
+		####################### ACCESS POINT ####################
+		
+		my $quota=0;
+		my $Query = ""; my $Query0 = ""; my $Query1 = "";
+		my $ip ='';
+		my %AP = (
+		    'VLAN',	0,
+		    'MAC',	'0',
+		    'id',	0,
+		    'name',	'',
+		    'swid',	0,
+		    'house',	0,
+		    'podezd',	0,
+		    'portpref',	'',
+		    'port',	0,
+		    'trust',	0,
+		    'set',	0,
+		    'ds_db',	0,
+		    'us_db',	0,
+		    'ds',	-1,
+		    'us',	-1,
+		    'autoconf',	0,
+		    'bw_ctl',	0,
+		    'lastlogin','1',
+		    'portvlan',	0,
+		    'ip_subnet', '',
+		    'autoneg', 1,
+		    'speed', 100,
+		    'duplex', 1,
+		    'maxhwaddr', -1,
+		);
+
+		###################### MAC ########################
+		if ( $AP_get and $hdrs{'Cisco-AVPair'} and $hdrs{'Cisco-AVPair'} =~ /"client-mac-address=(\w\w)(\w\w)\.(\w\w)(\w\w)\.(\w\w)(\w\w)"/ ) {
+		    $AP{'MAC'} = lc("$1:$2:$3:$4:$5:$6");
+		    if (($AP{'MAC'} eq "0") || ($AP{'MAC'} eq "00:00:00:00:00:00")) {
+		    	print STDERR "===>> COM_AUTH[$$]: User '$user' MAC '".$AP{'MAC'}."' is Wrong!!!\n\n";
+		    	next;
+		    }
+
+		    ####### Start FIX Access Point (TD) #######
+		    $LIB_ACT =  $headinfo{'L2LIB_'.$nas_ip}.'_fix_vlan';
+		    $AP{'VLAN'} = &$LIB_ACT( IP => $headinfo{'L2IP_'.$nas_ip}, LOGIN => $headinfo{'MONLOGIN_'.$nas_ip}, PASS => $headinfo{'MONPASS_'.$nas_ip}, MAC => $AP{'MAC'});
+
+		    if (not $AP{'VLAN'}) {
+			## Если мы вообще не смогли выявить VLAN с которого пытаются выйти в сеть ( например нет связи с CATALYST'ом)
+			print STDERR "===>> COM_AUTH[$$]: User '$user' Access point VLAN is not FIX!!! Trobles in connect to ZONE SWITCH???\n\n";
+			if ($AP_check) {
+                    	    $Reply = expand_string($NAS_Deny_Reply{$nas_ip}, $user);
+			    print $Reply;
+			    print STDERR "===>> COM_AUTH[$$]: VLAN AP '$user' NOT FIX!!!\n\n";
+			    next;
+			}
+		    } else {
+		    ############# GET Switch IP's 
+			    $stm0 = $dbm->prepare("SELECT s.automanage, s.bw_ctl, s.id, s.ip, s.model, s.hostname, s.idhouse, s.podezd, h.idhouse, h.street, h.dom, \
+			    m.lib, m.mon_login, m.mon_pass FROM hosts s, houses h, models m WHERE s.model=m.id and s.idhouse=h.idhouse and m.lib is not NULL and s.clients_vlan='".$AP{'VLAN'}."'");
+			    $stm0->execute();
+			    #$swrw  = $stm0->rows;
+			    print STDERR "===>> COM_AUTH[$$]: Greater by one switches in VLAN '".$AP{'VLAN'}."'!!!\n" if $stm0->rows>1;
+			    
+			    while ($ref = $stm0->fetchrow_hashref() and not $AP{'id'}) {
+				$AP{'autoconf'}=1 if ($ref->{'automanage'} == 1);
+				$AP{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
+				$LIB_ACT = $ref->{'lib'}.'_fix_macport';
+				( $AP{'portpref'}, $AP{'port'} ) = &$LIB_ACT( IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, MAC => $AP{'MAC'}, VLAN => $AP{'VLAN'});
+				if ($AP{'port'}>0 or $stm0->rows == 1) {
+    				    $AP{'swid'} = $ref->{'id'}; $AP{'house'} = $ref->{'idhouse'}; $AP{'podezd'} = $ref->{'podezd'};
+				    $AP{'name'} = "ул. ".$ref->{'street'}.", д.".$ref->{'dom'}; $AP{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
+				}
+			    	if ($AP{'port'}>0) {
+				    if ( defined($AP{'portpref'}) and 'x'.$AP{'portpref'} ne 'x' ) {
+			    		$Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP{'portpref'}."' and  port='".$AP{'port'}."' and sw_id=".$AP{'swid'};
+			    		$Query0 = "SELECT port_id, ds_speed, us_speed, link_type, login, portvlan, ip_subnet, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref='".$AP{'portpref'}."' and  port='".$AP{'port'}."' and sw_id=".$AP{'swid'};
+			    		$Query1 = "INSERT into swports  SET  status=1, link_type=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref='".$AP{'portpref'}."', port='".$AP{'port'}."', sw_id='".$AP{'swid'}."', portvlan=".$AP{'VLAN'};
+				    } else {
+			    		$Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port='".$AP{'port'}."' and sw_id=".$AP{'swid'};
+			    		$Query0 = "SELECT port_id, ds_speed, us_speed, link_type, login, portvlan, ip_subnet, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref is NULL and port='".$AP{'port'}."' and sw_id=".$AP{'swid'};
+			    		$Query1 = "INSERT into swports  SET status=1, link_type=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref=NULL, port='".$AP{'port'}."', sw_id='".$AP{'swid'}."', portvlan=".$AP{'VLAN'};
+				    }
+				    my $stm10 = $dbm->prepare($Query10);
+				    $stm10->execute();
+				    if (not $stm10->rows) {
+			    		$dbm->do($Query1);
+					print STDERR "===>> COM_AUTH[$$]: Insert New PORT record in swports\n";
+				    }
+				    $stm10->finish;
+				    my $stm1 = $dbm->prepare($Query0);
+				    $stm1->execute();
+			    	    while (my $refp = $stm1->fetchrow_hashref()) {
+					$AP{'link_type'} = $refp->{'link_type'} if defined($refp->{'link_type'});
+					$AP{'lastlogin'} = $refp->{'login'} if defined($refp->{'login'});
+					$AP{'id'} = $refp->{'port_id'};
+					$AP{'ds_db'} = $refp->{'ds_speed'} if defined($refp->{'ds_speed'});
+					$AP{'us_db'} = $refp->{'us_speed'} if defined($refp->{'us_speed'});
+					#NEW Parameters    
+					$AP{'portvlan'} = $refp->{'portvlan'} if defined($refp->{'portvlan'});
+					$AP{'ip_subnet'} = $refp->{'ip_subnet'} if defined($refp->{'ip_subnet'});
+					$AP{'autoneg'} = $refp->{'autoneg'} if defined($refp->{'autoneg'});
+					$AP{'speed'} = $refp->{'speed'} if defined($refp->{'speed'});
+					$AP{'duplex'} = $refp->{'duplex'} if defined($refp->{'duplex'});
+					$AP{'maxhwaddr'} = $refp->{'maxhwaddr'} if defined($refp->{'maxhwaddr'});
+
+			    	    }
+				    $AP{'name'} .= ", порт ".$AP{'port'};
+				    $stm1->finish;
+				}
+				print STDERR "\n===>> COM_AUTH[$$]: VLAN '".$AP{'VLAN'}."' User: '$user' AP -> '".$AP{'id'}."', '".$AP{'name'}."'\n\n";
+			    }
+			    $stm0->finish;
+			    if (not $AP{'id'}) {
+				$AP{'DB_portinfo'}=1;
+				$stm0 = $dbm->prepare("SELECT s.automanage, s.bw_ctl, s.id, s.ip, s.model, s.hostname, s.idhouse, s.podezd, h.idhouse, ".
+				"h.street, h.dom, p.sw_id, p.port_id, p.portpref, p.link_type, p.port, p.ds_speed, p.us_speed, p.login, ".
+				"p.portvlan, p.ip_subnet, p.autoneg, p.speed, p.duplex, p.maxhwaddr FROM hosts s, houses h, swports p ".
+				"WHERE s.idhouse=h.idhouse and p.sw_id=s.id and p.portvlan=".$AP{'VLAN'});
+                        	$stm0->execute();
+				#if ($stm0->rows > 1) {
+				#    print STDERR "===>> COM_AUTH[$$]: MULTI TD's!!!\n";
+				#    $AP{'id'} = 0; $AP{'swid'} = 0; $AP{'house'}=0; $AP{'podezd'}=0; $AP{'name'}=''; $AP{'port'}=0;
+				#    last;
+				#}
+                        	while ($ref = $stm0->fetchrow_hashref()) {
+				    $AP{'port'} = $ref->{'port'} if not defined($ref->{'portpref'});
+				    $AP{'port'} = $ref->{'portpref'}.$ref->{'port'} if defined($ref->{'portpref'});
+                            	    $AP{'swid'} = $ref->{'sw_id'}; $AP{'house'} = $ref->{'idhouse'}; $AP{'podezd'} = $ref->{'podezd'};
+
+                            	    $AP{'name'} = "ул. ".$ref->{'street'}.", д.".$ref->{'dom'};
+				    $AP{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
+                            	    $AP{'name'} .= ", порт ".$AP{'port'};
+				    $AP{'link_type'}=$link_type{'pppoe'};
+
+				    $AP{'lastlogin'} = $ref->{'login'}  if defined($ref->{'login'});
+				    $AP{'autoconf'}=1 if ($ref->{'automanage'} == 1);
+				    $AP{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
+				    $AP{'ds_db'} = $ref->{'ds_speed'} if defined($ref->{'ds_speed'});
+				    $AP{'us_db'} = $ref->{'us_speed'} if defined($ref->{'us_speed'});
+				    #NEW Parameters
+				    $AP{'portvlan'} = $refp->{'portvlan'} if defined($refp->{'portvlan'});
+				    $AP{'ip_subnet'} = $refp->{'ip_subnet'} if defined($refp->{'ip_subnet'});
+				    $AP{'autoneg'} = $refp->{'autoneg'} if defined($refp->{'autoneg'});
+				    $AP{'speed'} = $refp->{'speed'} if defined($refp->{'speed'});
+				    $AP{'duplex'} = $refp->{'duplex'} if defined($refp->{'duplex'});
+				    $AP{'maxhwaddr'} = $refp->{'maxhwaddr'} if defined($refp->{'maxhwaddr'});
+
+				    if ($AP{'id'}) {
+					print STDERR "===>> COM_AUTH[$$]: MULTI TD's!!! = '".$AP{'id'}."' and '".$ref->{'port_id'}."'\n";
+					$AP{'id'} = 0; $AP{'swid'} = 0; $AP{'house'}=0; $AP{'podezd'}=0; $AP{'name'}=''; $AP{'port'}=0;
+					last;
+				    }
+				    $AP{'id'} = $ref->{'port_id'};
+				    print STDERR "\n===>> COM_AUTH[$$]: VLAN '".$AP{'VLAN'}."' User: '$user' AP -> '".$AP{'id'}."', '".$AP{'name'}."'\n\n";
+				}
+				$stm0->finish;
+			    }
+			######### UserCheckMAC  #########
+			    # Если точка доступа полностью определена с точностью до порта коммутатора.
+			    if ($AP{'id'}) {
+				$AP{'trust'} = 1 if not $AP_check;
+				if ( $AP{'trust'} < 1 ) {
+				    $sth = $dbh->prepare("exec UserCheckMAC '".$user."', '".$AP{'MAC'}."', '".$AP{'id'}."', '".&$k2w($AP{'name'})."', ".$AP{'bw_ctl'}.", ".$AC{$nas_ip}.", ".$AP{'swid'});
+				    last unless defined($sth);
+				    $sth->execute or last;
+				    my @c = $sth->fetchrow_array or last;
+				    if ($debug or 1 == 1) {
+					    print STDERR "===>> COM_AUTH[$$]: SQL UserCheckMAC reply for '".$user."'";
+					    foreach $p (0..9) {
+						    defined($c[$p]) and print STDERR " '$c[$p]'" or print STDERR " 'NULL'";
+					    }
+					    print STDERR "\n";
+				    }
+				    $sth->finish;
+				    $AP{'trust'} = $c[0] if defined($c[0]);
+				    if ($AP{'trust'}+0 > 0) {
+					
+					# Важно!
+					# $c[1] - DS пользователя
+					# $c[2] - US пользователя
+					$AP{'ds'} 		= $c[1] if defined($c[1]);
+					$AP{'us'} 		= $c[2] if defined($c[2]);
+# >>>>>> NEW				#NEW Parameters
+					# Костылик :)))
+					$AP{'set_link_type'}	= $link_type{'pppoe'};
+					#$AP{'set_link_type'}	= $c[3]	if defined($c[3]);
+					#$AP{'set_portvlan'}	= $c[4]	if defined($c[4]);
+					#$AP{'set_maxhwaddr'}	= $c[5]	if defined($c[5]);
+					#$AP{'set_autoneg'}	= $c[6]	if defined($c[6]);
+					#$AP{'set_speed'}	= $c[7]	if defined($c[7]);
+					#$AP{'set_duplex'}	= $c[8]	if defined($c[8]);
+					#$AP{'set_ip_subnet'}	= $c[9]	if defined($c[9]);
+					#$AP{'set_'}		= $c[]	if defined($c[]);
+# <<<<<< 				# 
+    					if ( $AP{'ds'} != $AP{'ds_db'} || $AP{'us'} != $AP{'us_db'}
+					|| $AP{'link_type'} == $link_type{'free'}					
+# >>>>>> NEW				#
+					#|| $AP{'set_link_type'}	ne $AP{'link_type'}
+					#|| $AP{'set_ip_subnet'}	ne $AP{'ip_subnet'}
+					#|| $AP{'set_portvlan'}	!= $AP{'portvlan'}
+					#|| $AP{'set_maxhwaddr'}	!= $AP{'maxhwaddr'}
+					#|| $AP{'set_autoneg'}	!= $AP{'autoneg'}
+					#|| $AP{'set_speed'}	!= $AP{'speed'}
+					#|| $AP{'set_duplex'}	!= $AP{'duplex'} 
+# <<<<<< 				#
+					) { $AP{'set'} = 1; } # Признак перенастройки порта 
+
+					print STDERR "==>> COM_AUTH[$$]: TD_set = '".$AP{'set'}."', TD_ds ='".$AP{'ds'}."', TD_us ='".$AP{'us'}."', DB_ds = '".$AP{'ds_db'}."', DB_us = '".$AP{'us_db'}."'\n" if $debug;
+				    } else {
+					$AP{'trust'}=0;
+				    }
+				}
+				
+				# Если UserCheckMAC не разрешает вход, при включенной  проверке  -->  TD не доверенная.
+				if ( not ($AP{'trust'} and $AP_check)) {
+				    $AP{'trust'} = 0; $AP{'set'} = 0; # $AP{'ds'} = -1; $AP{'us'} = -1;
+				}
+				# фиксируем выход с новой ТД, или обновляем запись
+				$Query = "INSERT INTO user_mac_port SET trust=".$AP{'trust'}.", login='".$user."', start_date='".$date."', last_date='".$date."', mac='".$AP{'MAC'}."', vlan='".$AP{'VLAN'}."', td='".$AP{'id'}."'";
+				$Query .= ", td_name='".$AP{'name'}."', idhouse='".$AP{'house'}."', podezd='".$AP{'podezd'}."', sw_id='".$AP{'swid'}."', port='".$AP{'port'}."' ON DUPLICATE KEY UPDATE trust=".$AP{'trust'};
+				$Query .= ", td_name='".$AP{'name'}."', idhouse='".$AP{'house'}."', podezd='".$AP{'podezd'}."', sw_id='".$AP{'swid'}."', last_date='".$date."', vlan='".$AP{'VLAN'}."'";
+				$dbm->do("$Query") or print STDERR "===>> COM_AUTH[$$]: ERROR in table user_mac_port '".$user."' '".$AP{'MAC'}."' '".$AP{'id'}."'\n\n";
+				#### TEMP SET
+				$AP{'lastlogin'} = '';
+				# Если порт управляемого свича был свободным или изменились параметры - обновляем БД и флаг конфигурации порта.
+				if ($AP{'set'} and $AP{'autoconf'} and !($user =~ /^(jur|com)test\d+$/ )) {
+				    $Query = "UPDATE swports SET start_date='".$date."', login='".$user."', mac_port='".$AP{'MAC'}."', ds_speed=".$AP{'ds'}.", us_speed=".$AP{'us'};
+				    $Query .= ", portvlan=".$AP{'VLAN'} if not $AP{'DB_portinfo'};
+# >>>>> NEW			    $Query .= ", portvlan=".$AP{'set_portvlan'}.", maxhwaddr=".$AP{'set_maxhwaddr'}.", autoneg=".$AP{'set_autoneg'}.", speed=".$AP{'set_speed'}.", duplex=".$AP{'set_duplex'}.", ip_subnet='".$AP{'set_ip_subnet'};
+				    # Костылик ...
+				    $Query .= ", link_type=".$link_type{'pppoe'}.", link_head=".$conf{'CLI_DFLT_TERM'}.
+				    ", autoconf=".$link_type{'setparms'}." WHERE port_id=".$AP{'id'} if ($AP{'link_type'} == $link_type{'free'});
+				    #$Query .= ", autoconf=".$AP{'set_link_type'}." WHERE port_id=".$AP{'id'}." and link_type=".$link_type{'free'} if $AP{'link_type'} == $link_type{'free'};
+				    $Query .= ", autoconf=".$link_type{'setparms'}." WHERE port_id=".$AP{'id'} if $AP{'link_type'}>$conf{'STARTLINKCONF'};
+
+				    #print STDERR $Query."\n" if $debug>1;
+				    print STDERR "===>> COM_AUTH[$$]: Update port DB parameters info\n";
+				    $dbm->do($Query) or print STDERR "===>> COM_AUTH[$$]: ERROR update speed fields in table SWPORTS '".$user."' '".$AP{'MAC'}."' '".$AP{'id'}."' '".$AP{'ds'}."' '".$AP{'us'}."'\n\n";
+				# Если на порту изменился логин пользователя и точка доступа доверенная для этого логина.
+				} elsif ($AP{'trust'} and ("x".$user ne "x".$AP{'lastlogin'} ) and !($user =~ /^(jur|com)test\d+$/ )) {
+				    $Query = "UPDATE swports SET start_date='".$date."', login='".$user."', mac_port='".$AP{'MAC'}."'";
+				    $Query .= ", portvlan=".$AP{'VLAN'} if not $AP{'DB_portinfo'};
+				    $Query .= " WHERE port_id=".$AP{'id'}." and link_type>".$conf{'STARTLINKCONF'};
+				    print STDERR "===>> COM_AUTH[$$]: Update port login DB info\n";
+				    $dbm->do($Query) or print STDERR "===>> COM_AUTH[$$]: ERROR update LOGIN in table SWPORTS '".$user."' '".$AP{'MAC'}."' '".$AP{'id'}."' \n\n";
+				}
+				# прекращаем процедуру авторизации если включена проверка ТД и выход с этой точки запрещён
+				if ($AP_check and not $AP{'trust'}) {
+                    		    $Reply = expand_string($NAS_Deny_Reply{$nas_ip}, $user);
+				    print STDERR "===>> COM_AUTH[$$]: UserCheckMAC '$user' access DENY!!!\n\n";
+				    print $Reply;
+				    next;
+				}
+
+			    # Иначе если мы смогли определить только VLAN с которого пытаются подключиться.
+			    } elsif ($AP{'VLAN'}) {
+				## Добавляем недовыясненную TD для выяснения причин сбоя алгоритма определения TD.
+				$stm = $dbm->prepare("INSERT INTO user_mac_port SET login='".$user."', start_date='".$date."', last_date='".$date."', mac='".$AP{'MAC'}."', vlan=".
+				$AP{'VLAN'}.", td=0, td_name='".$AP{'name'}."', idhouse=".$AP{'house'}.", podezd='".$AP{'podezd'}."', sw_id=".$AP{'swid'}.
+				", port=NULL ON DUPLICATE KEY UPDATE td_name='".$AP{'name'}."', idhouse=".$AP{'house'}.", podezd='".$AP{'podezd'}."', sw_id=".$AP{'swid'}.
+				",last_date='".$date."', vlan=".$AP{'VLAN'});
+				$stm->execute or print STDERR "===>> COM_AUTH[$$]: ERROR INSERT INTO user_mac_port '".$user."' '".$AP{'MAC'}."' '".$AP{'id'}."'\n";
+				$stm->finish;
+				# прекращаем процедуру авторизации если включена проверка ТД
+				if ($AP_check) {
+                                    $Reply = expand_string($NAS_Deny_Reply{$nas_ip}, $user);
+				    print STDERR "===>> COM_AUTH[$$]: AP ID '$user' in VLAN ".$AP{'VLAN'}." not FIX!!!\n\n";
+                                    print $Reply;
+                                    next;
+                                }
+
+			    }
+			####### END UserCheckMAC ########
+		    }
+		}
+		################# ACCESS POINT END SEARCH #################
+
+		my $Request = expand_string($NAS_SQL_Request{$nas_ip}, $user);
+		$debug and print STDERR "========>> COM_AUTH[$$]: SQL Request: $Request\n";
+		my $sth = $dbh->prepare($Request);
+		last unless defined($sth);
+
+		$sth->execute or last;
+                my @d = $sth->fetchrow_array or last;
+               foreach $p (0..$NAS_SQL_Reply_Count{$nas_ip}) {
+                        $doit = 0 unless defined($d[$p]);
+                }
+                if (not $doit or $debug ) {
+                    print STDERR "========>> COM_AUTH[$$]: SQL reply for '$user'";
+                    foreach $p (0..11) {
+                        defined($d[$p]) and print STDERR " '".&$w2k($d[$p])."'";
+                        not defined($d[$p]) and print STDERR " 'NULL'";
+                    }
+                    print STDERR "\n";
+                }
+		$sth->finish;
+
+		# IF USERAUTH true
+		$doit and (($p = $pass{$d[4],$d[5]}) and do {
+		    print STDERR "=========>> COM_AUTH[$$]: pass = '$p'\n" if $debug;
+		    #my $IP1 = $NAS_IP2{$d[1]};
+		    if ($d[0]+0 == 10) {
+			$ip = $d[0].".".$NAS_IP2{$nas_ip}.".".$d[2].".".$d[3];
+		    } else {
+			$ip = $d[0].".".$d[1].".".$d[2].".".$d[3];
+		    }
+		    my $ip3 = $d[2];
+		    $quota = $d[6];
+		    my $Reply; my $Timeout = 86400;
+		    #my $sts = 1;
+
+		if ($quota < 0) {
+			$Timeout = 600; 
+			#$sts = 13;
+			$Reply = expand_string($NAS_Fake_Reply{$nas_ip}, $user, $p, $ip, $Timeout);
+		} else {
+			$int_r = "1";
+			if ($quota > 0) {
+				$Timeout = $quota;
+			}
+			if ($hdrs{'NAS-IP-Address'}){
+				my $user_ip = $hdrs{'NAS-IP-Address'};
+				if (($user_ip ne $ip) &&
+				    ($user_ip !~ /^77\.239\.208\.10?/) &&
+				    ($user_ip !~ /^192\.168\./) &&
+				    ($user_ip !~ /^10\.2\./) &&
+				    ($ip !~ /^127\./)) {
+					print STDERR "===>> COM_AUTH[$$]: IP fraud: '".$user_ip."' instead of '".$ip."' on '".$nas_ip."'\n";
+					$int_r = "0";
+				}
+			}
+			if ($ip3 >= 240) {
+				$Reply = expand_string($NAS_Fake_Reply{$nas_ip}, $user, $p, $ip, $Timeout);
+			} else {
+				$Reply = expand_string($NAS_Reply{$nas_ip}, $user, $p, $ip, $Timeout, $int_r);
+			}
+		}
+		print $Reply;
+		print STDERR "===>> COM_AUTH[$$]: Reply: $Reply\n" if $debug>1;
+		print STDERR "===>> COM_AUTH[$$]: Check user '$user' successfull, set IP '$ip'\n\n";
+		next;
+		}) or print STDERR "===>> COM_AUTH[$$]: !!NO SUCH USER!! '$user'\n";
+	    }
+	}
+print "str=Wrong username/password.\nint=0\n\n";
+}
+
+print STDERR "===>> COM_AUTH[$$]:. Emergency shutdown!!! $DBI::errstr\n";
+
+untie %pass;
+
+$dbm->disconnect;
+$dbh->disconnect;
