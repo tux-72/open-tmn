@@ -54,7 +54,7 @@ my $bw_unlim	= 64;
 
 sub ES_login {
     my ($swl, $ip, $login, $pass) = @_;
-    print STDERR " IP = ".$ip.", LOGIN =".$login." \n" if $debug > 1;
+    print STDERR " IP = ".$ip.", LOGIN =".$login."\n" if $debug > 1;
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
