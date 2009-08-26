@@ -24,7 +24,7 @@ $VERSION = 1.07;
 	    );
 
 
-my $debug 	= 2;
+my $debug 	= 1;
 my $timeout	= 10;
 
 my $block_vlan=4094;
@@ -54,7 +54,7 @@ my $bw_unlim	= 64;
 
 sub ES_login {
     my ($swl, $ip, $login, $pass) = @_;
-    print STDERR " IP = ".$ip.", LOGIN =".$login.", PASS = ".$pass." \n" if $debug > 1;
+    print STDERR " IP = ".$ip.", LOGIN =".$login." \n" if $debug > 1;
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,

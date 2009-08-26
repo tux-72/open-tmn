@@ -20,7 +20,7 @@ $VERSION = 1.07;
 @EXPORT = qw(	GS_fix_vlan	GS_conf_save	GS_vlan_trunk_add	GS_vlan_trunk_remove	GS_vlan_remove
 	    );
 
-my $debug 	= 2;
+my $debug 	= 1;
 my $timeout	= 10;
 
 
@@ -46,7 +46,7 @@ my $prompt_conf_vlan ='/.*\(config\-vlan\)#.*/';
 
 sub GS_login {
     my ($swl, $ip, $login, $pass) = @_;
-    print STDERR " IP = ".$ip.", LOGIN =".$login.", PASS = ".$pass." \n" if $debug > 1;
+    print STDERR " IP = ".$ip.", LOGIN =".$login." \n" if $debug > 1;
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
