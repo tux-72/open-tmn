@@ -11,22 +11,22 @@
     'MAXPARENTS',	7,
     'MYSQL_host',	'localhost',
     'MYSQL_base',	'switchnet',
-    'MYSQL_user',	'swgen',
-    'MYSQL_pass',	'SWgeneRatE',
+    'MYSQL_user',	'mysqluser',
+    'MYSQL_pass',	'mysqlpass',
 
     'MSSQL_host',	'StatServer',
     'MSSQL_base',	'inet',
-    'MSSQL_user',	'cisco',
-    'MSSQL_pass',	'cisco',
+    'MSSQL_user',	'mssqluser',
+    'MSSQL_pass',	'mssqlpass',
 
 #    '',		,
 );
 
-use lib '/usr/local/swctl/lib';
+use lib '/usr/local/switch-control/lib';
 use C73Ctl;
 use CATIOSCtl;
 use CAT2950Ctl;
-#use CAT3508GCtl;
+use CAT3508GCtl;
 use CATOSCtl;
 use DESCtl;
 use ESCtl;
