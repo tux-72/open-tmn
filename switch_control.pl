@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-$debug=0;
+$debug=1;
 my $ver='1.08';
 #$VERSION = 0.97;
 
