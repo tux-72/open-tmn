@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 
 $debug=1;
-my $ver='1.08';
+my $ver='1.09';
 #$VERSION = 0.97;
 
 use Getopt::Long;
@@ -100,7 +100,7 @@ if (not defined($ARGV[0])) {
 		last if ($ref1->{'uplink_port'} < 1 or $ref1->{'clients_vlan'} < 1);
 
 		$SW{'id'}=$ref1->{'id'} if defined($ref1->{'id'});
-		$SW{'type'}=$ref1->{'lib'} if defined($ref1->{'lib'});
+		$SW{'lib'}=$ref1->{'lib'} if defined($ref1->{'lib'});
 		$SW{'admin'}="$ref1->{'admin_login'}" if defined($ref1->{'admin_login'});
 		$SW{'adminpass'}="$ref1->{'admin_pass'}"   if defined($ref1->{'admin_pass'});
 		$SW{'ena_pass'}="$ref1->{'ena_pass'}"   if defined($ref1->{'ena_pass'});
@@ -182,7 +182,7 @@ if (not defined($ARGV[0])) {
     $stm2 = $dbm->prepare("SELECT h.hostname, h.clients_vlan, h.model, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_port, \
     h.parent_portpref, h.vlan_zone, h.automanage, \
     p.sw_id, p.port_id, p.port, p.portpref, p.ds_speed, p.us_speed, p.autoconf, p.portvlan, p.link_head, p.autoneg, p.speed, p.duplex, p.maxhwaddr, p.tag, \
-    p.link_type, p.login, p.ip_subnet, p.login,  p.type, \
+    p.link_type, p.login, p.ip_subnet, p.login, \
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m \
     WHERE h.model=m.id and h.id=p.sw_id and p.type>0 and p.autoconf>0 and p.autoconf<=".$conf{'STARTLINKCONF'}." and p.autoconf<>".$link_type{'uplink'}." and h.automanage=1 order by h.model, p.sw_id, p.portpref, p.port");
     $stm2->execute();
@@ -191,9 +191,9 @@ if (not defined($ARGV[0])) {
     #print STDERR "Switch ports configuring ".$conf{'STARTLINKCONF'}."\n";
 
 	############ SAVE PREVIOUS SWITCH CONFIG
-	if ( $SW{'change'} and $SW{'sw_id'} != $ref->{'sw_id'} and defined($libs{$SW{'type'}}) ) {
+	if ( $SW{'change'} and $SW{'sw_id'} != $ref->{'sw_id'} and defined($libs{$SW{'lib'}}) ) {
     	    $SW{'change'} = 0;
-	    SAVE_config( LIB => $SW{'type'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'}); 
+	    SAVE_config( LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'}); 
 	}
 	
 	print STDERR "Switch LIB '".$ref->{'lib'}."' not exists!!! for switch '".$ref->{'hostname'}."'\n" if not defined($libs{$ref->{'lib'}});
@@ -204,9 +204,10 @@ if (not defined($ARGV[0])) {
 
         $SW{'sw_id'}=$ref->{'sw_id'};
         $SW{'swip'}=$ref->{'ip'}		if defined($ref->{'ip'});
-	$SW{'type'}=$ref->{'lib'} 		if defined($ref->{'lib'});
+	$SW{'lib'}=$ref->{'lib'} 		if defined($ref->{'lib'});
 	$SW{'admin'}=$ref->{'admin_login'} 	if defined($ref->{'admin_login'});
 	$SW{'adminpass'}=$ref->{'admin_pass'}	if defined($ref->{'admin_pass'});
+	$SW{'ena_pass'}=$ref->{'ena_pass'}      if defined($ref->{'ena_pass'});
 
 	if ($ref->{'autoconf'} < $conf{'STARTPORTCONF'}) {
 	    $Querry_portfix = "UPDATE swports SET complete_q=1 ";
@@ -216,7 +217,7 @@ if (not defined($ARGV[0])) {
 	print STDERR "\n\n#############\n Configure <<".$link_types[$ref->{'autoconf'}].">> LINK $point\n##############\n";
 
 ## CONFIGURE FREE PORT
-	if ( $ref->{'autoconf'} == $link_type{'free'} and $ref->{'portvlan'} == $ref->{'clients_vlan'} ) {
+	if ( $ref->{'autoconf'} == $link_type{'free'} and ($ref->{'portvlan'} == $ref->{'clients_vlan'} || $ref->{'portvlan'} < 1 ) ) {
 	    next if $debug>2;
 	    next if $ref->{'portvlan'} == 1;
 
@@ -283,8 +284,8 @@ if (not defined($ARGV[0])) {
 	$dbm->do($Querry_portfix) if $res > 0;
     }
     # SAVE LAST SWITCH CONFIG to NVRAM
-    SAVE_config( LIB => $SW{'type'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'})
-    if ($SW{'change'} and defined($libs{$SW{'type'}}));
+    SAVE_config( LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'})
+    if ($SW{'change'} and defined($libs{$SW{'lib'}}));
     $stm2->finish();
 
 } elsif ( $ARGV[0] eq "checklink" ) {
@@ -297,7 +298,7 @@ if (not defined($ARGV[0])) {
     $stm2 = $dbm->prepare("SELECT h.hostname, h.clients_vlan, h.model, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_port, \
     h.parent_portpref, h.vlan_zone, h.automanage, \
     p.sw_id, p.port_id, p.port, p.portpref, p.ds_speed, p.us_speed, p.autoconf, p.portvlan, p.link_head, p.autoneg, p.speed, p.duplex, p.maxhwaddr, p.tag, \
-    p.link_type, p.login, p.ip_subnet, p.login,  p.type, \
+    p.link_type, p.login, p.ip_subnet, p.login, \
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m \
     WHERE h.model=m.id and h.id=p.sw_id and p.type>0 and p.autoconf>".$conf{'STARTPORTCONF'}." and h.automanage=1 order by h.model, p.sw_id, p.portpref, p.port");
 
@@ -305,10 +306,10 @@ if (not defined($ARGV[0])) {
 
     while (my $ref = $stm2->fetchrow_hashref()) {
 	############ SAVE PREVIOUS SWITCH CONFIG
-	if ( $SW{'change'} and $SW{'sw_id'} != $ref->{'sw_id'} and defined($libs{$SW{'type'}}) and 
+	if ( $SW{'change'} and $SW{'sw_id'} != $ref->{'sw_id'} and defined($libs{$SW{'lib'}}) and 
 	( $ref->{'autoconf'} == $link_type{'uplink'} || $ref->{'autoconf'} >= $conf{'STARTLINKCONF'} )) {
 	    $SW{'change'} = 0;
- 	    $res = SAVE_config(LIB => $SW{'type'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, 
+ 	    $res = SAVE_config(LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, 
 	    PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'}); 
 	    next if $res < 1;
 	}
@@ -322,9 +323,10 @@ if (not defined($ARGV[0])) {
 
         $SW{'sw_id'}=$ref->{'sw_id'};
         $SW{'swip'}=$ref->{'ip'}		if defined($ref->{'ip'});
-	$SW{'type'}=$ref->{'lib'} 		if defined($ref->{'lib'});
+	$SW{'lib'}=$ref->{'lib'} 		if defined($ref->{'lib'});
 	$SW{'admin'}=$ref->{'admin_login'} 	if defined($ref->{'admin_login'});
 	$SW{'adminpass'}=$ref->{'admin_pass'}	if defined($ref->{'admin_pass'});
+	$SW{'ena_pass'}=$ref->{'ena_pass'}      if defined($ref->{'ena_pass'});
 
 	if ($ref->{'autoconf'} < $conf{'STARTPORTCONF'}) {
 	    $Querry_portfix = "UPDATE swports SET complete_q=1 ";
@@ -411,7 +413,7 @@ if (not defined($ARGV[0])) {
 	    UPLINKPORTPREF => $ref->{'uplink_portpref'}) if defined($libs{$ref->{'lib'}}); next if $resport < 1;
 	    $SW{'change'} += 1;
  	    $Querry_portfix  .=  " WHERE autoconf=".$link_type{'free'};
-
+	    VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, LINK_TYPE => $ref->{'link_type'}, ZONE => $ref->{'vlan_zone'});
 
 #### UPLINK PORT
 	} elsif ( $ref->{'autoconf'} == $link_type{'uplink'} ) {
@@ -514,6 +516,12 @@ if (not defined($ARGV[0])) {
 		    $trunking_vlan=1;
 		}
 	    } 
+            $head = GET_Terminfo( TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
+	    ### Выясняем необходимость выделения и номер влана для использования
+	    if ( $ref->{'portvlan'} < 2 and $ref->{'link_type'} != $link_type{'uplink'}) {
+		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
+		next if $ref->{'portvlan'} < 1;
+	    }
 
             ## Прописываем VLAN на клиентском порту текущего коммутатора
             print STDERR "Config CLIENT port parameters and set VLAN ".$ref->{'portvlan'}."\n" if $debug;
@@ -523,7 +531,6 @@ if (not defined($ARGV[0])) {
 	    UPLINKPORT => $ref->{'uplink_port'}, DS => $ref->{'ds_speed'}, US => $ref->{'us_speed'}, TAG => $ref->{'tag'}, MAXHW => $ref->{'maxhwaddr'},
 	    AUTONEG => $ref->{'autoneg'}, SPEED => $ref->{'speed'}, DUPLEX => $ref->{'duplex'}) if defined($libs{$ref->{'lib'}}); next if $resport < 1;
 	    $SW{'change'} += 1;
-            $head = GET_Terminfo( TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
             $Querry_portfix .=", link_head=".$head->{'HEAD_ID'}.", status=".$port_status{'enable'};
 
             if ($trunking_vlan) {
@@ -592,8 +599,8 @@ if (not defined($ARGV[0])) {
 	$dbm->do($Querry_portfix) if $resport > 0;
     }
     # SAVE LAST SWITCH CONFIG to NVRAM
-    SAVE_config( LIB => $SW{'type'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'} )
-    if ($SW{'change'} and defined($libs{$SW{'type'}}));
+    SAVE_config( LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'} )
+    if ($SW{'change'} and defined($libs{$SW{'lib'}}));
     $stm2->finish();
 }
 
@@ -871,3 +878,56 @@ sub SAVE_config {
     return $res;
 }
 
+sub VLAN_remove {
+	#VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, LINK_TYPE => $ref->{'link_type'}, ZONE => $ref->{'vlan_zone'});
+        my %arg = (
+            @_,         # список пар аргументов
+        );
+	# PORT_ID VLAN LINK_TYPE ZONE 
+	my $res = -1;
+
+	return $res if $debug>1;
+
+	my $Qr_in = "SELECT p.port_id FROM swports p, hosts h WHERE h.id=p.sw_id and p.port_id<>".$arg{'PORT_ID'}." and p.portvlan=".$arg{'VLAN'}." and h.vlan_zone=".$arg{'ZONE'};
+	$stm34 = $dbm->prepare($Qr_in);
+	$stm34->execute();
+	if ( $stm34->rows > 0 ) {
+	    $res =  -1;
+	} else {
+	    $dbm->do("DELETE from vlan_list WHERE vlan_id=".$arg{'VLAN'}" and ZONE=".$arg{'ZONE'})
+	    $res =  1;
+	}
+	$stm34->finish();
+	return $res;
+}
+
+
+sub VLAN_get {
+	#VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
+        my %arg = (
+            @_,         # список пар аргументов
+        );
+	# PORT_ID VLAN LINK_TYPE ZONE 
+
+	my $res = -1;
+
+#	return $res if $debug>1;
+
+	my $Qr_range = "SELECT p.port_id FROM swports p, hosts h WHERE h.id=p.sw_id and p.port_id<>".$arg{'PORT_ID'}." and p.portvlan=".$arg{'VLAN'}." and h.vlan_zone=".$arg{'ZONE'};
+
+	my $Qr_in = "SELECT p.port_id FROM swports p, hosts h WHERE h.id=p.sw_id and p.port_id<>".$arg{'PORT_ID'}." and p.portvlan=".$arg{'VLAN'}." and h.vlan_zone=".$arg{'ZONE'};
+	$stm34 = $dbm->prepare($Qr_in);
+	$stm34->execute();
+	if ( $stm34->rows > 0 ) {
+	    $res =  -1;
+	} else {
+	    $dbm->do("UPDATE vlan_list set port_id=NULL, usage=0 WHERE vlan_id=".$arg{'VLAN'}" and ZONE=".$arg{'ZONE'})
+	    $res =  1;
+	}
+	$stm34->finish();
+	return $res;
+}
+
+
+
+	    #$dbm->do("INSERT INTO vlan_list set port_id=".$arg{'PORT_ID'}.", vlan_id=".$arg{'VLAN'}." ON DUPLICATE KEY UPDATE port_id=".$arg{'PORT_ID'})

@@ -5,7 +5,7 @@ use POSIX qw(strftime);
 use DBI();
 
 my $ver = "0.4";
-my $debug=0;
+my $debug=1;
 
 
 my $PROG=$0;
