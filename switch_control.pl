@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 
 $debug=1;
-my $ver='1.09';
+my $ver='1.091';
 #$VERSION = 0.97;
 
 use Getopt::Long;
@@ -519,7 +519,7 @@ if (not defined($ARGV[0])) {
             $head = GET_Terminfo( TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
 	    ### Выясняем необходимость выделения и номер влана для использования
 	    if ( $ref->{'portvlan'} < 2 and $ref->{'link_type'} != $link_type{'uplink'}) {
-		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
+		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
 		next if $ref->{'portvlan'} < 1;
 	    }
 
@@ -894,7 +894,7 @@ sub VLAN_remove {
 	if ( $stm34->rows > 0 ) {
 	    $res =  -1;
 	} else {
-	    $dbm->do("DELETE from vlan_list WHERE vlan_id=".$arg{'VLAN'}" and ZONE=".$arg{'ZONE'})
+	    $dbm->do("DELETE from vlan_list WHERE vlan_id=".$arg{'VLAN'}." and ZONE=".$arg{'ZONE'});
 	    $res =  1;
 	}
 	$stm34->finish();
@@ -903,7 +903,7 @@ sub VLAN_remove {
 
 
 sub VLAN_get {
-	#VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
+	#VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
         my %arg = (
             @_,         # список пар аргументов
         );
@@ -912,22 +912,23 @@ sub VLAN_get {
 	my $res = -1;
 
 #	return $res if $debug>1;
-
-	my $Qr_range = "SELECT p.port_id FROM swports p, hosts h WHERE h.id=p.sw_id and p.port_id<>".$arg{'PORT_ID'}." and p.portvlan=".$arg{'VLAN'}." and h.vlan_zone=".$arg{'ZONE'};
-
-	my $Qr_in = "SELECT p.port_id FROM swports p, hosts h WHERE h.id=p.sw_id and p.port_id<>".$arg{'PORT_ID'}." and p.portvlan=".$arg{'VLAN'}." and h.vlan_zone=".$arg{'ZONE'};
-	$stm34 = $dbm->prepare($Qr_in);
-	$stm34->execute();
-	if ( $stm34->rows > 0 ) {
-	    $res =  -1;
-	} else {
-	    $dbm->do("UPDATE vlan_list set port_id=NULL, usage=0 WHERE vlan_id=".$arg{'VLAN'}" and ZONE=".$arg{'ZONE'})
-	    $res =  1;
+	my %vlanuse = ();
+	my $Qr_range = "SELECT vlan_id FROM vlan_list WHERE vlan_id>=".$arg{'VLAN_MIN'}." and vlan_id<=".$arg{'VLAN_MAX'}." and zone_id=".$arg{'ZONE'};
+        $stm35 = $dbm->prepare($Qr_range);
+        $stm35->execute();
+	while (my $ref35 = $stm35->fetchrow_hashref()) {
+	    $vlanuse{$ref35->{'vlan_id'}} = 1;
 	}
-	$stm34->finish();
+	$stm35->finish();
+		
+	my $vlan_id = $arg{'VLAN_MIN'};
+
+	while ($res < 1 || $arg{'VLAN_MAX'} > $vlan_id ) {
+	    $res = $vlan_id if not defined($vlanuse{$vlan_id});
+	    $vlan_id += 1;
+	}
+	
+	$dbm->do("INSERT into vlan_list SET info='AUTO INSERT VLAN record from vlan range', vlan_id=".$res.", zone_id=".$arg{'ZONE'}.", port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}.
+	" ON DUPLICATE KEY UPDATE info='AUTO UPDATE VLAN record', port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}) if $res > 0;
 	return $res;
 }
-
-
-
-	    #$dbm->do("INSERT INTO vlan_list set port_id=".$arg{'PORT_ID'}.", vlan_id=".$arg{'VLAN'}." ON DUPLICATE KEY UPDATE port_id=".$arg{'PORT_ID'})
