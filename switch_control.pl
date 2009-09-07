@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 
 $debug=1;
-my $ver='1.091';
+my $ver='1.092';
 #$VERSION = 0.97;
 
 use Getopt::Long;
@@ -300,7 +300,7 @@ if (not defined($ARGV[0])) {
     p.sw_id, p.port_id, p.port, p.portpref, p.ds_speed, p.us_speed, p.autoconf, p.portvlan, p.link_head, p.autoneg, p.speed, p.duplex, p.maxhwaddr, p.tag, \
     p.link_type, p.login, p.ip_subnet, p.login, \
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m \
-    WHERE h.model=m.id and h.id=p.sw_id and p.type>0 and p.autoconf>".$conf{'STARTPORTCONF'}." and h.automanage=1 order by h.model, p.sw_id, p.portpref, p.port");
+    WHERE h.model=m.id and h.id=p.sw_id and p.type>0 and p.autoconf>=".$conf{'STARTPORTCONF'}." and h.automanage=1 order by h.model, p.sw_id, p.portpref, p.port");
 
     $stm2->execute();
 
