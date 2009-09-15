@@ -32,7 +32,7 @@ my $login_nopriv= $LIB."_login_nopriv";
 my $speed_char	= $LIB."_speed_char";
 my $block_vlan=4094;
 
-my $timeout=3;
+my $timeout=15;
 #my $prompt='/\r{1,}CAT2950\-.*#$/i';
 my $prompt='/.*#.*/';
 my $prompt_nopriv='/.*[\>#].*/';
@@ -166,11 +166,11 @@ sub CAT2950_conf_save {
     print STDERR "SAVING $LIB config in switch ".$arg{'IP'}." ...\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-
+    
     if ($debug < 2) {
-	$sw->print("copy runn startup");
+	$sw->print("copy running-config startup-config");
 	$sw->waitfor("/\[startup-config\]/");
-	return -1  if (&$command(\$sw, $prompt, "\n" ) < 1 );
+	return -1  if (&$command(\$sw, $prompt, "" ) < 1 );
     } else {
 	print STDERR $LIB."_conf_save function not running in DEBUG mode\n";
     }
@@ -429,8 +429,8 @@ sub CAT2950_vlan_trunk_add {
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
+#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
+#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);

@@ -417,9 +417,9 @@ sub CATIOS_vlan_trunk_add  {
     return -1  if (&$command(\$sw, $prompt_conf,        "exit" ) < 1);
 
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk encapsulation dot1q" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport mode trunk" ) < 1);
+#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
+#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk encapsulation dot1q" ) < 1);
+#    return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,        "exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,             "exit" ) < 1);

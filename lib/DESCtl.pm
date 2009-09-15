@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.11;
+$VERSION = 1.12;
 
 @ISA = qw(Exporter);
 
@@ -110,13 +110,13 @@ sub DES_port_set_vlan {
 	    @range = split /\,/,$ranges_vlan;
 	    foreach $c ( @range ) {
 		if ("x".$port eq "x".$c) {
-		    print STDERR "Remove port ".$c." from vlan ".$vlan_id."\n" if $debug;
+		    print STDERR "Remove port ".$c." from vlan ".$vln_num."\n" if $debug;
 		    ${$swl}->cmd("config vlan ".$vln." delete ".$port );
 		} else {
 		    @d = split /-/,$c;
 		    for $e ($d[0]..$d[1]) {
 			if ($port == $e) {
-			    print STDERR "Remove port ".$e." in portrange - ".$c." from vlan ".$vlan_id."\n" if $debug;
+			    print STDERR "Remove port ".$e." in portrange - ".$c." from vlan ".$vln_num."\n" if $debug;
 			    ${$swl}->cmd("config vlan ".$vln." delete ".$port );
 			}
 		    }
