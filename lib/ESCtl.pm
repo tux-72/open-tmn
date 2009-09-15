@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.07;
+$VERSION = 1.08;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -73,7 +73,7 @@ sub ES_login {
 
 sub ES_start_login {
     my ($swl, $ip) = @_;
-    print STDERR " IP = ".$ip.", LOGIN =".$login.", PASS = ".$pass." \n" if $debug > 1;
+    print STDERR " IP = ".$ip.", LOGIN =".$login."\n" if $debug > 1;
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
@@ -547,8 +547,8 @@ sub ES_port_trunk {
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid 1") < 1 );
     }
 
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit ".$trunk_ctl_bcast ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"no bmstorm-limit" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit 64" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"bandwidth-limit    ingress 64" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"bandwidth-limit     egress 64" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no bandwidth-limit ingress" ) < 1 );
@@ -556,7 +556,7 @@ sub ES_port_trunk {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no flow-control" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed-duplex ".$speed ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no inactive") < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"loopguard") < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"no loopguard") < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
     $sw->close();
