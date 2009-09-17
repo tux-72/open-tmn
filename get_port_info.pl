@@ -86,64 +86,9 @@ my $point='';
 my $Querry_portfix = '';
 
 if (not defined($ARGV[0])) {
-    print STDERR "Usage: switch_control.pl (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink | pass_change)\n"
-} elsif ( $ARGV[0] eq "newswitch" ) {
-	exit if not $ARGV[1] =~ /^\S+$/;
-	exit if not $ARGV[2] =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-	my $src_switch= $ARGV[1];
-	my $test_swip= $ARGV[2] || $conf{'def_swip'};
-	my $stm1 = $dbm->prepare("SELECT h.id, h.hostname, h.ip, h.clients_vlan, h.uplink_port, h.uplink_portpref, h.model, m.lib, m.bw_free, \
-	m.lastuserport, m.admin_login, m.admin_pass, m.ena_pass, m.mon_login, m.mon_pass, m.rocom, m.rwcom FROM hosts h, models m WHERE \
-	h.model=m.id and h.uplink_port>0 and h.hostname='".$src_switch."'");
-	$stm1->execute();
-	while (my $ref1 = $stm1->fetchrow_hashref()) {
-		last if ($ref1->{'uplink_port'} < 1 or $ref1->{'clients_vlan'} < 1);
+    print STDERR "Usage: get_port_info.pl ( host <hostname switch> | ip <IP switch> | allhosts )\n"
 
-		$SW{'id'}=$ref1->{'id'} if defined($ref1->{'id'});
-		$SW{'lib'}=$ref1->{'lib'} if defined($ref1->{'lib'});
-		$SW{'admin'}="$ref1->{'admin_login'}" if defined($ref1->{'admin_login'});
-		$SW{'adminpass'}="$ref1->{'admin_pass'}"   if defined($ref1->{'admin_pass'});
-		$SW{'ena_pass'}="$ref1->{'ena_pass'}"   if defined($ref1->{'ena_pass'});
-		$SW{'monlogin'}="$ref1->{'mon_login'}"     if defined($ref1->{'mon_login'});
-		$SW{'monpass'}="$ref1->{'mon_pass'}"  if defined($ref1->{'mon_pass'});
-		$SW{'bwfree'}="$ref1->{'bw_free'}"   if defined($ref1->{'bw_free'});
-		$SW{'rocomunity'}="$ref1->{'rocom'}"  if defined($ref1->{'rocom'});
-		$SW{'rwcomunity'}="$ref1->{'rwcom'}"  if defined($ref1->{'rwcom'});
-
-		$SW{'cli_vlan_num'}="$ref1->{'clients_vlan'}";
-		$SW{'cli_vlan'}="$ref1->{'hostname'}";
-		$SW{'uplink'}="$ref1->{'uplink_port'}";
-		if ($SW{'uplink'} > $ref1->{'lastuserport'}) {
-		    $SW{'last_port'} = $ref1->{'lastuserport'};
-		} else {
-		    $SW{'last_port'} = $SW{'uplink'} - 1;
-		}
-		$LIB_action = $ref1->{'lib'}.'_conf_first';
-		$res = &$LIB_action( IP => $test_swip, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'},  ENA_PASS => $SW{'ena_pass'}, UPLINKPORT => $SW{'uplink'},
-		UPLINKPORTPREF => $SW{'uplink_portpref'}, LASTPORT => $SW{'last_port'}, VLAN => $SW{'cli_vlan_num'}, VLANNAME => $SW{'cli_vlan'},
-		BWFREE => $SW{'bwfree'}, MONLOGIN => $SW{'monlogin'}, MONPASS => $SW{'monpass'}, COM_RO => $SW{'rocomunity'}, COM_RW => $SW{'rwcomunity'}) if $debug < 3;
-		############# RECONFIGURE SWITCH (for replace hardware)
-		#$dbm-> do("UPDATE swports SET autoconf=".$link_type{'setparms'}." WHERE sw_id=".$SW{'id'}) if ( $ARGV[2] eq "useport" ); 
-	}
-	$stm1->finish();
-} elsif ( $ARGV[0] eq "pass_change" ) {
-	my $stm = $dbm->prepare("SELECT h.hostname, h.ip, m.lib, m.admin_login, m.admin_pass, m.ena_pass, m.old_admin, m.old_pass, m.mon_login, m.mon_pass FROM hosts h, models m \
-	WHERE h.automanage=1 and h.model=m.id order by h.model");
-	$stm->execute();
-	while (my $ref = $stm->fetchrow_hashref()) {
-	    next if not defined($ref->{'lib'});
-	    next if not defined($ref->{'admin_login'});
-	    next if not defined($ref->{'admin_pass'});
-
-	    print STDERR "ADD admin accounts in host '".$ref->{'hostname'}."'...\n";
-	    $LIB_action = $ref->{'lib'}.'_pass_change';
-	    $res = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'old_admin'}, PASS => $ref->{'old_pass'}, ENA_PASS => $ref->{'ena_pass'},
-	    ADMINLOGIN => $ref->{'admin_login'}, ADMINPASS => $ref->{'admin_pass'}, MONLOGIN => $ref->{'mon_login'}, MONPASS => $ref->{'mon_pass'});
-	    print STDERR "Change accounts in host '".$ref->{'hostname'}."' failed!\n" if $res < 1;
-	}
-	$stm->finish();
-
-} elsif ( $ARGV[0] eq "checkterm" ) {
+} elsif ( $ARGV[0] eq "host" ) {
     ################################ SYNC LINK STATES
     my $stml = $dbm->prepare("SELECT l.head_id, l.port_id, l.vlan_id, l.status, l.set_status, p.link_type, p.login, p.ip_subnet, p.login \
     FROM swports p, head_link l WHERE l.set_status>0 and l.port_id=p.port_id ORDER BY l.head_id");
@@ -171,7 +116,7 @@ if (not defined($ARGV[0])) {
     }
     $stml->finish;
 
-} elsif ( $ARGV[0] eq "checkport" ) {
+} elsif ( $ARGV[0] eq "ip" ) {
 
     #print STDERR "Switch ports configuring\n";
     ################################ SET PORT PARAMETERS
@@ -894,7 +839,7 @@ sub VLAN_remove {
 	if ( $stm34->rows > 0 ) {
 	    $res =  -1;
 	} else {
-	    $dbm->do("DELETE from vlan_list WHERE vlan_id=".$arg{'VLAN'}." and zone_id=".$arg{'ZONE'});
+	    $dbm->do("DELETE from vlan_list WHERE vlan_id=".$arg{'VLAN'}." and ZONE=".$arg{'ZONE'});
 	    $res =  1;
 	}
 	$stm34->finish();
