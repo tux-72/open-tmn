@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 
 use DBI;
 use cyrillic qw/cset_factory/;

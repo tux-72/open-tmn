@@ -1,14 +1,17 @@
-#!/usr/local/bin/perl -w 
+#!/usr/bin/perl -w 
 
 %conf = (
     'def_swip',	'172.20.20.200',
     'CONTROL_VLAN',	1,
+    'BLOCKPORT_VLAN',	4093,
     'STARTPORTSTATE',	1,
     'STARTPORTCONF',	10,
     'STARTLINKCONF',	20,
     'CLI_VLAN_LINKTYPE',21,
     'CLI_DFLT_TERM',	1,
     'MAXPARENTS',	7,
+    'FIRST_ZONEVLAN',	1000,
+
     'MYSQL_host',	'localhost',
     'MYSQL_base',	'switchnet',
     'MYSQL_user',	'mysqluser',

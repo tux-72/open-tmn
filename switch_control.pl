@@ -1,7 +1,7 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl
 
 $debug=1;
-my $ver='1.092';
+my $ver='1.095';
 #$VERSION = 0.97;
 
 use Getopt::Long;
@@ -349,7 +349,6 @@ if (not defined($ARGV[0])) {
 	    autoneg=1, speed=NULL, duplex=NULL";
 	    $ds=$ref->{'bw_free'}; $us=$ref->{'bw_free'}; $trunking_vlan = 1; 
 		
-	    $Querry_portfix  .=  ", portvlan=".$ref->{'clients_vlan'} if ( $ref->{'clients_vlan'} > 1 );
 
 	    # если VLAN на свиче установлен, а на порту не установлен 
 	    if ( $ref->{'clients_vlan'} > 1 and $ref->{'portvlan'} < 1 ) {
@@ -392,7 +391,8 @@ if (not defined($ARGV[0])) {
 		#next if $res < 1;
 		## Убираем VLAN на UPLINK порту текущего коммутатора
                 print STDERR "REMOVE VLAN in UPLINK port\n" if $debug;
-	      if ($ref->{'uplink_port'} > 0 and DB_trunk_vlan(ACT => 'remove', SWID => $ref->{'sw_id'}, VLAN => $ref->{'portvlan'}, PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'}) < 1) {
+	      if ($ref->{'uplink_port'} > 0 and DB_trunk_vlan(ACT => 'remove', SWID => $ref->{'sw_id'}, VLAN => $ref->{'portvlan'},
+	      PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'}) < 1) {
 		$LIB_action = $ref->{'lib'}.'_vlan_trunk_remove';
     	        $res = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'}, VLAN => $ref->{'portvlan'},
 	        PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'}); next if $res < 1;
@@ -407,13 +407,16 @@ if (not defined($ARGV[0])) {
 
 	    }
 	    ## Освобождаем клиентский порт текущего коммутатора
+	    $ref->{'clients_vlan'} = $conf{'BLOCKPORT_VLAN'} if not defined($ref->{'clients_vlan'});
+	    $Querry_portfix  .=  ", portvlan=".$ref->{'clients_vlan'} if ( $ref->{'clients_vlan'} > 1 );
+
 	    $LIB_action = $ref->{'lib'}.'_port_free';
 	    $resport = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'}, VLAN => $ref->{'clients_vlan'}, 
 	    PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}, DS => $ref->{'bw_free'}, US => $ref->{'bw_free'}, UPLINKPORT => $ref->{'uplink_port'}, 
 	    UPLINKPORTPREF => $ref->{'uplink_portpref'}) if defined($libs{$ref->{'lib'}}); next if $resport < 1;
 	    $SW{'change'} += 1;
  	    $Querry_portfix  .=  " WHERE autoconf=".$link_type{'free'};
-	    VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, LINK_TYPE => $ref->{'link_type'}, ZONE => $ref->{'vlan_zone'});
+	    VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, LINK_TYPE => $ref->{'link_type'}, HEAD => $ref->{'link_head'}) if defined($ref->{'link_head'});
 
 #### UPLINK PORT
 	} elsif ( $ref->{'autoconf'} == $link_type{'uplink'} ) {
@@ -883,21 +886,32 @@ sub SAVE_config {
 }
 
 sub VLAN_remove {
-	#VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, LINK_TYPE => $ref->{'link_type'}, ZONE => $ref->{'vlan_zone'});
+	#VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, HEAD => $ref->{'link_head'});
         my %arg = (
             @_,         # список пар аргументов
         );
-	# PORT_ID VLAN LINK_TYPE ZONE 
+	# PORT_ID VLAN HEAD 
 	my $res = -1;
+	return if ( not defined($arg{'HEAD'}) || not defined($arg{'PORT_ID'}) || not defined($arg{'VLAN'}) );
 
 	return $res if $debug>1;
+	my $Qr_zone = "SELECT vlan_zone FROM heads where head_id=".$arg{'HEAD'};
+	$stm341 = $dbm->prepare($Qr_zone);
+        $stm341->execute();
+	while (my $ref341 = $stm341->fetchrow_hashref()) {
+	    $arg{'ZONE'} = $ref341->{'vlan_zone'};
+	}
+	$stm341->finish();
 
-	my $Qr_in = "SELECT p.port_id FROM swports p, hosts h WHERE h.id=p.sw_id and p.port_id<>".$arg{'PORT_ID'}." and p.portvlan=".$arg{'VLAN'}." and h.vlan_zone=".$arg{'ZONE'};
+	my $Qr_in = "SELECT p.port_id FROM swports p, heads h WHERE h.head_id=p.link_head and p.port_id<>".$arg{'PORT_ID'}.
+	" and p.portvlan=".$arg{'VLAN'}." and h.vlan_zone=".$arg{'ZONE'};
+
 	$stm34 = $dbm->prepare($Qr_in);
 	$stm34->execute();
 	if ( $stm34->rows > 0 ) {
 	    $res =  -1;
 	} else {
+	    print STDERR "DELETE from vlan_list VLAN=".$arg{'VLAN'}." ZONE=".$arg{'ZONE'}."\n" if $debug;
 	    $dbm->do("DELETE from vlan_list WHERE vlan_id=".$arg{'VLAN'}." and zone_id=".$arg{'ZONE'});
 	    $res =  1;
 	}
@@ -921,15 +935,15 @@ sub VLAN_get {
         $stm35 = $dbm->prepare($Qr_range);
         $stm35->execute();
 	while (my $ref35 = $stm35->fetchrow_hashref()) {
-	    $vlanuse{"vl".$ref35->{'vlan_id'}} = 1;
+	    $vlanuse{$ref35->{'vlan_id'}} = 1;
 	}
 	$stm35->finish();
 		
 	my $vlan_id = $arg{'VLAN_MIN'};
 
-	while ($res < 1 || $arg{'VLAN_MAX'} > $vlan_id ) {
-	    print STDERR "PROBE VLAN N".$vlan_id."\n" if $debug;
-	    $res = $vlan_id if not defined($vlanuse{"vl".$vlan_id});
+	while ( $res < 1 and $vlan_id <= $arg{'VLAN_MAX'} ) {
+	    print STDERR "PROBE VLAN N".$vlan_id." VLANDB -> '".$vlanuse{$vlan_id}."'\n" if $debug;
+	    $res = $vlan_id if not defined($vlanuse{$vlan_id});
 	    $vlan_id += 1;
 	}
 	

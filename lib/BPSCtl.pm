@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.100;
+$VERSION = 1.11;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -190,7 +190,7 @@ sub BPS_port_defect {
 
     print STDERR "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORT'}." !!!\n\n" if $debug;
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$block_vlan." name Block type port learning ivl" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$block_vlan." name Block".$block_vlan." type port learning ivl" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$block_vlan." ".$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging disable pvid ".$block_vlan.
     " filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
@@ -216,7 +216,7 @@ sub BPS_port_free {
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'VLAN'}." name PPPoE_vlan type port learning ivl" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'VLAN'}." name PPPoE_vlan".$arg{'VLAN'}." type port learning ivl" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging disable pvid ".$arg{'VLAN'}.
     " filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
