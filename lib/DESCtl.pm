@@ -82,7 +82,7 @@ sub DES_set_segmentation {
 }
 
 sub DES_port_set_vlan {
-    my ($swl, $port, $vlan_id, $tag ) = @_;
+    my ($swl, $port, $vlan_id, $tag, $trunk ) = @_;
     my $tagging='untagged ';
     $tagging = 'tagged ' if $tag > 0;
     #print STDERR "PARMS - ' $swl, $port, $vlan_id ' \n" if $debug;
@@ -104,7 +104,7 @@ sub DES_port_set_vlan {
 	    $vln_num = $1;
 	    $vlanname = $2 if $1 == $vlan_id;
 	#	 Member ports    : 5,7-8,23-26
-        } elsif ( /Member\s+ports\s+:\s+(\S+)/ and "x".$vln_num ne "x".$vlan_id ) {
+        } elsif ( ! $trunk and /Member\s+ports\s+:\s+(\S+)/ and "x".$vln_num ne "x".$vlan_id ) {
 	    $ranges_vlan = $1;
 	    $ranges_vlan =~ s/\n//;
 	    @range = split /\,/,$ranges_vlan;
@@ -438,7 +438,7 @@ sub DES_port_defect {
 
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state disable flow_control disable speed auto" ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config bandwidth_control ".$arg{'PORT'}." rx_rate no_limit tx_rate no_limit" ) < 1 );
-    &$port_set_vlan( \$sw, $arg{'PORT'}, $block_vlan, 0 ) if ($arg{'VLAN'} > 0);
+    &$port_set_vlan( \$sw, $arg{'PORT'}, $block_vlan, 0, 0 ) if ($arg{'VLAN'} > 0);
 
     $sw->close();
     return 1;
@@ -460,7 +460,7 @@ sub DES_port_free {
     return -1  if (&$command(\$sw, $prompt, "config bandwidth_control ".$arg{'PORT'}." rx_rate ".$us." tx_rate ".$ds ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config port_security ports ".$arg{'PORT'}.
     " admin_state enable max_learning_addr 5 lock_address_mode DeleteOnTimeout" ) < 1 );
-    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, 0 ) if ($arg{'VLAN'} > 0);
+    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, 0, 0 ) if ($arg{'VLAN'} > 0);
 
     #return -1  if (&$command(\$sw, $prompt, "config traffic_segmentation ".$arg{'PORT'}." forward_list ".$arg{'UPLINKPORT'} ) < 1 );
     $sw->close();
@@ -481,7 +481,11 @@ sub DES_port_trunk {
     return -1  if (&$command(\$sw, $prompt, "config port_security ports ".$arg{'PORT'}." admin_state disable" ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state enable flow_control disable speed ".$speed ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config bandwidth_control ".$arg{'PORT'}." rx_rate no_limit tx_rate no_limit" ) < 1 );
-    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'} ) if ($arg{'VLAN'} > 0);
+    #if $arg{'VLAN'}
+    #my $tagging='untagged ';
+    #$tagging = 'tagged ' if $tag > 0;
+    #return -1  if (&$command(\$sw, $prompt, "config vlan default add untagged ".$arg{'PORT'} ) < 1 );
+    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 1 ) if ($arg{'VLAN'} > 0);
     $sw->close();
     return 1;
 }
@@ -501,7 +505,7 @@ sub DES_port_system {
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state enable flow_control  enable speed ".$speed) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config bandwidth_control ".$arg{'PORT'}." rx_rate ".$us." tx_rate ".$ds ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config port_security ports ".$arg{'PORT'}." admin_state disable" ) < 1 );
-    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'} ) if ($arg{'VLAN'} > 0);
+    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 ) if ($arg{'VLAN'} > 0);
 
     $sw->close();
     return 1;
@@ -525,7 +529,7 @@ sub DES_port_setparms {
     return -1  if (&$command(\$sw, $prompt, "config port_security ports ".$arg{'PORT'}." admin_state ".$adm_state.
     " max_learning_addr ".$maxhw." lock_address_mode DeleteOnTimeout" ) < 1 );
 
-    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'} ) if ($arg{'VLAN'} > 0);
+    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 ) if ($arg{'VLAN'} > 0);
     #return -1  if (&$command(\$sw, $prompt, "config traffic_segmentation ".$arg{'PORT'}." forward_list ".$arg{'UPLINKPORT'} ) < 1 );
     $sw->close();
     return 1;
