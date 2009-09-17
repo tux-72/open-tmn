@@ -499,12 +499,14 @@ if (not defined($ARGV[0])) {
 
 	    if ( $ref->{'autoconf'} == $conf{'CLI_VLAN_LINKTYPE'} and defined($ref->{'clients_vlan'}) ) {
                 $trunking_vlan=0;
-		if ( $ref->{'portvlan'} < 1 ) {
+		if ( $ref->{'portvlan'} == -1 ) {
             	    $ref->{'portvlan'} = $ref->{'clients_vlan'};
 		} elsif ($ref->{'portvlan'} != $ref->{'clients_vlan'}) {
 		    $trunking_vlan = 1;
 		}
 	    } 
+	    $ref->{'vlan_zone'} = -1 if ( $ref->{'portvlan'} < -1
+	    || ( $ref->{'portvlan'} > 1 and $ref->{'portvlan'} < $conf{'FIRST_ZONEVLAN'} ));
 
             $head = GET_Terminfo( TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
 	    ### Выясняем необходимость выделения и номер влана для использования
@@ -512,7 +514,6 @@ if (not defined($ARGV[0])) {
 		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, 
 		VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
 	    }
-	    #next if $ref->{'portvlan'} < 1;
 
             # Завершаем если нет вменяемого номера влана
 	    if (not defined($ref->{'clients_vlan'}) and $ref->{'portvlan'} < 1 ) {
@@ -920,14 +921,15 @@ sub VLAN_get {
         $stm35 = $dbm->prepare($Qr_range);
         $stm35->execute();
 	while (my $ref35 = $stm35->fetchrow_hashref()) {
-	    $vlanuse{$ref35->{'vlan_id'}} = 1;
+	    $vlanuse{"vl".$ref35->{'vlan_id'}} = 1;
 	}
 	$stm35->finish();
 		
 	my $vlan_id = $arg{'VLAN_MIN'};
 
 	while ($res < 1 || $arg{'VLAN_MAX'} > $vlan_id ) {
-	    $res = $vlan_id if not defined($vlanuse{$vlan_id});
+	    print STDERR "PROBE VLAN N".$vlan_id."\n" if $debug;
+	    $res = $vlan_id if not defined($vlanuse{"vl".$vlan_id});
 	    $vlan_id += 1;
 	}
 	
