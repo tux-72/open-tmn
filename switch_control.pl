@@ -496,32 +496,35 @@ if (not defined($ARGV[0])) {
             next if ( $ref->{'portvlan'} == 1 );
             $ds=$ref->{'ds_speed'}; $us=$ref->{'us_speed'}; $trunking_vlan = 1;
             print STDERR "Start linking\n" if $debug;
-            # Завершаем если нет вменяемого номера влана
-            next if ( $ref->{'portvlan'} < 1 and not defined($ref->{'clients_vlan'}));
 
-	    if (not defined($ref->{'clients_vlan'}) and $ref->{'portvlan'} < 1 ) {
-		if ($ref->{'autoconf'} == $conf{'CLI_VLAN_LINKTYPE'}) {
-		    print STDERR " Clients VLAN not defined in switch ".$ref->{'hostname'}."! Next\n" 
-		} else {
-		    print STDERR " PORT VLAN not defined in port ".$ref->{'portpref'}.$ref->{'port'}."switch ".$ref->{'hostname'}."! Next\n" 
-		}
-		next;
-	    }
 	    if ( $ref->{'autoconf'} == $conf{'CLI_VLAN_LINKTYPE'} and defined($ref->{'clients_vlan'}) ) {
                 $trunking_vlan=0;
 		if ( $ref->{'portvlan'} < 1 ) {
             	    $ref->{'portvlan'} = $ref->{'clients_vlan'};
-		    $Querry_portfix  .=  ", portvlan=".$ref->{'clients_vlan'} 
 		} elsif ($ref->{'portvlan'} != $ref->{'clients_vlan'}) {
-		    $trunking_vlan=1;
+		    $trunking_vlan = 1;
 		}
 	    } 
+
             $head = GET_Terminfo( TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
 	    ### Выясняем необходимость выделения и номер влана для использования
-	    if ( $ref->{'portvlan'} < 2 and $ref->{'link_type'} != $link_type{'uplink'}) {
-		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
-		next if $ref->{'portvlan'} < 1;
+	    if ( $ref->{'portvlan'} < 1 ) {
+		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, 
+		VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
 	    }
+	    #next if $ref->{'portvlan'} < 1;
+
+            # Завершаем если нет вменяемого номера влана
+	    if (not defined($ref->{'clients_vlan'}) and $ref->{'portvlan'} < 1 ) {
+		if ($ref->{'autoconf'} == $conf{'CLI_VLAN_LINKTYPE'}) {
+		    print STDERR " Clients PPPoE VLAN not defined in switch ".$ref->{'hostname'}."! Next\n"; 
+		} else {
+		    print STDERR " PORT VLAN not defined in port ".$ref->{'portpref'}.$ref->{'port'}."switch ".$ref->{'hostname'}."! Next\n";
+		}
+		next;
+	    }
+
+	    $Querry_portfix  .=  ", portvlan=".$ref->{'portvlan'};
 
             ## Прописываем VLAN на клиентском порту текущего коммутатора
             print STDERR "Config CLIENT port parameters and set VLAN ".$ref->{'portvlan'}."\n" if $debug;
