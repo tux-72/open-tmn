@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.12;
+$VERSION = 1.14;
 
 @ISA = qw(Exporter);
 
