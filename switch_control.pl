@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 $debug=1;
-my $ver='1.095';
+my $ver='1.10';
 #$VERSION = 0.97;
 
 use Getopt::Long;
@@ -87,6 +87,11 @@ my $Querry_portfix = '';
 
 if (not defined($ARGV[0])) {
     print STDERR "Usage: switch_control.pl (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink | pass_change)\n"
+
+} elsif ( $ARGV[0] eq "VLAN_get" ) {
+        my $vlanget = VLAN_get(PORT_ID => 4370, LINK_TYPE => 24, ZONE => -1, VLAN_MIN => 100, VLAN_MAX => 999);
+	print STDERR "NEW VLAN pppoe for ZONE -1 = '".$vlanget."'\n" if $debug;
+
 } elsif ( $ARGV[0] eq "newswitch" ) {
 	exit if not $ARGV[1] =~ /^\S+$/;
 	exit if not $ARGV[2] =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -512,9 +517,11 @@ if (not defined($ARGV[0])) {
 	    || ( $ref->{'portvlan'} > 1 and $ref->{'portvlan'} < $conf{'FIRST_ZONEVLAN'} ));
 
             $head = GET_Terminfo( TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
+	    #$ref->{'vlan_zone'} = $head->{'VLAN_ZONE'} if defined($head->{'VLAN_ZONE'});
+
 	    ### Выясняем необходимость выделения и номер влана для использования
-	    if ( $ref->{'portvlan'} < 1 ) {
-		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, 
+	    if ( $ref->{'portvlan'} < 1 and defined($head->{'VLAN_ZONE'}) ) {
+		$ref->{'portvlan'} = VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $head->{'VLAN_ZONE'}, 
 		VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
 	    }
 
@@ -646,7 +653,7 @@ sub GET_Terminfo {
     my %arg = (
         @_,         # список пар аргументов
     );
-    # TYPE ZONE
+    # TYPE ZONE TERM_ID
     my %headinfo; my $res = 0;
     $Querry_start = "SELECT * FROM heads WHERE ";
     if ($arg{'TERM_ID'} > 0) {
@@ -686,6 +693,7 @@ sub GET_Terminfo {
 	    $headinfo{'DOWN_ACLIN'} = $ref31->{'down_acl-in'};
 	    $headinfo{'DOWN_ACLOUT'} = $ref31->{'down_acl-out'};
 	    $headinfo{'LOOP_IF'} = $ref31->{'loop_if'};
+	    $headinfo{'VLAN_ZONE'} = $ref31->{'vlan_zone'};
 	    #print STDERR "\nHEAD ID - ".$ref31->{'head_id'}."\n";
 	}
 	$res = 1;
@@ -927,7 +935,7 @@ sub VLAN_get {
         );
 	# PORT_ID VLAN LINK_TYPE ZONE 
 
-	my $res = -1;
+	my $res = -1; my $increment = 1;
 
 #	return $res if $debug>1;
 	my %vlanuse = ();
@@ -939,15 +947,24 @@ sub VLAN_get {
 	}
 	$stm35->finish();
 		
-	my $vlan_id = $arg{'VLAN_MIN'};
-
-	while ( $res < 1 and $vlan_id <= $arg{'VLAN_MAX'} ) {
-	    print STDERR "PROBE VLAN N".$vlan_id." VLANDB -> '".$vlanuse{$vlan_id}."'\n" if $debug;
-	    $res = $vlan_id if not defined($vlanuse{$vlan_id});
-	    $vlan_id += 1;
+	my $vlan_id=0; 
+	if ($increment) {
+	    $vlan_id = $arg{'VLAN_MIN'};
+	    while ( $res < 1 and $vlan_id <= $arg{'VLAN_MAX'} ) {
+		print STDERR "PROBE VLAN N".$vlan_id." VLANDB -> '".$vlanuse{$vlan_id}."'\n" if $debug > 1;
+		$res = $vlan_id if not defined($vlanuse{$vlan_id});
+		$vlan_id += 1;
+	    }
+	} else {
+	    $vlan_id = $arg{'VLAN_MAX'};
+	    while ( $res < 1 and $vlan_id >= $arg{'VLAN_MIN'} ) {
+		print STDERR "PROBE VLAN N".$vlan_id." VLANDB -> '".$vlanuse{$vlan_id}."'\n" if $debug > 1;
+		$res = $vlan_id if not defined($vlanuse{$vlan_id});
+		$vlan_id -= 1;
+	    }
 	}
-	
+
 	$dbm->do("INSERT into vlan_list SET info='AUTO INSERT VLAN record from vlan range', vlan_id=".$res.", zone_id=".$arg{'ZONE'}.", port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}.
-	" ON DUPLICATE KEY UPDATE info='AUTO UPDATE VLAN record', port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}) if $res > 0;
+	" ON DUPLICATE KEY UPDATE info='AUTO UPDATE VLAN record', port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}) if ($res > 0 and $debug < 2);
 	return $res;
 }
