@@ -51,15 +51,15 @@ while (my $refap = $sthap->fetchrow_hashref()) {
 $sthap->finish;
 
 foreach $ap (sort keys %apclose) {
-        $query2 ="UPDATE swports SET autoconf=".$link_type{'free'}." WHERE port_id=".$ap." and link_type>".$conf{'STARTLINKCONF'};
-        $query="UPDATE InfoModem SET FlagClose=0 WHERE IdModem=".$ap;
+        $query1 ="UPDATE swports SET autoconf=".$link_type{'free'}." WHERE port_id=".$ap." and link_type>".$conf{'STARTLINKCONF'}." and autoconf<".$conf{'STARTPORTCONF'};
+        $query2="UPDATE InfoModem SET FlagClose=0 WHERE IdModem=".$ap;
     if ($debug) {
-	print STDERR $query2."\n";
-	print STDERR  $query."\n";
+	print STDERR $query1."\n";
+	print STDERR  $query2."\n";
     } else {
-	print STDERR $query2."\n";
-	$dbm->do($query2) or die $dbm->errstr; # Отмечаем порт для освобождения
-	$dbh->do($query) or die $dbh->errstr;	# подтверждаем обработку порта
+	print STDERR $query1."\n";
+	$dbm->do($query1) or die $dbm->errstr; # Отмечаем порт для освобождения
+	$dbh->do($query2) or die $dbh->errstr;	# подтверждаем обработку порта
 	print STDERR "Closed AP, id N'".$ap."'\n";
     }
 }

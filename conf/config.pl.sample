@@ -3,7 +3,7 @@
 %conf = (
     'def_swip',	'172.20.20.200',
     'CONTROL_VLAN',	1,
-    'BLOCKPORT_VLAN',	4093,
+    'BLOCKPORT_VLAN',	4094,
     'STARTPORTSTATE',	1,
     'STARTPORTCONF',	10,
     'STARTLINKCONF',	20,

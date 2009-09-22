@@ -32,7 +32,7 @@ my $login       = $LIB."_login";
 my $login_nopriv= $LIB."_login_nopriv";
 my $speed_char  = $LIB."_speed_char";
 
-my $block_vlan=4094;
+#my $block_vlan=4094;
 my $prompt='/.*\>.*\(enable\).*/';
 my $prompt_nopriv='/.*\>.*/';
 
@@ -220,7 +220,7 @@ sub CATOS_port_defect {
 
     return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." 1-1005,1025-4094" ) < 1);
     return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." off dot1q" ) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$block_vlan." ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
     $sw->print("set port disable ".$arg{'PORTPREF'}.$arg{'PORT'});
     $sw->waitfor("/Do you want to continue.*/") || return -1;
     return -1  if (&$command(\$sw, $prompt,	"y" ) < 1);
@@ -263,10 +263,10 @@ sub CATOS_port_trunk {
     if (not $arg{'AUTONEG'}) {
 	return -1  if (&$command(\$sw, $prompt,	 "set port duplex ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$duplex) < 1);
     }
-    if (not $arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$arg{'VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+    if ($arg{'TAG'}) {
+	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
     } else {
-	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$block_vlan." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$arg{'VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
     }
     return -1  if (&$command(\$sw, $prompt,	 "set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." nonegotiate dot1q ".$arg{'VLAN'}) < 1);
     return -1  if (&$command(\$sw, $prompt,	 "set port enable ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
@@ -295,7 +295,7 @@ sub CATOS_port_system {
 	return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." 1-1005,1025-4094" ) < 1);
 	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." off dot1q") < 1);
     } else {
-	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$block_vlan." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
 	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." nonegotiate dot1q ".$arg{'VLAN'}) < 1);
     }
     return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
@@ -323,7 +323,7 @@ sub CATOS_port_setparms {
 	return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." 1-1005,1025-4094" ) < 1);
 	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." off dot1q") < 1);
     } else {
-	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$block_vlan." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
 	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." nonegotiate dot1q ".$arg{'VLAN'}) < 1);
     }
     return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);

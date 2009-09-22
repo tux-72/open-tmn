@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.14;
+$VERSION = 1.15;
 
 @ISA = qw(Exporter);
 
@@ -38,7 +38,7 @@ my $vlan_char	= $LIB."_vlan_char";
 my $port_remove_vlans	= $LIB."_port_remove_vlans";
 my $port_set_vlan	= $LIB."_port_set_vlan";
 my $set_segmentation	= $LIB."_set_segmentation";
-my $block_vlan		= 4094;
+#my $block_vlan		= 4094;
 
 my $prompt='/.*#.*/';
 
@@ -438,7 +438,7 @@ sub DES_port_defect {
 
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state disable flow_control disable speed auto" ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config bandwidth_control ".$arg{'PORT'}." rx_rate no_limit tx_rate no_limit" ) < 1 );
-    &$port_set_vlan( \$sw, $arg{'PORT'}, $block_vlan, 0, 0 ) if ($arg{'VLAN'} > 0);
+    &$port_set_vlan( \$sw, $arg{'PORT'}, $arg{'BLOCK_VLAN'}, 0, 0 ) if ($arg{'VLAN'} > 0);
 
     $sw->close();
     return 1;

@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.0;
+$VERSION = 1.1;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -33,7 +33,7 @@ my $command     = $LIB."_cmd";
 my $login       = $LIB."_login";
 my $speed_char  = $LIB."_speed_char";
 
-my $block_vlan=4094;
+#my $block_vlan=4094;
 
 my $prompt='/.*[\>#].*/';
 my $prompt_conf ='/.*\(config\)#.*/';
@@ -216,7 +216,7 @@ sub CATIOS_port_defect {
     return -1  if (&$command(\$sw, $prompt_conf_if,     "no switchport trunk encapsulation dot1q" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "no switchport trunk allowed vlan" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport mode access" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport access vlan ".$block_vlan ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport access vlan ".$arg{'BLOCK_VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "description PORT DEFECT!!!" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "speed auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "duplex auto" ) < 1);
@@ -296,9 +296,8 @@ sub CATIOS_port_trunk {
     return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk encapsulation dot1q" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk native vlan ".$arg{'VLAN'} ) < 1);
     if ($arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk native vlan ".$block_vlan ) < 1);
+#	return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk native vlan ".$arg{'BLOCK_VLAN'} ) < 1);
     } else {
 	return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk native vlan ".$arg{'VLAN'} ) < 1);
     }
@@ -333,11 +332,11 @@ sub CATIOS_port_system {
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     if ($arg{'TAG'}) {
-        return -1  if (&$command(\$sw, $prompt_conf_if, "switchport access vlan ".$block_vlan ) < 1);
+        return -1  if (&$command(\$sw, $prompt_conf_if, "switchport access vlan ".$arg{'BLOCK_VLAN'} ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if, "switchport trunk encapsulation dot1q" ) < 1);
         return -1  if (&$command(\$sw, $prompt_conf_if, "switchport mode trunk" ) < 1);
         return -1  if (&$command(\$sw, $prompt_conf_if, "switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
-	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk native vlan ".$block_vlan ) < 1);
+	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk native vlan ".$arg{'BLOCK_VLAN'} ) < 1);
     } else {
 	return -1  if (&$command(\$sw, $prompt_conf_if, "no switchport trunk encapsulation dot1q" ) < 1);
         return -1  if (&$command(\$sw, $prompt_conf_if, "no switchport trunk allowed vlan" ) < 1);
@@ -375,11 +374,11 @@ sub CATIOS_port_setparms {
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     if ($arg{'TAG'}) {
-        return -1  if (&$command(\$sw, $prompt_conf_if, "switchport access vlan ".$block_vlan ) < 1);
+        return -1  if (&$command(\$sw, $prompt_conf_if, "switchport access vlan ".$arg{'BLOCK_VLAN'} ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if, "switchport trunk encapsulation dot1q" ) < 1);
         return -1  if (&$command(\$sw, $prompt_conf_if, "switchport mode trunk" ) < 1);
         return -1  if (&$command(\$sw, $prompt_conf_if, "switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
-	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk native vlan ".$block_vlan ) < 1);
+	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk native vlan ".$arg{'BLOCK_VLAN'} ) < 1);
     } else {
 	return -1  if (&$command(\$sw, $prompt_conf_if, "no switchport trunk encapsulation dot1q" ) < 1);
         return -1  if (&$command(\$sw, $prompt_conf_if, "no switchport trunk allowed vlan" ) < 1);

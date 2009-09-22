@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.0;
+$VERSION = 1.1;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -32,7 +32,7 @@ my $login       = $LIB."_login";
 my $login_nopriv= $LIB."_login_nopriv";
 my $speed_char  = $LIB."_speed_char";
 
-my $block_vlan=4094;
+#my $block_vlan=4094;
 my $prompt='/.*#.*/';
 my $prompt_nopriv='/.*[\>#].*/';
 my $prompt_conf ='/.*\(config\)#.*/';
@@ -234,7 +234,7 @@ sub CAT3508G_port_defect {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no switchport trunk allowed vlan" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode access" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport access vlan ".$block_vlan ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport access vlan ".$arg{'BLOCK_VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"description PORT DEFECT!!!" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"shutdown" ) < 1);
@@ -304,9 +304,8 @@ sub CAT3508G_port_trunk {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
-    #return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk native vlan ".$arg{'VLAN'} ) < 1);
     if ($arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk native vlan ".$block_vlan ) < 1);
+#	return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk native vlan ".$arg{'BLOCK_VLAN'} ) < 1);
     } else {
 	return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk native vlan ".$arg{'VLAN'} ) < 1);
     }
@@ -344,7 +343,7 @@ sub CAT3508G_port_system {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     if ($arg{'TAG'}) {
-	#return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport access vlan ".$block_vlan ) < 1);
+	#return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport access vlan ".$arg{'BLOCK_VLAN'} ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
     } else {
@@ -382,7 +381,7 @@ sub CAT3508G_port_setparms {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     if ($arg{'TAG'}) {
-	#return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport access vlan ".$block_vlan ) < 1);
+	#return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport access vlan ".$arg{'BLOCK_VLAN'} ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
     } else {
@@ -416,8 +415,6 @@ sub CAT3508G_vlan_trunk_add {
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan add ".$arg{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
@@ -437,7 +434,6 @@ sub CAT3508G_vlan_trunk_remove  {
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan remove ".$arg{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);

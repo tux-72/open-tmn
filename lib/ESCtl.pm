@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.08;
+$VERSION = 1.10;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -26,8 +26,6 @@ $VERSION = 1.08;
 
 my $debug 	= 1;
 my $timeout	= 10;
-
-my $block_vlan=4094;
 
 my $LIB	= 'ES';
 my $command     = $LIB."_cmd";
@@ -543,7 +541,7 @@ sub ES_port_trunk {
     if (not $arg{'TAG'}) {
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'VLAN'}) < 1 );
     } else {
-        #return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$block_vlan) < 1 );
+        #return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'BLOCK_VLAN'}) < 1 );
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid 1") < 1 );
     }
 
@@ -588,15 +586,22 @@ sub ES_port_system {
 	return -1 if (&$command(\$sw, $prompt_conf_vlan,"untagged ".$arg{'PORT'} ) < 1 );
      }
      return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+     if ($arg{'TAG'}) {
+	return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'BLOCK_VLAN'} ) < 1 );
+	return -1  if (&$command(\$sw, $prompt_conf_vlan,	"fixed ".$arg{'PORT'} ) < 1 );
+	return -1  if (&$command(\$sw, $prompt_conf_vlan,	"untagged ".$arg{'PORT'} ) < 1 );
+	return -1  if (&$command(\$sw, $prompt_conf,		"exit" ) < 1 );
+     }
     }
+
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface port-channel ".$arg{'PORT'} ) < 1 );
     if ($arg{'VLAN'}) {
-     if (not $arg{'TAG'}) {
+     if ($arg{'TAG'}) {
+        return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'BLOCK_VLAN'}) < 1 );
+     } else {
         return -1  if (&$command(\$sw, $prompt_conf_if, "vlan1q port-isolation") < 1 );
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'VLAN'}) < 1 );
-     } else {
-        return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$block_vlan) < 1 );
      }
     }
     return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit" ) < 1 );
@@ -628,6 +633,7 @@ sub ES_port_setparms {
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
     print STDERR "SET PARAMETERS in PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ...\n" if $debug;
+    print STDERR "BLOCKING VLAN = ".$arg{'BLOCK_VLAN'}." ...\n" if $debug;
 
     my $speed = ES_speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $maxhw, $adm_state ) = &$hw_char( MAXHW => $arg{'MAXHW'} );
@@ -647,15 +653,21 @@ sub ES_port_setparms {
 	return -1 if (&$command(\$sw, $prompt_conf_vlan,"untagged ".$arg{'PORT'} ) < 1 );
      }
      return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+     if ($arg{'TAG'}) {
+        return -1  if (&$command(\$sw, $prompt_conf_vlan,       "vlan ".$arg{'BLOCK_VLAN'} ) < 1 );
+        return -1  if (&$command(\$sw, $prompt_conf_vlan,       "fixed ".$arg{'PORT'} ) < 1 );
+        return -1  if (&$command(\$sw, $prompt_conf_vlan,       "untagged ".$arg{'PORT'} ) < 1 );
+        return -1  if (&$command(\$sw, $prompt_conf,            "exit" ) < 1 );
+     }
     }
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface port-channel ".$arg{'PORT'} ) < 1 );
     if ($arg{'VLAN'}) {
-     if (not $arg{'TAG'}) {
+     if ($arg{'TAG'}) {
+        return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'BLOCK_VLAN'}) < 1 );
+     } else {
         return -1  if (&$command(\$sw, $prompt_conf_if, "vlan1q port-isolation") < 1 );
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'VLAN'}) < 1 );
-     } else {
-        return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$block_vlan) < 1 );
      }
     }
 
@@ -690,8 +702,8 @@ sub ES_vlan_trunk_add  {
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"fixed ".$arg{'PORT'} ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"no untagged ".$arg{'PORT'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"fixed ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"no untagged ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
 
@@ -710,7 +722,7 @@ sub ES_vlan_trunk_remove  {
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"forbidden ".$arg{'PORT'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"forbidden ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
     $sw->close();
