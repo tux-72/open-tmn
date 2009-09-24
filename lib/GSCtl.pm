@@ -96,8 +96,6 @@ sub GS_conf_save {
     return 1;
 }
 
-
-
 sub GS_fix_vlan {
     # IP LOGIN PASS MAC
     my %arg = (
@@ -108,7 +106,7 @@ sub GS_fix_vlan {
 
     print STDERR "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
     my $vlan = 0;
-    my @ln = $sw->cmd("show mac address-table all PORT" . "\n" x 100 );
+    my @ln = $sw->cmd("show mac address-table all PORT" );
     foreach (@ln) {
 	#Port      VLAN ID        MAC Address         Type
 	#26        1              00:03:42:97:66:a1   Dynamic
@@ -119,6 +117,42 @@ sub GS_fix_vlan {
     $sw->close();
     return $vlan;
 }
+
+
+
+sub GS_fix_macport {
+    # IP LOGIN PASS MAC VLAN
+    my %arg = (
+        @_,
+    );
+    # login
+    my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
+
+    my $port = -1; my $pref; my $max=3; my $count=0;
+    while ($count < $max) {
+	my @ln = $sw->cmd("show mac address-table all VID" );
+	foreach (@ln) {
+	    #Port      VLAN ID        MAC Address         Type
+	    #26        1              00:03:42:97:66:a1   Dynamic
+    	    if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+Dynamic/ and $2 eq $arg{'VLAN'} and $3 eq $arg{'MAC'} ) {
+                $port = $1+0;
+    	    }
+	}
+        if ($port>0) {
+            last;
+        } else {
+            $count+=1;
+        }
+    }
+    $sw->close();
+    print STDERR "MAC Port - $port\n" if $debug;
+    return ($pref, $port);
+}
+
+
+
+
 
 sub GS_vlan_trunk_add  {
 #    IP LOGIN PASS VLAN PORT PORTPREF

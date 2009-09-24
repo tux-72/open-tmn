@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.15;
+$VERSION = 1.16;
 
 @ISA = qw(Exporter);
 
@@ -361,9 +361,9 @@ sub DES_fix_macport {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "FIX PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}.", VLAN '".$arg{'VLAN'}." '\n" if $debug;
+    print STDERR "FIX PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}.", VLAN '".$arg{'VLAN'}."'\n" if $debug;
 
-    my $port = 0; my $pref; my $max=3; my $count=0; 
+    my $port = -1; my $pref; my $max=3; my $count=0; 
 
     while ($count < $max) {
     my @ln= $sw->cmd("show fdb mac_address ".$arg{'MAC'}."\n");

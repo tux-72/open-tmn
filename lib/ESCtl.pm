@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.11;
+$VERSION = 1.12;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -356,7 +356,7 @@ sub ES_fix_macport {
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
     print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
 
-    my $port = 0; my $pref; my $max=3; my $count=0;
+    my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
 	my @ln = $sw->cmd("show mac address-table vlan ".$arg{'VLAN'});
         foreach (@ln) {

@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.12;
+$VERSION = 1.13;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -100,7 +100,7 @@ sub BPS_fix_macport {
     # login
     my $sw; return -1  if ( &$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
 
-    my $port = 0; my $pref; my $max=3; my $count=0;
+    my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
     my @ln = $sw->cmd("show mac-address-table vid ".$arg{'VLAN'}." address ".$arg{'MAC'});
         foreach (@ln) {

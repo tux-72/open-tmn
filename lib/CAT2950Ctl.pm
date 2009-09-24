@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.0;
+$VERSION = 1.2;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -132,7 +132,7 @@ sub CAT2950_fix_macport {
     );
     print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug;
 
-    my $port = 0; my $pref; my $max=3; my $count=0;
+    my $port = -1; my $pref; my $max=3; my $count=0;
     # login
     my $sw; return -1  if ( &$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
 

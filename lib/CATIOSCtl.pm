@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.1;
+$VERSION = 1.3;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -67,7 +67,7 @@ sub CATIOS_login {
     ${$swl}->open($ip);
     ${$swl}->print("");
     ${$swl}->login($login,$pass) || return -1;
-    print STDERR "Login - Ok\n"; # if $debug > 1;
+    print STDERR "Login - Ok\n" if $debug > 1;
     return 1;
 }
 
@@ -110,36 +110,56 @@ sub CATIOS_fix_vlan {
     return $vlan;
 }
 
+sub CATIOS_mac_fix {
+        my $mac = shift;
+        $mac =~ /^(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)$/ || return -1 ;
+        return "$1$2\.$3$4\.$5$6";
+}
+
+
 sub CATIOS_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my %arg = (
         @_,
     );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug;
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug ;
 
-    my $port = 0; my $pref; my $max=3; my $count=0;
+    my $mac=CATIOS_mac_fix($arg{'MAC'});
+    print STDERR "MAC transfer - $mac \n" if $debug > 1;
+    my $port = -1; my $pref; my $max=3; my $count=0;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    my $sw; return -1 if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
 
     while ($count < $max) {
-    my @ln= $sw->cmd("show mac-address-table dynamic address ".$arg{'MAC'}." vlan ".$arg{'VLAN'});
+    my @ln= $sw->cmd("show mac-address-table dynamic address ".$mac." vlan ".$arg{'VLAN'});
         foreach (@ln) {
 	    #vlan   mac address     type        protocols               port
 	    #-------+---------------+--------+---------------------+--------------------
 	    #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
-            if ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+\S+\s+(Fa|Gi)\D+(\d+\/)(\d+)/ ) {
-                $port = $5+0;
-                $pref = "$3$4";
-            }
-        }
-        if ($port>0) {
-            last;
-        } else {
-            $count+=1;
-        }
+            if      ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+\S+\s+(Fa|Gi)\D+(\d+\/)(\d+)/ ) {
+		$port = $5+0;
+		$pref = "$3$4";
+	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+\S+\s+(Po|Lo)\D+(\d+)/ ) {
+		$port = $4+0;
+		$pref = "$3";
+		    # *    1  001b.1105.3d8e   dynamic  Yes          5   Fa4/46
+	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(\D+)(\d+\/)(\d+)/ ) {
+		$port = $5+0;
+		$pref = "$3$4";
+		    # *    1  001b.1105.3d8e   dynamic  Yes          5   Po1
+	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+\S+\s+\d+\s+(\D+)(\d+)/ ) {
+		$port = $4+0;
+		$pref = "$3";
+	    }
+	}
+	if ($port>0) {
+	    last;
+	} else {
+	    $count+=1;
+	}
     }
     $sw->close();
-    print STDERR "MAC Port - $pref / $port\n" if $debug;
+    print STDERR "MAC Port - $pref / $port\n" if $debug > 1;
     return ($pref, $port);
 }
 

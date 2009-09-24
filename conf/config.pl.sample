@@ -1,8 +1,9 @@
 #!/usr/bin/perl -w 
 
 %conf = (
-    'def_swip',	'172.20.20.200',
+    'def_swip',		'172.20.20.200',
     'CONTROL_VLAN',	1,
+    'CONTROL_HOST_MAC',	'00:09:3d:12:c6:58',
     'BLOCKPORT_VLAN',	4094,
     'STARTPORTSTATE',	1,
     'STARTPORTCONF',	10,

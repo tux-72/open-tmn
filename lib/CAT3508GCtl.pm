@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.1;
+$VERSION = 1.2;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -140,7 +140,7 @@ sub CAT3508G_fix_macport {
     print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug;
 
     my $mac=CAT3508G_mac_fix($arg{'MAC'});
-    my $port = 0; my $pref; my $max=3; my $count=0;
+    my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
     my @ln = $sw->cmd("show mac-address-table dynamic address ".$mac." vlan ".$arg{'VLAN'});
         foreach (@ln) {

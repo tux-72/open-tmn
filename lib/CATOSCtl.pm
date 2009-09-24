@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.0;
+$VERSION = 1.1;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -152,7 +152,7 @@ sub CATOS_fix_macport {
     my $sw;  return -1  if (&$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
 
     $arg{'MAC'} =~ s/\:/\-/g;
-    my $port = 0; my $pref; my $max=3; my $count=0; my @p = '';
+    my $port = -1; my $pref; my $max=3; my $count=0; my @p = '';
 
     while ($count < $max) {
     my @ln= $sw->cmd('show cam dynamic '.$arg{'VLAN'}.' | inc '.$arg{'MAC'});
