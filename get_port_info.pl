@@ -91,26 +91,28 @@ if (not defined($ARGV[0])) {
     print STDERR "Usage: get_port_info.pl ( chk_model <hostname|allhosts> | chk_trunk <hostname> | host <hostname> | ip <IP switch> | allhosts )\n"
 
 } elsif ( $ARGV[0] eq "chk_model" ) {
-    my $Q_end = ' and h.info is NULL ';
+    my $Q_end = '';
     $Q_end = " and h.hostname='".$ARGV[1]."'" if ( $ARGV[1] ne "allhosts" );
 
-    my $stm = $dbm->prepare("SELECT h.model, h.id, h.ip, m.rocom FROM hosts h, models m WHERE h.visible>0 and h.model=m.id ".$Q_end );
+    my $stm = $dbm->prepare("SELECT h.hostname, h.hw_mac, h.model, h.id, h.ip, m.rocom FROM hosts h, models m WHERE h.visible>0 and h.model=m.id ".$Q_end );
     $stm->execute();
     while (my $ref = $stm->fetchrow_hashref()) {
-	print STDERR " IP = ".$ref->{'ip'}." Community ".$ref->{'rocom'}."\n"  if $debug;
+	#print STDERR " IP = ".$ref->{'ip'}." Community ".$ref->{'rocom'}."\n"  if $debug;
 	$ref->{'rocom'} = $conf{'DEF_COMUNITY'} if not defined($ref->{'rocom'});
 
+	# ------------------------------------
 	my($sess, $err) = Net::SNMP->session(	-hostname => $ref->{'ip'},
 						-community => $ref->{'rocom'},
 						-domain => 'udp/ipv4',
 						-version => 'snmpv1',
-						-timeout => 5,
+						-timeout => 2,
 						-translate => 0,
 					    );
 
 #	unless (defined($sess)) {
 #	    die $err;
 #	}
+	my $Q_update = "UPDATE hosts SET";
 
 	my($oid_model) = '.1.3.6.1.2.1.1.1.0';
 	#my($res) = $sess->get_table(-baseoid => $boid);
@@ -120,12 +122,10 @@ if (not defined($ARGV[0])) {
 	    $sess->close;
 	    foreach my $key ( sort keys %sw_descr ) {
 		if ( $res->{$oid_model} =~ /$key/ ) {
-		    $model = $sw_descr{$key};
-		    print STDERR "Host model N".$sw_descr{$key}.", description = '".$sw_models[$sw_descr{$key}]."'\n" if $debug;
 		    if ( $ref->{'model'} != $sw_descr{$key} ) {
-			print STDERR "Change host model to ID N".$sw_descr{$key}.", previous model ID is N".$ref->{'model'}."\n" if $debug;
-			$dbm->do("UPDATE hosts SET model=".$sw_descr{$key}." WHERE id=".$ref->{'id'} );
-			#$dbm->do("UPDATE hosts SET info='".$sw_descr{$key}."' WHERE id=".$ref->{'id'} );
+			print STDERR "Change Host = ".$ref->{'hostname'}." model => N".$sw_descr{$key}.", description = '".$sw_models[$sw_descr{$key}].
+			", previous model ID is N".$ref->{'model'}."\n" if $debug > 1 ;
+			$Q_update .= " model=".$sw_descr{$key};
 		    }
 		}
 	    }
@@ -134,7 +134,27 @@ if (not defined($ARGV[0])) {
 #	    $sess->close;
 #	    return undef;
 	}
+	# ------------------------------------
+	open ARPTABLE, "/usr/sbin/arp -na|" or die "Error read system ARP table";
+	while (<ARPTABLE>) {
+	    #? (192.168.29.22) at 00:09:6b:8c:2e:e1 on mif0 [vlan]
+	    if ( /\((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\)\s+\S+\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+/ and "$1" eq $ref->{'ip'} and "$2" ne $ref->{'hw_mac'}) {
+		my $MAC = $2;
+		#print STDERR "\t IP $1 = MAC '".$MAC."' " if $debug;
+		$Q_update .= "," if ( $Q_update =~ /model\=\d+/); 
+		$Q_update .= " hw_mac='".$MAC."'";
+	    }
+	}
+	close ARPTABLE;
+	# ------------------------------------
 
+
+	#  END check switch parameters -------
+	$Q_update .= " WHERE id=".$ref->{'id'};
+	if ( not $Q_update =~ /SET\sWHERE/ ) {
+	    print STDERR "Host = ".$ref->{'hostname'}."\tQuerry = \"".$Q_update."\"\n";
+	    $dbm->do($Q_update) if $debug < 2;
+	}
     }
     $stm->finish();
 
