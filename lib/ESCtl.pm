@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.10;
+$VERSION = 1.11;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -430,13 +430,13 @@ sub ES_port_defect {
     return -1  if (&$command(\$sw, $prompt_conf,	"port-security ".$arg{'PORT'}." address-limit 5" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"no port-security ".$arg{'PORT'} ) < 1 );
 
-    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'BLOCK_VLAN'} ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"fixed ".$arg{'PORT'} ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"untagged ".$arg{'PORT'} ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface port-channel ".$arg{'PORT'} ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"pvid ".$arg{'VLAN'}) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"pvid ".$arg{'BLOCK_VLAN'}) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"inactive") < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
@@ -538,11 +538,11 @@ sub ES_port_trunk {
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface port-channel ".$arg{'PORT'} ) < 1 );
 
-    if (not $arg{'TAG'}) {
-        return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'VLAN'}) < 1 );
-    } else {
+    if ($arg{'TAG'}) {
         #return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'BLOCK_VLAN'}) < 1 );
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid 1") < 1 );
+    } else {
+        return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'VLAN'}) < 1 );
     }
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no bmstorm-limit" ) < 1 );
@@ -633,7 +633,6 @@ sub ES_port_setparms {
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
     print STDERR "SET PARAMETERS in PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ...\n" if $debug;
-    print STDERR "BLOCKING VLAN = ".$arg{'BLOCK_VLAN'}." ...\n" if $debug;
 
     my $speed = ES_speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $maxhw, $adm_state ) = &$hw_char( MAXHW => $arg{'MAXHW'} );

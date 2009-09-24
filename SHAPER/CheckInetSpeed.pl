@@ -100,7 +100,7 @@ while (my @d = $sth->fetchrow_array) {
 		$priority{$IP} = $pri*20+int($d[4]/100)*3;
 	    }
 	    $priority{$IP} = 90 if ($priority{$IP} > 90 );
-	    $speedpipe{$pipe{$IP}} = $d[4];
+	    $speedpipe{$pipe{$IP}} = int($d[4]*1.04);
 	    $onlinepipe{$pipe{$IP}} += $d[6];
 	    print SHAPER	$IP." ".$pipe{$IP}." ".($pipe{$IP}+1)."\n";
 	    print SHAPER_DIFF	$IP." ".$pipe{$IP}." ".($pipe{$IP}+1)."\n"  if  ((not defined($pipeold{$IP})) || $pipe{$IP} != $pipeold{$IP});
@@ -115,8 +115,8 @@ foreach $pipe (sort keys %speedpipe) {
     print PIPES $pipe." ".$speedpipe{$pipe}."\n";
     my $pipeout= $pipe+1;
     print IPFW_CMD '#${fwcmd} pipe '.$pipe.' delete; ${fwcmd} pipe '.$pipeout.' delete'."\n".
-    '${fwcmd} pipe '.$pipe.' config buckets 512 mask dst-ip 0xffffffff bw '.$speedpipe{$pipe}.'Kbit queue 100 gred 0.002/10/30/0.1'."\n".
-    '${fwcmd} pipe '.$pipeout.' config buckets 512 mask src-ip 0xffffffff bw '.$speedpipe{$pipe}.'Kbit queue 100 gred 0.002/10/30/0.1'."\n";
+    '${fwcmd} pipe '.$pipe.' config buckets 512 mask dst-ip 0xffffffff bw '.$speedpipe{$pipe}.'Kbit queue 50 gred 0.002/10/30/0.1'."\n".
+    '${fwcmd} pipe '.$pipeout.' config buckets 512 mask src-ip 0xffffffff bw '.$speedpipe{$pipe}.'Kbit queue 50 gred 0.002/10/30/0.1'."\n";
 }
 print IPFW_CMD "\n".'. /etc/SHAPER/0ch_shaper_tables.sh'."\n";
 

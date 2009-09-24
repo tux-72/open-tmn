@@ -11,7 +11,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.11;
+$VERSION = 1.12;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
@@ -32,7 +32,7 @@ my $login       = $LIB."_login";
 my $login_nopriv= $LIB."_login_nopriv";
 my $speed_char  = $LIB."_speed_char";
 
-my $block_vlan=4094;
+#my $block_vlan=4094;
 my $prompt='/.*[\>#].*/';
 my $prompt_conf ='/.*\(config\)#.*/';
 my $prompt_conf_if ='/.*\(config\-if\)#.*/';
@@ -181,7 +181,7 @@ sub BPS_port_down {
 
 
 sub BPS_port_defect {
-#    IP LOGIN PASS PORT PORTPREF VLAN
+#    IP LOGIN PASS PORT PORTPREF BLOCK_VLAN
     my %arg = (
         @_,
     );
@@ -190,9 +190,9 @@ sub BPS_port_defect {
 
     print STDERR "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORT'}." !!!\n\n" if $debug;
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$block_vlan." name Block".$block_vlan." type port learning ivl" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$block_vlan." ".$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging disable pvid ".$block_vlan.
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'BLOCK_VLAN'}." name Block".$arg{'BLOCK_VLAN'}." type port learning ivl" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'BLOCK_VLAN'}." ".$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging disable pvid ".$arg{'BLOCK_VLAN'}.
     " filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed auto" ) < 1);

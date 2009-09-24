@@ -14,7 +14,7 @@ use locale;
 
 my $PROG=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
-    print STDERR "USE PROGRAMM DIRECTORY => $1\n" if $debug;
+#    print STDERR "PROG DIR => $1\n" if $debug;
     require $1.'/conf/config.pl';
 } else {
     require '/usr/local/swctl/conf/config.pl';
