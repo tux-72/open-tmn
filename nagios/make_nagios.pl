@@ -89,7 +89,7 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
     
     $sth2->finish();
 
-    my $sth3 = $dbh->prepare("SELECT h.id, h.hostname, p.portpref, p.port, p.info, p.portvlan, p.client_address, p.snmp_portindex, p.login FROM hosts h, swports p where h.visible>0 and h.model>0 and h.grp='".$grp."' and h.id=p.sw_id and p.link_type not in (0,20,19) and p.type>0 order by h.id, p.portpref, p.port");
+    my $sth3 = $dbh->prepare("SELECT h.id, h.hostname, p.portpref, p.port, p.info, p.portvlan, p.snmp_portindex, p.login FROM hosts h, swports p where h.visible>0 and h.model>0 and h.grp='".$grp."' and h.id=p.sw_id and p.link_type not in (0,20,19) and p.type>0 order by h.id, p.portpref, p.port");
     $sth3->execute();
     while (my $ref3 = $sth3->fetchrow_hashref()) {
 
@@ -107,8 +107,7 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
 	    $pinfo .=  $ref3->{'port'}."-port" if $ref3->{'port'};
 	}
 	
-	$pinfo .=  " ".koi2tr($ref3->{'client_address'}) if $ref3->{'client_address'};
-	$pinfo .=  " ".koi2tr($ref3->{'info'}) if not $ref3->{'client_address'};
+	$pinfo .=  " ".koi2tr($ref3->{'info'});
 	$pinfo .=  " vl-".$ref3->{'portvlan'} if $ref3->{'portvlan'};
 
 	if (defined($ref3->{'login'}) and $ref3->{'login'} ne '' and not $ref3->{'info'}) {

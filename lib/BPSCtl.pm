@@ -96,9 +96,9 @@ sub BPS_fix_macport {
     my %arg = (
         @_,
     );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug;
     # login
     my $sw; return -1  if ( &$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
 
     my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {

@@ -162,7 +162,7 @@ sub TCOM4500_fix_macport {
     );
     # login
     my $sw; return -1  if ( &$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug;
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
 
     my $mac=TCOM4500_mac_fix($arg{'MAC'});
     my $port = 0; my $pref; my $max=3; my $count=0;

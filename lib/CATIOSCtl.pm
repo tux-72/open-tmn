@@ -122,32 +122,35 @@ sub CATIOS_fix_macport {
     my %arg = (
         @_,
     );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug ;
+    # login
+    my $sw; return -1 if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
 
     my $mac=CATIOS_mac_fix($arg{'MAC'});
     print STDERR "MAC transfer - $mac \n" if $debug > 1;
     my $port = -1; my $pref; my $max=3; my $count=0;
-    # login
-    my $sw; return -1 if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
 
     while ($count < $max) {
     my @ln= $sw->cmd("show mac-address-table dynamic address ".$mac." vlan ".$arg{'VLAN'});
         foreach (@ln) {
-	    #vlan   mac address     type        protocols               port
-	    #-------+---------------+--------+---------------------+--------------------
-	    #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
-            if      ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+\S+\s+(Fa|Gi)\D+(\d+\/)(\d+)/ ) {
+		    #vlan   mac address     type        protocols               port
+		    #-------+---------------+--------+---------------------+--------------------
+		    #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
+            if      ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Fa|Gi)\D+(\d+\/)(\d+)/ ) {
 		$port = $5+0;
 		$pref = "$3$4";
-	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+\S+\s+(Po|Lo)\D+(\d+)/ ) {
+	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Po|Lo)\D+(\d+)/ ) {
 		$port = $4+0;
 		$pref = "$3";
-		    # *    1  001b.1105.3d8e   dynamic  Yes          5   Fa4/46
-	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(\D+)(\d+\/)(\d+)/ ) {
+		    #*    1  001b.1105.3d8e   dynamic  Yes          5   Fa4/46
+		    #     1  001e.589f.0c61   dynamic  Yes   Gi3/16
+		    #*    1  0013.4998.0def   dynamic  Yes   Fa5/46
+	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Fa|Gi)(\d+\/)(\d+)/ ) {
 		$port = $5+0;
 		$pref = "$3$4";
-		    # *    1  001b.1105.3d8e   dynamic  Yes          5   Po1
-	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+\S+\s+\d+\s+(\D+)(\d+)/ ) {
+		    # *   1  001b.1105.3d8e   dynamic  Yes          5   Po1
+		    #     1  0013.4991.f9a5   dynamic  Yes   Po1
+	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Po|Lo)(\d+)/ ) {
 		$port = $4+0;
 		$pref = "$3";
 	    }

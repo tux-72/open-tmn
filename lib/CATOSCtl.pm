@@ -150,6 +150,7 @@ sub CATOS_fix_macport {
         @_,
     );
     my $sw;  return -1  if (&$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
 
     $arg{'MAC'} =~ s/\:/\-/g;
     my $port = -1; my $pref; my $max=3; my $count=0; my @p = '';

@@ -354,7 +354,7 @@ sub ES_fix_macport {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug > 1;
 
     my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
@@ -374,7 +374,7 @@ sub ES_fix_macport {
         }
     }
     $sw->close();
-    print STDERR "MAC Port - $port\n" if $debug;
+    print STDERR "MAC Port - $port\n" if $debug > 1;
     return ($pref, $port);
 }
 

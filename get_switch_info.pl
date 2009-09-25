@@ -14,9 +14,11 @@ use locale;
 
 
 my $PROG=$0;
+my $script_name=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
     require $1.'/conf/config.pl';
-    print STDERR "RUN in DIR => $1\n" if $debug;
+    $script_name="$2";
+#    print STDERR "RUN in DIR => $1\n" if $debug;
 } else {
     require '/usr/local/swctl/conf/config.pl';
     print STDERR "USE STANDART PROGRAMM DIRECTORY\n\n";
@@ -90,14 +92,22 @@ my $Querry_portfix = '';
 
 if (not defined($ARGV[0])) {
     print STDERR 
-    "Usage: get_port_info.pl ( chk_model <hostname|allhosts> | chk_trunk <hostname> | host <hostname> | ip <IP switch> | allhosts )\n"
+    "Usage: $script_name ( chk_model|chk_trunk  <hostname|ip|allhosts> )\n"
 
-} elsif ( $ARGV[0] eq "chk_model" ) {
-    my $Q_end = '';
-    $Q_end = " and h.hostname='".$ARGV[1]."'" if ( $ARGV[1] ne "allhosts" );
+############################################## CHECK SWITCH MODEL & MAC ##############################################
+} elsif ( $ARGV[0] eq "chk_model" and defined($ARGV[1]) ) {
+    my $Q_end = " order by h.hostname" ;
+    if ( $ARGV[1] ne "allhosts" ) {
+	if ( $ARGV[1] =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) {
+	    $Q_end = " and h.ip='".$ARGV[1]."'";
+	} else {
+	    $Q_end = " and h.hostname='".$ARGV[1]."'";
+	}
+    }
 
     my $stm = $dbm->prepare("SELECT h.hostname, h.hw_mac, h.model, h.id, h.ip, m.rocom FROM hosts h, models m WHERE h.visible>0 and h.model=m.id ".$Q_end );
     $stm->execute();
+    print STDERR "Not found switches for input parameters\n" if ($stm->rows < 1 );
     while (my $ref = $stm->fetchrow_hashref()) {
 	#print STDERR " IP = ".$ref->{'ip'}." Community ".$ref->{'rocom'}."\n"  if $debug;
 	$ref->{'rocom'} = $conf{'DEF_COMUNITY'} if not defined($ref->{'rocom'}); my $MAC = '';
@@ -160,57 +170,133 @@ if (not defined($ARGV[0])) {
     }
     $stm->finish();
 
-} elsif ( $ARGV[0] eq "chk_trunk" ) {
-    my $Q_end = '';
-    $Q_end = " and h.hostname='".$ARGV[1]."'" if ( $ARGV[1] ne "allhosts" );
 
-    my $stm2 = $dbm->prepare("SELECT h.hostname, h.hw_mac, h.id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_portpref".
-    ", h.parent_port, m.lib, m.mon_login, m.mon_pass FROM hosts h, models m WHERE h.visible>0 and h.model=m.id ".$Q_end );
+############################################## CHECK & UPDATE TRUNK PORTS ##############################################
+} elsif ( $ARGV[0] eq "chk_trunk" and defined($ARGV[1])) {
+    my $Q_end = " order by h.hostname" ;
+    if ( $ARGV[1] ne "allhosts" ) {
+	if ( $ARGV[1] =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) {
+	    $Q_end = " and h.ip='".$ARGV[1]."'";
+	} else {
+	    $Q_end = " and h.hostname='".$ARGV[1]."'";
+	}
+    }
+
+    my $stm2 = $dbm->prepare("SELECT h.hostname, h.model, h.hw_mac, h.id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_portpref".
+    ", h.parent_port, h.control_vlan, m.lib, m.mon_login, m.mon_pass FROM hosts h, models m WHERE h.visible>0 and h.model=m.id and h.control_vlan>0 ".$Q_end);
     $stm2->execute();
+    print STDERR "Not found switches for input parameters\n" if ($stm2->rows < 1 );
     while (my $ref = $stm2->fetchrow_hashref()) {
-	#print STDERR " IP = ".$ref->{'ip'}." Community ".$ref->{'rocom'}."\n"  if $debug;
-	$ref->{'rocom'} = $conf{'DEF_COMUNITY'} if not defined($ref->{'rocom'});
+	if ($ref->{'parent'} < 1 ) {
+	    print STDERR " NOT found PARENT switch for '".$ref->{'hostname'}."'\n";
+	    next;
+	}
 	my $LIB_action = ''; my $uplink_portpref = ''; my $uplink_port = 0; my $parent_portpref = ''; my $parent_port = 0;
 
 	# ------- Fix uplink PORT ------------
-	my $Q_update = "UPDATE hosts SET ip='".$ref->{'ip'}."'";
+	my $Q_update = "UPDATE hosts SET model='".$ref->{'model'}."'";
+	my $Q_downlink = ''; $Q_uplink = '';
+
 	if ( $ref->{'lib'} ) {
+	print STDERR "\n--- Checking switch '".$ref->{'hostname'}."' ---\t" if $debug; 
 	    $LIB_action = $ref->{'lib'}."_fix_macport";
-	    ( my $uplink_portpref, my $uplink_port ) = &$LIB_action( IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, MAC => $conf{'CONTROL_HOST_MAC'}, VLAN => $conf{'CONTROL_VLAN'});
+	    ( $uplink_portpref, $uplink_port ) = &$LIB_action( IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, MAC => $checkmac{$ref->{'control_vlan'}}, VLAN => $ref->{'control_vlan'} );
 	    if ( $uplink_port > 0 ) {
-		print STDERR "FIX uplink port = ".$uplink_portpref.$uplink_port."\n";
+		print STDERR "FIX uplink port = ".$uplink_portpref.$uplink_port."\t"; # if ( $ARGV[1] ne "allhosts" );
 		$Q_update .= ", uplink_portpref='".$uplink_portpref."'"	if ( "x".$uplink_portpref ne "x".$ref->{'uplink_portpref'} );
 		$Q_update .= ", uplink_port=".$uplink_port		if ( "x".$uplink_port 	  ne "x".$ref->{'uplink_port'} );
 	    } else {
-		print STDERR "Uplink port not fixed :(((\n"; 
+		print STDERR "Uplink port not fixed :(((\t"; 
 	    }
 	}
 
 	# -------- Fix parent PORT -----------
-	my $stm22 = $dbm->prepare("SELECT h.hostname, h.model, h.ip, m.lib, m.mon_login, m.mon_pass FROM hosts h, models m WHERE h.visible>0 and h.model=m.id and h.id=".$ref->{'parent'} );
+	my $stm22 = $dbm->prepare("SELECT h.hostname, h.model, h.ip, h.id, m.lib, m.mon_login, m.mon_pass FROM hosts h, models m WHERE h.visible>0 and h.model=m.id and h.id=".$ref->{'parent'} );
 	$stm22->execute();
 	while (my $ref2 = $stm22->fetchrow_hashref()) {
 	    $LIB_action = $ref2->{'lib'}."_fix_macport";
 	    if ( $ref2->{'lib'} ) {
-		( my $parent_portpref, my $parent_port ) = &$LIB_action( IP => $ref2->{'ip'}, LOGIN => $ref2->{'mon_login'}, PASS => $ref2->{'mon_pass'}, MAC => $ref->{'hw_mac'}, VLAN => $conf{'CONTROL_VLAN'});
+		( $parent_portpref, $parent_port ) = &$LIB_action( IP => $ref2->{'ip'}, LOGIN => $ref2->{'mon_login'}, PASS => $ref2->{'mon_pass'}, MAC => $ref->{'hw_mac'}, VLAN => $ref->{'control_vlan'});
 		if ( $parent_port > 0 ) {
-		    print STDERR "FIX parent downlink port = ".$parent_portpref.$parent_port."\n";
+		    print STDERR "FIX parent '".$ref2->{'hostname'}."' downlink port = ".$parent_portpref.$parent_port; # if  ( $ARGV[1] ne "allhosts" );
 		    $Q_update .= ", parent_portpref='".$parent_portpref."'"	if ( "x".$parent_portpref ne "x".$ref->{'parent_portpref'} );
 		    $Q_update .= ", parent_port=".$parent_port			if ( "x".$parent_port 	  ne "x".$ref->{'parent_port'} );
+
+		    if ( CHECK_port_exists( SWID => $ref2->{'id'}, PORTPREF => $parent_portpref, PORT => $parent_port, TYPE => 1 ) < 0 ) {
+			$Q_downlink = "INSERT INTO swports SET info='Downlink to ".$ref->{'hostname'}."', sw_id=".$ref2->{'id'}.", link_type=".$link_type{'trunk'}.
+			", type=1, portvlan=".$ref->{'control_vlan'}.", port=".$parent_port;
+			$Q_downlink .= ", portpref='".$parent_portpref."'" if ("x".$parent_portpref ne "x" );
+			$Q_downlink .= " ON DUPLICATE KEY UPDATE link_type=".$link_type{'trunk'}.", info='Downlink to ".$ref->{'hostname'}."'";
+		    } else {
+			$Q_downlink = "UPDATE swports SET link_type=".$link_type{'trunk'}.", info='Downlink to ".$ref->{'hostname'}.
+			"' WHERE sw_id=".$ref2->{'id'}." and type=1 and port=".$parent_port;
+			if ( "x".$parent_portpref ne "x" ) {
+			    $Q_downlink .= " and portpref='".$parent_portpref."'";
+			} else {
+			    $Q_downlink .= " and portpref is NULL";
+			}
+		    }
 		} else {
-		    print STDERR "Parent downlink port not fixed :(((\n"; 
+		    print STDERR " Parent host '".$ref2->{'hostname'}."' downlink port not fixed :(((\t";
+		}
+	    }
+	    if ( $uplink_port > 0 ) {
+		if ( CHECK_port_exists( SWID => $ref->{'id'}, PORTPREF => $uplink_portpref, PORT => $uplink_port, TYPE => 1 ) < 0 ) {
+		    $Q_uplink = "INSERT INTO swports SET info='Uplink to ".$ref2->{'hostname'}."', sw_id=".$ref->{'id'}.", link_type=".$link_type{'uplink'}.
+		    ", type=1, portvlan=".$ref->{'control_vlan'}.", port=".$uplink_port;
+		    $Q_uplink .= ", portpref='".$uplink_portpref."'" if ("x".$uplink_portpref ne "x" );
+		    $Q_uplink .= " ON DUPLICATE KEY UPDATE link_type=".$link_type{'uplink'}.", info='Uplink to ".$ref2->{'hostname'}."'";
+                } else {
+		    $Q_uplink = "UPDATE swports SET link_type=".$link_type{'uplink'}.", info='Uplink to ".$ref2->{'hostname'}.
+		    "' WHERE sw_id=".$ref->{'id'}." and type=1 and port=".$uplink_port;
+		    if ( "x".$uplink_portpref ne "x" ) {
+			$Q_uplink .= " and portpref='".$uplink_portpref."'";
+		    } else {
+			$Q_uplink .= " and portpref is NULL";
+		    }
 		}
 	    }
 	}
 	$stm22->finish();
-	
+	print STDERR "\nUPDATE UPLINK   = \"".$Q_uplink."\"\n"   if $debug > 1;
+	print STDERR "\nUPDATE DOWNLINK = \"".$Q_downlink."\"\n" if $debug > 1;
+
+	if ( $ARGV[1] ne "allhosts" and $debug < 2 ) {
+	    $dbm->do($Q_uplink);
+	    $dbm->do($Q_downlink);
+	}
+
 	#  END check switch parameters -------
 	$Q_update .= " WHERE id=".$ref->{'id'};
 	if ( $Q_update =~ /\,/ ) {
-	    print STDERR "Host = ".$ref->{'hostname'}."\tQuerry = \"".$Q_update."\"\n";
-	    $dbm->do($Q_update) if $debug < 2;
+	    print STDERR "\nUPDATE Querry = \"".$Q_update."\"\n" if $debug > 1 ;
+	    $dbm->do($Q_update) if ( $ARGV[1] ne "allhosts" and $debug < 2 );
 	}
     }
     $stm2->finish();
+    print STDERR "\n" if $debug; 
 }
 
+
+sub CHECK_port_exists {
+        my %arg = (
+            @_,
+        );
+        #  SWID PORTPREF PORT TYPE 
+	my $Q_chk  = "SELECT port_id FROM swports WHERE sw_id=".$arg{'SWID'}." and port=".$arg{'PORT'}." and type=".$arg{'TYPE'};
+	if ( "x".$arg{'PORTPREF'} ne "x" ) {
+	    $Q_chk .= " and portpref='".$arg{'PORTPREF'}."'";
+	} else {
+	    $Q_chk .= " and portpref is NULL";
+	}
+	#print "\n--------------\"$Q_chk\"\n" if $debug > 1;
+	my $stmchk = $dbm->prepare($Q_chk);
+	$stmchk->execute();
+	if ( $stmchk->rows < 1 ) {
+	    # записи для порта не найдено
+	    return -1;
+	} else {
+	    # запись для порта существует
+	    return 1;
+	}
+}

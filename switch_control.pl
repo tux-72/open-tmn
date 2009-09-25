@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 $debug=1;
-my $ver='1.10';
+my $ver='1.11';
 #$VERSION = 0.97;
 
 use Getopt::Long;
@@ -13,9 +13,11 @@ use locale;
 
 
 my $PROG=$0;
+my  $script_name=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
 #    print STDERR "PROG DIR => $1\n" if $debug;
     require $1.'/conf/config.pl';
+    $script_name=$2;
 } else {
     require '/usr/local/swctl/conf/config.pl';
     print STDERR "USE STANDART PROGRAMM DIRECTORY\n";
@@ -86,7 +88,7 @@ my $point='';
 my $Querry_portfix = '';
 
 if (not defined($ARGV[0])) {
-    print STDERR "Usage: switch_control.pl (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink | pass_change)\n"
+    print STDERR "Usage:  $script_name (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink | pass_change)\n"
 
 } elsif ( $ARGV[0] eq "VLAN_get" ) {
         my $vlanget = VLAN_get(PORT_ID => 4370, LINK_TYPE => 24, ZONE => -1, VLAN_MIN => 100, VLAN_MAX => 999);
@@ -227,7 +229,7 @@ if (not defined($ARGV[0])) {
 	    next if $ref->{'portvlan'} == 1;
 
 	    $Querry_portfix  .=  ", status=".$port_status{'enable'}.", us_speed=".$ref->{'bw_free'}.", ds_speed=".$ref->{'bw_free'}.
-	    ", client_address=NULL, tag=0, start_date=NULL, mac_port=NULL, info=NULL, login=NULL, maxhwaddr=-1, link_head=NULL, \
+	    ", tag=0, start_date=NULL, mac_port=NULL, info=NULL, login=NULL, maxhwaddr=-1, link_head=NULL, \
 	    autoneg=1, speed=NULL, duplex=NULL";
 	    $ds=$ref->{'bw_free'}; $us=$ref->{'bw_free'};
 
@@ -249,7 +251,7 @@ if (not defined($ARGV[0])) {
 
 	    ############# SET PORT is DEFECT 
 	    } elsif ($ref->{'autoconf'} == $link_type{'defect'}) {
-	    $Querry_portfix  .=  ", status=".$port_status{'disable'}.", us_speed=NULL, ds_speed=NULL, client_address=NULL, tag=0, \
+	    $Querry_portfix  .=  ", status=".$port_status{'disable'}.", us_speed=NULL, ds_speed=NULL, tag=0, \
 	    portvlan=-1, start_date=NULL, mac_port=NULL, info=NULL, login=NULL, maxhwaddr=-1, link_head=NULL, autoneg=1, speed=NULL, duplex=NULL";
 
 	    ############# PORT TYPE TRUNK
@@ -350,7 +352,7 @@ if (not defined($ARGV[0])) {
     	    $head = GET_Terminfo( TYPE => $ref->{'link_type'}, ZONE => $ref->{'vlan_zone'}, TERM_ID => $ref->{'link_head'});
 
 	    $Querry_portfix  .=  ", status=".$port_status{'enable'}.", us_speed=".$ref->{'bw_free'}.", ds_speed=".$ref->{'bw_free'}.
-	    ", client_address=NULL, tag=0, start_date=NULL, mac_port=NULL, info=NULL, login=NULL, maxhwaddr=-1, link_head=NULL, \
+	    ", tag=0, start_date=NULL, mac_port=NULL, info=NULL, login=NULL, maxhwaddr=-1, link_head=NULL, \
 	    autoneg=1, speed=NULL, duplex=NULL";
 	    $ds=$ref->{'bw_free'}; $us=$ref->{'bw_free'}; $trunking_vlan = 1; 
 		

@@ -27,6 +27,13 @@
 #    '',		,
 );
 
+%checkmac = (
+    '1'         =>      '00:09:3d:12:c6:58',
+    '10'        =>      '00:09:3d:12:c6:59',
+    '870'       =>      '00:09:3d:12:c6:58',
+);
+
+
 use lib '/usr/local/switch-control/lib';
 use C73Ctl;
 use CATIOSCtl;

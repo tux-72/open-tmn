@@ -17,7 +17,7 @@ $VERSION = 1.07;
 @EXPORT_OK = qw();
 @EXPORT_TAGS = ();
 
-@EXPORT = qw(	GS_fix_vlan	GS_conf_save	GS_vlan_trunk_add	GS_vlan_trunk_remove	GS_vlan_remove
+@EXPORT = qw( GS_fix_vlan GS_fix_macport GS_conf_save GS_vlan_trunk_add GS_vlan_trunk_remove GS_vlan_remove
 	    );
 
 my $debug 	= 1;
@@ -110,7 +110,7 @@ sub GS_fix_vlan {
     foreach (@ln) {
 	#Port      VLAN ID        MAC Address         Type
 	#26        1              00:03:42:97:66:a1   Dynamic
-        if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+Dynamic/ and $3 eq $arg{'MAC'} ) {
+        if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+\S+/ and $3 eq $arg{'MAC'} ) {
             $vlan = $2+0;
         }
     }
@@ -127,7 +127,7 @@ sub GS_fix_macport {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug > 1;
 
     my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
@@ -135,7 +135,7 @@ sub GS_fix_macport {
 	foreach (@ln) {
 	    #Port      VLAN ID        MAC Address         Type
 	    #26        1              00:03:42:97:66:a1   Dynamic
-    	    if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+Dynamic/ and $2 eq $arg{'VLAN'} and $3 eq $arg{'MAC'} ) {
+    	    if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+\S+/ and $2 eq $arg{'VLAN'} and $3 eq $arg{'MAC'} ) {
                 $port = $1+0;
     	    }
 	}
@@ -146,7 +146,7 @@ sub GS_fix_macport {
         }
     }
     $sw->close();
-    print STDERR "MAC Port - $port\n" if $debug;
+    print STDERR "MAC Port - $port\n" if $debug > 1;
     return ($pref, $port);
 }
 

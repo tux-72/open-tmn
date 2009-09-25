@@ -137,7 +137,7 @@ sub CAT3508G_fix_macport {
     );
     # login
     my $sw; return -1  if ( &$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug;
+    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
 
     my $mac=CAT3508G_mac_fix($arg{'MAC'});
     my $port = -1; my $pref; my $max=3; my $count=0;
