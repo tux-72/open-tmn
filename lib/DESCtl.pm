@@ -5,6 +5,7 @@ package DESCtl;
 #use strict;
 #use Net::SNMP;
 #use locale;
+use SWALLCtl;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
@@ -48,6 +49,40 @@ my $port_ctl_mcast      = 1;    my $port_ctl_bcast      = 2;
 
 ############ SUBS ##############
 
+sub DES_conf_save {
+
+#   IP LOGIN PASS 
+    my %arg = (
+        @_,
+    );
+    # login
+    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    #print STDERR "SAVE $LIB config in switch ".$arg{'IP'}." ...\n";
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "SAVE config on $LIB switch ".$arg{'IP'}." ..." );
+    return -1  if (&$command(\$sw, $prompt, "save" ) < 1 );
+    $sw->close();
+    if ( $debug > 0 ) {
+	return -1;
+    } else {
+	return 1;
+    }
+}
+
+sub DES_cmd {
+    my ($swl, $cmd_prompt, $cmd ) = @_;
+    my @lines = ${$swl}->cmd(   String  => $cmd,
+                                Prompt  => $cmd_prompt,
+                                Timeout => $timeout,
+                                Errmode => 'return',
+				#Cmd_remove_mode => 0,
+                            );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@lines );
+    undef @lines;
+    return 1;
+}
+
+
+
 sub DES_set_segmentation {
 
     my ($swl, $port, $fwd_ports ) = @_;
@@ -75,7 +110,7 @@ sub DES_set_segmentation {
         }
     }
     if ( $fwd_ports ne '' ) {
-	print STDERR "Normalize traffic_segmentation in ".$port." to ".$fwd_ports."\n" if $debug;
+	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Normalize traffic_segmentation in ".$port." to ".$fwd_ports );
 	#return -1  if (&$command(\${$swl}, $prompt, "config traffic_segmentation ".$port." forward_list ".$fwd_ports ) < 1 );
     }
     return 1;
@@ -110,13 +145,13 @@ sub DES_port_set_vlan {
 	    @range = split /\,/,$ranges_vlan;
 	    foreach $c ( @range ) {
 		if ("x".$port eq "x".$c) {
-		    print STDERR "Remove port ".$c." from vlan ".$vln_num."\n" if $debug;
+		    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$c." from vlan ".$vln_num );
 		    ${$swl}->cmd("config vlan ".$vln." delete ".$port );
 		} else {
 		    @d = split /-/,$c;
 		    for $e ($d[0]..$d[1]) {
 			if ($port == $e) {
-			    print STDERR "Remove port ".$e." in portrange - ".$c." from vlan ".$vln_num."\n" if $debug;
+			    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$e." in portrange - ".$c." from vlan ".$vln_num );
 			    ${$swl}->cmd("config vlan ".$vln." delete ".$port );
 			}
 		    }
@@ -126,11 +161,14 @@ sub DES_port_set_vlan {
     }
     if ("x".$vlanname eq "x" ) {
 	$vlanname = "Vlan".$vlan_id;
-	print STDERR "Create VLAN ".$vlanname."\n" if $debug;
-	@ln = ${$swl}->cmd("create vlan ".$vlanname." tag ".$vlan_id ); print STDERR @ln;
+	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create VLAN ".$vlanname );
+	@ln = ${$swl}->cmd("create vlan ".$vlanname." tag ".$vlan_id ); 
+	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@ln );
     }
-    print STDERR "Use vlan name '".$vlanname."'\n" if $debug;
-    @ln = ${$swl}->cmd( "config vlan ".$vlanname." add ".$tagging." ".$port ); print STDERR @ln;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Use vlan name '".$vlanname."'" );
+    @ln = ${$swl}->cmd( "config vlan ".$vlanname." add ".$tagging." ".$port );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@ln );
+    undef @ln;
     #return -1  if (&$command(\${$swl}, $prompt,	"config vlan ".$vlanname." add ".$tagging." ".$port ) < 1 );
 
     return 1;
@@ -153,12 +191,10 @@ sub DES_vlan_char {
 }
 
 sub DES_speed_char {
-
     my %arg = (
         @_,
     );
     my @duplex = ''; $duplex[0] = 'half'; $duplex[1] = 'full';
-
     my $spd = 'auto';
     if ( $arg{'SPEED'} =~ /^1(0|00|000)/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) { 
 	$spd = $arg{'SPEED'}."_".$duplex[$arg{'DUPLEX'}];
@@ -186,30 +222,14 @@ sub DES_hw_char {
 
 sub DES_login {
     my ($swl, $ip, $login, $pass) = @_;
-    print STDERR " IP = ".$ip.", PASS = ".$pass."\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "IP = ".$ip.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
     ${$swl}->open($ip);
     ${$swl}->login($login,$pass) || return -1;
-    print STDERR "Connect to switch - Ok\n" if $debug > 1;
-    return 1;
-}
-
-sub DES_cmd {
-    my ($swl, $cmd_prompt, $cmd ) = @_;
-    my @lines = ${$swl}->cmd(   String  => $cmd,
-                                Prompt  => $cmd_prompt,
-                                Timeout => $timeout,
-                                Errmode => 'return',
-				#Cmd_remove_mode => 0,
-                            );
-    if ($debug) {
-        print STDERR "\n>>>\n";
-        print STDERR @lines; print STDERR "\n";
-    }
-    undef @lines;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect to switch - Ok" );
     return 1;
 }
 
@@ -218,7 +238,8 @@ sub DES_conf_first {
     my %arg = (
         @_,
     );
-    print STDERR "First config new switch - '".$arg{'IP'}."'\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "First config new switch - '".$arg{'IP'}."'" );
+    #print STDERR "First config new switch - '".$arg{'IP'}."'\n" if $debug;
     my $vlan = 0;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
@@ -231,7 +252,9 @@ sub DES_conf_first {
 	return -1  if (&$command(\$sw, $prompt,    "y") < 1 );
 	#$sw->print("y");
 	sleep(10);
-	print STDERR "Config resetting successfull \n" if $debug;
+	#print STDERR "Config resetting successfull \n" if $debug;
+	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Config resetting successfull!" );
+
     } else {
 	return -1  if (&$command(\$sw, $prompt,    "reset force_agree") < 1 );
     }
@@ -284,31 +307,28 @@ sub DES_conf_first {
     }
 
     ####### ADD ADMIN LOGIN
-    print STDERR "Create login ".$arg{'LOGIN'}."\n" if $debug;
+    #print STDERR "Create login ".$arg{'LOGIN'}."\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create login ".$arg{'LOGIN'} );
     $sw->print("create account admin $arg{'LOGIN'}");
     $sw->waitfor("/.* new password.*/");
     $sw->print("$arg{'PASS'}");
     $sw->waitfor("/.* for confirmation.*/");
     return -1  if (&$command(\$sw, $prompt, $arg{'PASS'} ) < 1 );
-    #$sw->print("$arg{'PASS'}");
-    print STDERR " - Ok!\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Login ".$arg{'LOGIN'}." created successfull!" );
 
     ####### ADD Monitoring LOGIN
-    print STDERR "Create login ".$arg{'MONLOGIN'}."\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create login ".$arg{'MONLOGIN'} );
     $sw->print("create account admin $arg{'MONLOGIN'}");
     $sw->waitfor("/.* new password.*/");
     $sw->print("$arg{'MONPASS'}");
     $sw->waitfor("/.* for confirmation.*/");
     return -1  if (&$command(\$sw, $prompt, $arg{'MONPASS'} ) < 1 );
-    #$sw->print("$arg{'MONPASS'}");
-    print STDERR " - Ok!\n" if $debug;
-    
-    print STDERR "Save..." if $debug;
-    #print STDERR "Sleep 5sec.\n";
-    return -1  if (&$command(\$sw, $prompt, "save" ) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Login ".$arg{'MONLOGIN'}." created successfull!" );
 
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Save config ..." );
+    return -1  if (&$command(\$sw, $prompt, "save" ) < 1 );
     $sw->close();
-    print STDERR "Switch '".$arg{'IP'}."' is configured successfull!\n\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Switch '".$arg{'IP'}."' is configured successfull!" );
     return 1;
 }
 
@@ -321,36 +341,31 @@ sub DES_pass_change {
     # login
     $arg{'IP'}='192.168.128.210' if $debug;
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Change ACCOUNTS in switch '".$arg{'IP'}."'\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Change ACCOUNTS in switch '".$arg{'IP'}."'" );
 
     ####### ADD ADMIN LOGIN
-    print STDERR "Create login ".$arg{'ADMINLOGIN'}."\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create login ".$arg{'ADMINLOGIN'} );
     return -1  if (&$command(\$sw, $prompt, "delete account ".$arg{'LOGIN'} ) < 1 );
     $sw->print("create account admin ".$arg{'ADMINLOGIN'});
     $sw->waitfor("/.* new password.*/");
     $sw->print($arg{'ADMINPASS'});
     $sw->waitfor("/.* for confirmation.*/");
     return -1  if (&$command(\$sw, $prompt, $arg{'ADMINPASS'} ) < 1 );
-    #$sw->print("$arg{'ADMINPASS'}");
-    print STDERR " - Ok!\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Login ".$arg{'ADMINLOGIN'}." created successfull!" );
 
     ####### ADD Monitoring LOGIN
-    print STDERR "Create login ".$arg{'MONLOGIN'}."\n" if $debug;
-    #return -1  if (&$command(\$sw, $prompt, "delete account ".$arg{'MONLOGIN'} ) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create login ".$arg{'MONLOGIN'} );
     $sw->print("create account admin ".$arg{'MONLOGIN'});
     $sw->waitfor("/.* new password.*/");
     $sw->print($arg{'MONPASS'});
     $sw->waitfor("/.* for confirmation.*/");
     return -1  if (&$command(\$sw, $prompt, $arg{'MONPASS'} ) < 1 );
-    #$sw->print("$arg{'MONPASS'}");
-    print STDERR " - Ok!\n" if $debug;
-    
-    print STDERR "Save..." if $debug;
-    #print STDERR "Sleep 5sec.\n";
-    return -1  if (&$command(\$sw, $prompt, "save" ) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Login ".$arg{'MONLOGIN'}." created successfull!" );
 
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Save config ..." );
+    return -1  if (&$command(\$sw, $prompt, "save" ) < 1 );
     $sw->close();
-    print STDERR "Accounts Created!\n";
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Change password accounts complete!" );
     return 1;
 }
 
@@ -361,7 +376,7 @@ sub DES_fix_macport {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "FIX PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}.", VLAN '".$arg{'VLAN'}."'\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "FIX PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}.", VLAN '".$arg{'VLAN'}."'" );
 
     my $port = -1; my $pref; my $max=3; my $count=0; 
     while ($count < $max) {
@@ -382,20 +397,6 @@ sub DES_fix_macport {
     return ($pref,$port);
 }
 
-sub DES_conf_save {
-
-#   IP LOGIN PASS 
-    my %arg = (
-        @_,
-    );
-    # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "SAVE $LIB config in switch ".$arg{'IP'}." ...\n";
-
-    return -1  if (&$command(\$sw, $prompt, "save" ) < 1 );
-    $sw->close();
-    return 1;
-}
 
 sub DES_port_up {
 
@@ -405,7 +406,7 @@ sub DES_port_up {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state enable" ) < 1 );
     $sw->close();
     return 1;
@@ -419,7 +420,7 @@ sub DES_port_down {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state disable" ) < 1 );
     $sw->close();
     return 1;
@@ -433,7 +434,7 @@ sub DES_port_defect {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
 
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state disable flow_control disable speed auto" ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config bandwidth_control ".$arg{'PORT'}." rx_rate no_limit tx_rate no_limit" ) < 1 );
@@ -452,7 +453,7 @@ sub DES_port_free {
     return -1 if (not $arg{'VLAN'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
     my ( $ds, $us ) = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
 
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state enable flow_control enable speed auto" ) < 1 );
@@ -474,7 +475,7 @@ sub DES_port_trunk {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
     my $speed = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt, "config port_security ports ".$arg{'PORT'}." admin_state disable" ) < 1 );
@@ -497,7 +498,7 @@ sub DES_port_system {
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
 
-    print STDERR "Configure SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
     my $speed = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $ds, $us ) = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
 
@@ -517,8 +518,8 @@ sub DES_port_setparms {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PARAMETERS port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
 
-    print STDERR "SET PARAMETERS in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
     my $speed = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $ds, $us ) = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
     my ( $maxhw, $adm_state ) = &$hw_char( MAXHW => $arg{'MAXHW'} );
@@ -541,16 +542,13 @@ sub DES_vlan_trunk_add  {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "ADD VLAN ".$arg{'VLAN'}." to trunk port ".$arg{'PORT'}."!!!\n\n";
-    
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN ".$arg{'VLAN'}." to trunk port ".$arg{'PORT'} );
     my $vlanname = &$vlan_char( \$sw, $arg{'VLAN'} );
-
     if ( $vlanname eq '' ) {
 	$vlanname = "Vlan_".$arg{'VLAN'};
 	return -1  if (&$command(\$sw, $prompt, "create vlan ".$vlanname." tag ".$arg{'VLAN'} ) < 1 );
     }
     return -1  if ( &$command(\$sw, $prompt, "config vlan ".$vlanname." add tag ".$arg{'PORT'} ) < 1 );
-
     #return -1  if ( &$set_segmentation (\$sw, $arg{'PORT'}, $arg{'UPLINKPORT'} ) < 1 );
     
     $sw->close();
@@ -566,10 +564,8 @@ sub DES_vlan_trunk_remove  {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN ".$arg{'VLAN'}." from trunk port ".$arg{'PORT'}."!!!\n\n";
-    
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN ".$arg{'VLAN'}." from trunk port ".$arg{'PORT'} );
     my $vlanname = &$vlan_char( \$sw, $arg{'VLAN'} );
-
     if ( $vlanname ne '' ) {
 	return -1  if (&$command(\$sw, $prompt, "config vlan ".$vlanname." delete ".$arg{'PORT'} ) < 1 );
     }
@@ -584,10 +580,8 @@ sub DES_vlan_remove  {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN ".$arg{'VLAN'}." from switch ".$arg{'IP'}."!!!\n";
-    
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN ".$arg{'VLAN'}." from switch ".$arg{'IP'} );
     my $vlanname = &$vlan_char( \$sw, $arg{'VLAN'} );
-
     if ( $vlanname ne '' ) {
 	return -1  if (&$command(\$sw, $prompt, "delete vlan ".$vlanname ) < 1 );
     }

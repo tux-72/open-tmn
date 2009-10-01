@@ -5,6 +5,7 @@ package CAT3508GCtl;
 #use strict;
 #use Net::SNMP;
 #use locale;
+use SWALLCtl;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();

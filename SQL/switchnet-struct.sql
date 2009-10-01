@@ -185,11 +185,12 @@ CREATE TABLE `hosts` (
   `idhouse` int(11) NOT NULL,
   `podezd` int(11) NOT NULL DEFAULT '0',
   `grp` varchar(15) NOT NULL,
-  `conffile` varchar(50) DEFAULT NULL,
   `stamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `clients_vlan` int(11) DEFAULT NULL,
   `parent_ext` varchar(40) DEFAULT NULL,
   `vlan_zone` int(11) DEFAULT '1',
+  `control_vlan` int(11) DEFAULT '1',
+  `info` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `hostname` (`hostname`),
   UNIQUE KEY `ip` (`ip`),
@@ -198,7 +199,7 @@ CREATE TABLE `hosts` (
   KEY `swmodel` (`model`),
   KEY `house` (`idhouse`),
   CONSTRAINT `idmodel` FOREIGN KEY (`model`) REFERENCES `models` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=279 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=284 DEFAULT CHARSET=koi8r CHECKSUM=1;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -383,7 +384,6 @@ CREATE TABLE `swports` (
   `mac_port` varchar(17) DEFAULT NULL,
   `info` varchar(60) DEFAULT NULL,
   `start_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `client_address` varchar(100) DEFAULT NULL,
   `portvlan` int(11) DEFAULT '-1',
   `tag` tinyint(1) NOT NULL DEFAULT '0',
   `complete_q` tinyint(4) NOT NULL DEFAULT '0',
@@ -408,7 +408,7 @@ CREATE TABLE `swports` (
   KEY `PHY` (`phy_type`),
   KEY `port_type` (`type`),
   CONSTRAINT `switch` FOREIGN KEY (`sw_id`) REFERENCES `hosts` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4719 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=4786 DEFAULT CHARSET=koi8r CHECKSUM=1;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -552,4 +552,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2009-09-17  9:18:13
+-- Dump completed on 2009-09-30 19:05:01

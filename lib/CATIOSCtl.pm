@@ -5,6 +5,7 @@ package CATIOSCtl;
 #use strict;
 #use Net::SNMP;
 #use locale;
+use SWALLCtl;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
@@ -136,22 +137,15 @@ sub CATIOS_fix_macport {
 		    #vlan   mac address     type        protocols               port
 		    #-------+---------------+--------+---------------------+--------------------
 		    #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
-            if      ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Fa|Gi)\D+(\d+\/)(\d+)/ ) {
-		$port = $5+0;
-		$pref = "$3$4";
-	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Po|Lo)\D+(\d+)/ ) {
-		$port = $4+0;
-		$pref = "$3";
 		    #*    1  001b.1105.3d8e   dynamic  Yes          5   Fa4/46
 		    #     1  001e.589f.0c61   dynamic  Yes   Gi3/16
-		    #*    1  0013.4998.0def   dynamic  Yes   Fa5/46
-	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Fa|Gi)(\d+\/)(\d+)/ ) {
-		$port = $5+0;
-		$pref = "$3$4";
+            if      ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Fa|Gi)(\D+|.*)(\d+\/)(\d+)/ ) {
+		$port = $6+0;
+		$pref = "$3$5";
 		    # *   1  001b.1105.3d8e   dynamic  Yes          5   Po1
 		    #     1  0013.4991.f9a5   dynamic  Yes   Po1
-	    } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Po|Lo)(\d+)/ ) {
-		$port = $4+0;
+            } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Po|Lo)(\D+|.*)(\d+)/ ) {
+		$port = $5+0;
 		$pref = "$3";
 	    }
 	}

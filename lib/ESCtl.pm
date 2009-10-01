@@ -10,6 +10,7 @@ use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
+use SWALLCtl;
 
 $VERSION = 1.12;
 @ISA = qw(Exporter);
@@ -52,7 +53,7 @@ my $bw_unlim	= 64;
 
 sub ES_login {
     my ($swl, $ip, $login, $pass) = @_;
-    print STDERR " IP = ".$ip.", LOGIN =".$login."\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => 'ES_login', MESS => "IP = ".$ip.", LOGIN = '".$login."'" );
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
@@ -65,13 +66,13 @@ sub ES_login {
     ${$swl}->waitfor("/.*assword.*/");
     ${$swl}->print($pass);
     ${$swl}->waitfor($prompt) || return -1;
-    print STDERR "Connect user '".$login."' - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => 'ES_login', MESS => "Connect user '".$login."' - Ok" );
     return 1;
 }
 
 sub ES_start_login {
     my ($swl, $ip) = @_;
-    print STDERR " IP = ".$ip.", LOGIN =".$login."\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => 'ES_start_login', MESS => "IP = ".$ip.", LOGIN = 'admin'" );
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
@@ -84,7 +85,7 @@ sub ES_start_login {
     ${$swl}->waitfor("/.*assword.*/");
     ${$swl}->print("1234");
     ${$swl}->waitfor($prompt) || return -1;
-    print STDERR "Connect user admin - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => 'ES_login', MESS => "Connect user 'admin' - Ok" );
     return 1;
 }
 
@@ -96,9 +97,8 @@ sub ES_cmd {
                                 Errmode => 'return',
                             );
     if ($debug) {
-        print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
-        print STDERR @lines;
-	print STDERR "\n";
+        #print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
+	dlog ( DBUG => 1, SUB => 'ES_cmd-'.${$swl}->last_prompt(), MESS => \@lines );
     }
     return 1;
 }
@@ -146,12 +146,12 @@ sub ES_conf_save {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "SAVE config in ES switch '".$arg{'IP'}."'...\n"; # if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_conf_save', MESS => "SAVE config on $LIB switch ".$arg{'IP'}." ..." );
     my @res = $sw->cmd(	String  =>      "write memory",
 			prompt  =>      $ES_prompt,
 			Timeout =>      20,
-		      ) if not $debug; print @res;
-    print STDERR " - OK!\n";
+		      );
+    dlog ( DBUG => 1, SUB => 'ES_conf_save', MESS => \@res );
     $sw->close();
     return 1;
 }
@@ -168,23 +168,20 @@ sub ES_conf_first {
 	$sw->close();
 	return -1  if (&$start_login(\$sw, $arg{'IP'}) < 1 );
     }
-    
-    print STDERR "REPLACE CONFIG in ES switch '".$arg{'IP'}."'...\n" if $debug;
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "REPLACE CONFIG in ES switch '".$arg{'IP'}."'"  );
 
     ######## ALL SWITCH conf
-    if ( $debug < 2) {
-	$sw->print("erase running-config interface port-channel 1-".$arg{'LASTPORT'});
-	$sw->waitfor("/.* erase configuration.*/");
-	print STDERR "Erasing config ... \n";
-	my @res = $sw->cmd  (	String	=>	"y",
+    $sw->print("erase running-config interface port-channel 1-".$arg{'LASTPORT'});
+    $sw->waitfor("/.* erase configuration.*/");
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Erasing interfaces config ... "  );
+    my @res = $sw->cmd  (	String	=>	"y",
 				prompt	=>	$prompt,
 				Timeout	=>	20,
-			    ); print @res;
-    }
-# ---------------------------------------------
+			    );
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => \@res  );
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Erasing VLAN config ... "  );
     my @lnv = $sw->cmd("show vlan \nc");
     $sw->cmd("");
-    #print STDERR @lnv;
     my $count = -1;
     my @lnd = ();
     foreach my $ln (@lnv) {
@@ -264,30 +261,30 @@ sub ES_conf_first {
 	    return -1  if (&$command(\$sw, $prompt_conf_if,	"vlan1q port-isolation" ) < 1 );
 	    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
 	}
-	print STDERR "Change admin pass\n";
+	dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Change admin pass ..." );
 	return -1  if (&$command(\$sw, $prompt_conf,	"multi-login" ) < 1 );
 	return -1  if (&$command(\$sw, $prompt_conf,	"admin-password ".$arg{'PASS'}." ".$arg{'PASS'} ) < 1 );
-	print STDERR " - Ok!\n";
+	dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Change admin pass - Ok" );
     }
 
 ######## ADD Logins
-    print STDERR "Create ".$arg{'MONLOGIN'}." login\n";
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Create ".$arg{'MONLOGIN'}." login" );
     return -1  if (&$command(\$sw, $prompt_conf,	"multi-login" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"logins username ".$arg{'MONLOGIN'}." password ".$arg{'MONPASS'} ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"logins username ".$arg{'MONLOGIN'}." privilege 3" ) < 1 );
-    print STDERR " - OK!\n";
-
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Create ".$arg{'MONLOGIN'}." login - OK" );
     return -1  if (&$command(\$sw, $prompt,	"exit" ) < 1 );
 
-    print STDERR "Save config ... \n" ;
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Save config ..." );
     @res = $sw->cmd (	String	=>	"write memory",
 			prompt	=>	$prompt,
 			Timeout	=>	20,
-		    );	print @res;
-    print STDERR " - OK!\n";
-
+		    );	
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => \@res );
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Save config - OK" );
     $sw->close();
-    print STDERR "Switch '".$arg{'IP'}."' is configured successfull!\n";
+
+    dlog ( DBUG => 0, SUB => 'ES_conf_first', MESS => "Switch '".$arg{'IP'}."' is configured successfull!" );
     return 1;
 }
 
@@ -296,29 +293,28 @@ sub ES_pass_change {
     my %arg = (
         @_,
     );
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => "CHANGE PASSWORD's in ES switch '".$arg{'IP'}."'" );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "CHANGE PASSWORD's in ES switch '".$arg{'IP'}."'...\n" if $debug;
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"multi-login" ) < 1 );
-    print STDERR "Change admin pass\n";
+
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => "Change ADMIN password ..." );
     return -1  if (&$command(\$sw, $prompt_conf,	"admin-password ".$arg{'PASS'}." ".$arg{'PASS'} ) < 1 );
-    print STDERR "Create ".$arg{'MONLOGIN'}." login\n";
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => "Change ADMIN password - OK" );
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => "Create ".$arg{'MONLOGIN'}." login ..." );
     return -1  if (&$command(\$sw, $prompt_conf,	"logins username ".$arg{'MONLOGIN'}." password ".$arg{'MONPASS'} ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"logins username ".$arg{'MONLOGIN'}." privilege 3" ) < 1 );
-    print STDERR " - Ok!\n";
-    print STDERR "Create ban login\n";
-    return -1  if (&$command(\$sw, $prompt_conf,	"logins username ban password ".$arg{'ADMINPASS'} ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"logins username ".$arg{'MONLOGIN'}." privilege 14" ) < 1 );
-    print STDERR " - Ok!\n";
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => "Create ".$arg{'MONLOGIN'}." login - OK" );
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
     
-    print STDERR "Save config ...\n" ;
-    my @res = $sw->cmd(	String  =>      "write memory",
-			prompt  =>      $prompt,
-			Timeout =>      20
-		      ) if not $debug; print @res;
-    print STDERR " - OK!\n";
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => "Save config ..." );
+    @res = $sw->cmd (	String	=>	"write memory",
+			prompt	=>	$prompt,
+			Timeout	=>	20,
+		    ) if not $debug;	
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => \@res )  if not $debug;
+    dlog ( DBUG => 1, SUB => 'ES_pass_change', MESS => "Save config - OK" );
     $sw->close();
     return 1;
 }
@@ -331,8 +327,8 @@ sub ES_fix_vlan {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => 'ES_fix_vlan', MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ..." );
 
-    print STDERR "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
     my $vlan = 0;
     my @ln = $sw->cmd("show mac address-table all PORT" . "\n" x 100 );
     foreach (@ln) {
@@ -354,7 +350,7 @@ sub ES_fix_macport {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug > 1;
+    dlog ( DBUG => 1, SUB => 'ES_fix_macport', MESS => "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ..." );
 
     my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
@@ -374,7 +370,6 @@ sub ES_fix_macport {
         }
     }
     $sw->close();
-    print STDERR "MAC Port - $port\n" if $debug > 1;
     return ($pref, $port);
 }
 
@@ -385,7 +380,7 @@ sub ES_port_up {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Set port state UP in switch '".$arg{'IP'}."', PORT '".$arg{'PORT'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_port_up', MESS => "Set port state UP in switch '".$arg{'IP'}."', PORT '".$arg{'PORT'}."' ..." );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface port-channel ".$arg{'PORT'} ) < 1 );
@@ -405,7 +400,7 @@ sub ES_port_down {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Set port state DOWN in switch '".$arg{'IP'}."', PORT '".$arg{'PORT'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_port_down', MESS => "Set port state DOWN in switch '".$arg{'IP'}."', PORT '".$arg{'PORT'}."' ..." );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface port-channel ".$arg{'PORT'} ) < 1 );
@@ -424,7 +419,7 @@ sub ES_port_defect {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure DEFECT PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_port_defect', MESS => "Configure DEFECT PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ..." );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"port-security ".$arg{'PORT'}." address-limit 5" ) < 1 );
@@ -454,7 +449,7 @@ sub ES_port_free {
     return -1 if (not $arg{'VLAN'});
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure FREE PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_port_free', MESS => "Configure FREE PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ..." );
 
     my ( $ds, $egress, $us, $ingress )  = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
 
@@ -502,7 +497,7 @@ sub ES_port_free {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"flow-control") < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed-duplex auto") < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no inactive") < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"loopguard") < 1 );
+    #return -1  if (&$command(\$sw, $prompt_conf_if,	"loopguard") < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"vlan1q port-isolation" ) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"exit") < 1 );
@@ -519,7 +514,8 @@ sub ES_port_trunk {
     return -1 if (not $arg{'VLAN'});
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure DEFECT PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_port_trunk', MESS => "Configure TRUNK PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ..." );
+
     my $speed = ES_speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
@@ -545,8 +541,8 @@ sub ES_port_trunk {
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'VLAN'}) < 1 );
     }
 
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"no bmstorm-limit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit 64" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"no bmstorm-limit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"bandwidth-limit    ingress 64" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"bandwidth-limit     egress 64" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no bandwidth-limit ingress" ) < 1 );
@@ -568,7 +564,7 @@ sub ES_port_system {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure SYSEM PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_port_system', MESS => "Configure SYSTEM PORT '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ..." );
 
     my $speed = ES_speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $maxhw, $adm_state ) = &$hw_char( MAXHW => $arg{'MAXHW'} );
@@ -604,8 +600,8 @@ sub ES_port_system {
         return -1  if (&$command(\$sw, $prompt_conf_if, "pvid ".$arg{'VLAN'}) < 1 );
      }
     }
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit ".$trunk_ctl_bcast ) < 1 );
+#    return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit" ) < 1 );
+#    return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit ".$trunk_ctl_bcast ) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf_if,     $ingress." bandwidth-limit ingress" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,     "bandwidth-limit  ingress ".$us ) < 1 );
@@ -615,7 +611,7 @@ sub ES_port_system {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"flow-control" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed-duplex ".$speed ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no inactive") < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"loopguard") < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"no loopguard") < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
 
@@ -632,12 +628,11 @@ sub ES_port_setparms {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "SET PARAMETERS in PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_port_setparms', MESS => "SET PARAMETERS port '".$arg{'PORT'}."' in switch '".$arg{'IP'}."' ..." );
 
     my $speed = ES_speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $maxhw, $adm_state ) = &$hw_char( MAXHW => $arg{'MAXHW'} );
     my ( $ds, $egress, $us, $ingress )  = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
-    print STDERR "BW - DS $egress $ds, US $ingress $us \n" if $debug; 
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"port-security ".$arg{'PORT'}." address-limit ".$maxhw ) < 1 );
@@ -674,14 +669,16 @@ sub ES_port_setparms {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"bmstorm-limit ".$port_ctl_bcast ) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf_if,     $ingress." bandwidth-limit ingress" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,     "bandwidth-limit  ingress ".$us ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,     $egress. " bandwidth-limit egress" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,     "bandwidth-limit  ingress ".$us ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,     "bandwidth-limit   egress ".$ds ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,     $ingress." bandwidth-limit ingress" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,     $egress. " bandwidth-limit egress" ) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"flow-control" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed-duplex ".$speed ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no inactive") < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"loopguard") < 1 );
+#    return -1  if (&$command(\$sw, $prompt_conf_if,	"loopguard") < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
 
@@ -697,7 +694,7 @@ sub ES_vlan_trunk_add  {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "ADD VLAN in TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_vlan_trunk_add', MESS => "ADD VLAN in TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ..." );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
@@ -717,7 +714,7 @@ sub ES_vlan_trunk_remove  {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN from TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_vlan_trunk_remove', MESS => "REMOVE VLAN from TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ..." );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
@@ -736,7 +733,7 @@ sub ES_vlan_remove  {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN from switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => 'ES_vlan_remove', MESS => "REMOVE VLAN from switch '".$arg{'IP'}."' ..." );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"no vlan ".$arg{'VLAN'} ) < 1 );
