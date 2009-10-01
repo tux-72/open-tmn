@@ -10,7 +10,7 @@ use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
 use POSIX qw(strftime);
 
-$VERSION = 1.0;
+$VERSION = 1.1;
 
 @ISA = qw(Exporter);
 
@@ -42,9 +42,10 @@ sub dlog {
         my %arg = (
             @_,
         );
-        #dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => 'mess' )
-	my $subchar = 30;
-        my @lines = () ; my $allmess ='';
+        #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', MESS => 'mess' )
+	my $subchar = 30; my @lines = ();
+	$arg{'PROMPT'} .= ' ';
+
         if ( not $arg{'DBUG'} > $debug ) {
             my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
             my $timelog = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year+1900, $month + 1, $day, $hour, $min, $sec);
@@ -54,9 +55,9 @@ sub dlog {
                 @lines = @{$arg{'MESS'}};
             }
             foreach my $mess ( @lines ) {
-                $mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\s\d/ /cs;
+                $mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs;
                 next if (not $mess =~ /\S+/);
-                print STDERR $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$mess."\n";
+                print STDERR $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
             }
         }
 }

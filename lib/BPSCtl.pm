@@ -46,18 +46,18 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 ############ SUBS ##############
 
 sub BPS_conf_first {
-    print STDERR "Switch '$arg{'IP'}' first configured MANUALLY!!!\n";
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub BPS_pass_change {
-    print STDERR "Switch '$arg{'IP'}' changed password MANUALLY!!!\n" if $debug;
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
 
 sub BPS_login {
     my ($swl, $ip, $pass ) = @_;
-    #print STDERR " IP = ".$ip.", PASS = ".$pass."\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (	prompt => $prompt,
                             	Timeout => $timeout,
                         	Errmode => 'return',
@@ -74,21 +74,20 @@ sub BPS_login {
     ${$swl}->waitfor("/.*Use arrow keys to.*/");
     ${$swl}->print("c");
     ${$swl}->waitfor($prompt) || return -1;
-    #print STDERR "USE BPS command line interface - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "USE BPS command line interface - Ok" );
     return 1;
 }
 
 sub BPS_cmd {
-    my ($swl, $cmd_prompt, $cmd ) = @_;
+   my ($swl, $cmd_prompt, $cmd ) = @_;
+
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    if ($debug) {
-        print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
-        print STDERR @lines; print STDERR "\n";
-    }
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 
@@ -99,7 +98,7 @@ sub BPS_fix_macport {
     );
     # login
     my $sw; return -1  if ( &$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."'" );
 
     my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
@@ -119,7 +118,6 @@ sub BPS_fix_macport {
         }
     }
     $sw->close();
-    print STDERR "MAC Port - $pref / $port\n" if $debug > 1;
     return ($pref, $port);
 }
 
@@ -129,15 +127,10 @@ sub BPS_conf_save {
     my %arg = (
         @_,
     );
-    print STDERR "SAVING $LIB config in switch ".$arg{'IP'}." ...\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-
-    if ($debug < 2) {
-	return -1  if (&$command(\$sw, $prompt, "copy config nvram" ) < 1 );
-    } else {
-	print STDERR $LIB."_conf_save function not running in DEBUG mode\n";
-    }
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in switch '".$arg{'IP'}."'" );
+    return -1  if (&$command(\$sw, $prompt, "copy config nvram" ) < 1 );
     $sw->close();
     return 1;
 }
@@ -149,9 +142,9 @@ sub BPS_port_up {
     my %arg = (
         @_,
     );
-    print STDERR "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORT'}." !!!\n\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in '".$arg{'IP'}."', port ".$arg{'PORT'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
@@ -167,9 +160,9 @@ sub BPS_port_down {
     my %arg = (
         @_,
     );
-    print STDERR "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORT'}." !!!\n\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in '".$arg{'IP'}."', port ".$arg{'PORT'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
@@ -188,8 +181,8 @@ sub BPS_port_defect {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in '".$arg{'IP'}."', port ".$arg{'PORT'});
 
-    print STDERR "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORT'}." !!!\n\n" if $debug;
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'BLOCK_VLAN'}." name Block".$arg{'BLOCK_VLAN'}." type port learning ivl" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'BLOCK_VLAN'}." ".$arg{'PORT'} ) < 1);
@@ -211,7 +204,7 @@ sub BPS_port_free {
         @_,
     );
     return -1 if (not $arg{'VLAN'});
-    print STDERR "Configure FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure FREE port in '".$arg{'IP'}."', port ".$arg{'PORT'});
 
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
@@ -258,7 +251,7 @@ sub BPS_port_trunk {
     my %arg = (
         @_,
     );
-    print STDERR "configure TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure TRUNK port in '".$arg{'IP'}."', port ".$arg{'PORT'});
 
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     # login
@@ -297,11 +290,12 @@ sub BPS_port_system {
     my %arg = (
         @_,
     );
-    print STDERR "configure SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
 
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure SYSTEM port in '".$arg{'IP'}."', port ".$arg{'PORT'});
+
+    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     if ($arg{'VLAN'} != 1 ) {
@@ -334,10 +328,11 @@ sub BPS_port_setparms {
     my %arg = (
         @_,
     );
-    print STDERR "SET PORT parameters in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PORT parameters in '".$arg{'IP'}."', port ".$arg{'PORT'} );
+
+    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     if ($arg{'VLAN'} != 1 ) {
@@ -370,9 +365,9 @@ sub BPS_vlan_trunk_add {
     my %arg = (
         @_,
     );
-    print STDERR "ADD VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg{'VLAN'}."' in '".$arg{'IP'}."', trunk port ".$arg{'PORT'} );
 
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
@@ -391,10 +386,9 @@ sub BPS_vlan_trunk_remove  {
     my %arg = (
         @_,
     );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from '".$arg{'IP'}."', trunk port ".$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan members remove ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
@@ -409,9 +403,9 @@ sub BPS_vlan_remove  {
     my %arg = (
         @_,
     );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' from switch '".$arg{'IP'}."'!!!\n\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from switch '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan delete ".$arg{'VLAN'} ) < 1);
@@ -419,3 +413,5 @@ sub BPS_vlan_remove  {
     $sw->close();
     return 1;
 }
+
+1;

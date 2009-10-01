@@ -52,39 +52,37 @@ my $bw_free     = 64;
 ############ SUBS ##############
 
 sub TCOM4500_conf_first {
-    print STDERR "Switch '$arg{'IP'}' first configured MANUALLY!!!\n";
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub TCOM4500_pass_change {
-    print STDERR "Switch '$arg{'IP'}' changed password MANUALLY!!!\n" if $debug;
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' changed password MANUALLY!!!" );
     return -1;
 }
 
 sub TCOM4500_login {
     my ($swl, $ip, $login, $pass) = @_;
-    #print STDERR " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass."\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
     ${$swl}->open($ip);
     ${$swl}->login($login,$pass) || return -1;
-    print STDERR "Login - Ok\n"; # if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Login - Ok" );
     return 1;
 }
 
 sub TCOM4500_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    if ($debug) {
-        print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
-        print STDERR @lines; print STDERR "\n";
-    }
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 
@@ -130,16 +128,14 @@ sub TCOM4500_fix_vlan {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ..." );
 
     my $vlan = 0;
     my $mac=TCOM4500_mac_fix($arg{'MAC'});
-    print STDERR "MAC transfer - $mac " if $debug > 1;
     my $max=3; my $count=0;
     while ($count < $max) {
 	my @ln = $sw->cmd("display mac-address ".$mac);
 	foreach (@ln) {
-	    print STDERR "$_" if $debug > 1;
 	    #MAC ADDR        VLAN ID    STATE            PORT INDEX             AGING TIME(s)
 	    #0017-315a-9277   344       Learned          GigabitEthernet1/0/49  AGING
 	    if ( /\w\w\w\w\-\w\w\w\w\-\w\w\w\w\s+(\d+)\s+\S+\s+\S+/ and $1 > 1) {
@@ -163,14 +159,13 @@ sub TCOM4500_fix_macport {
     );
     # login
     my $sw; return -1  if ( &$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."'..." );
 
     my $mac=TCOM4500_mac_fix($arg{'MAC'});
     my $port = 0; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
     my @ln = $sw->cmd("display mac-address ".$mac." vlan ".$arg{'VLAN'});
         foreach (@ln) {
-	    print STDERR "$_" if $debug > 1;
 	    #MAC ADDR        VLAN ID    STATE            PORT INDEX             AGING TIME(s)
 	    #0017-315a-9277   344       Learned          GigabitEthernet1/0/49  AGING
 	    if ( /\w\w\w\w\-\w\w\w\w\-\w\w\w\w\s+(\d+)\s+\S+\s+(Gi|Ether)\S+(\d+\/\d+\/)(\d+)\s+\S+/ and $1 == $arg{'VLAN'} ) {
@@ -185,7 +180,6 @@ sub TCOM4500_fix_macport {
         }
     }
     $sw->close();
-    print STDERR "MAC Port - $pref / $port\n" if $debug > 1;
     return ($pref, $port);
 }
 
@@ -197,20 +191,17 @@ sub TCOM4500_conf_save {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "SAVING $LIB config in switch ".$arg{'IP'}." ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in switch ".$arg{'IP'}." ..." );
 
-    if ($debug < 2) {
-	$sw->print("save safely");
-	$sw->waitfor("/.*Are you sure.*/");
-	my @ln = $sw->cmd( String  => "y",
-                                Prompt  => $prompt,
-                                Timeout => 60,
-                                Errmode => 'return',
-                                #Cmd_remove_mode => 1,
-        ); print STDERR @ln if $debug;
-    } else {
-	print STDERR $LIB."_conf_save function not running in DEBUG mode\n";
-    }
+    $sw->print("save safely");
+    $sw->waitfor("/.*Are you sure.*/");
+    my @ln = $sw->cmd( String  => "y",
+                        Prompt  => $prompt,
+                        Timeout => 60,
+                        Errmode => 'return',
+                        #Cmd_remove_mode => 1,
+    ); 
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@ln );
     $sw->close();
     return 1;
 }
@@ -223,7 +214,7 @@ sub TCOM4500_port_up {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"system-view" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -239,7 +230,7 @@ sub TCOM4500_port_down {
     my %arg = (
         @_,
     );
-    print STDERR "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
 
@@ -260,7 +251,7 @@ sub TCOM4500_port_defect {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"system-view" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -287,7 +278,7 @@ sub TCOM4500_port_free {
     return -1 if (not $arg{'VLAN'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "Configure FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"system-view" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
@@ -323,7 +314,7 @@ sub TCOM4500_port_trunk {
     return -1 if (not $arg{'VLAN'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "configure TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"system-view" ) < 1 );
@@ -366,7 +357,7 @@ sub TCOM4500_port_system {
     #return -1 if (not $arg{'VLAN'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "configure SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $ds, $out, $us, $in )  = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
@@ -411,7 +402,7 @@ sub TCOM4500_port_setparms {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "SET PORT parameters in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PORT parameters in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $ds, $out, $us, $in )  = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
@@ -455,7 +446,7 @@ sub TCOM4500_vlan_trunk_add {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "ADD VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"system-view" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
@@ -477,7 +468,7 @@ sub TCOM4500_vlan_trunk_remove  {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"system-view" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -496,7 +487,7 @@ sub TCOM4500_vlan_remove  {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'},  $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' from switch '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from switch ".$arg{'IP'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"system-view" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"undo vlan ".$arg{'VLAN'} ) < 1);

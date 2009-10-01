@@ -47,7 +47,7 @@ my $prompt_conf_vlan ='/.*\(config\-vlan\)#.*/';
 
 sub GS_login {
     my ($swl, $ip, $login, $pass) = @_;
-    print STDERR " IP = ".$ip.", LOGIN =".$login."\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", LOGIN =".$login );
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
@@ -60,25 +60,21 @@ sub GS_login {
     ${$swl}->waitfor("/.*assword.*/");
     ${$swl}->print($pass);
     ${$swl}->waitfor($prompt) || return -1;
-    print STDERR "Connect user '".$login."' - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect user '".$login."' - Ok" );
     return 1;
 }
 
 sub GS_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    if ($debug) {
-        print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
-        print STDERR @lines;
-	print STDERR "\n";
-    }
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
-
 
 sub GS_conf_save {
 #   IP LOGIN PASS 
@@ -87,12 +83,13 @@ sub GS_conf_save {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "SAVE config in GS switch '".$arg{'IP'}."'...\n"; # if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVE config in GS switch '".$arg{'IP'}."'..." );
     my @res = $sw->cmd(	String  =>      "write memory",
-			prompt  =>      $GS_prompt,
+			prompt  =>      $prompt,
 			Timeout =>      20,
-		      ) if not $debug; print @res;
-    print STDERR " - OK!\n";
+		      );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@res );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVE config in GS switch '".$arg{'IP'}."' - OK " );
     $sw->close();
     return 1;
 }
@@ -104,8 +101,8 @@ sub GS_fix_vlan {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ..." );
 
-    print STDERR "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
     my $vlan = 0;
     my @ln = $sw->cmd("show mac address-table all PORT" );
     foreach (@ln) {
@@ -128,7 +125,7 @@ sub GS_fix_macport {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', VLAN '".$arg{'VLAN'}."', MAC '".$arg{'MAC'}."' ..." );
 
     my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
@@ -152,9 +149,6 @@ sub GS_fix_macport {
 }
 
 
-
-
-
 sub GS_vlan_trunk_add  {
 #    IP LOGIN PASS VLAN PORT PORTPREF
     my %arg = (
@@ -162,7 +156,7 @@ sub GS_vlan_trunk_add  {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "ADD VLAN in TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN in TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
@@ -182,7 +176,7 @@ sub GS_vlan_trunk_remove  {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN from TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN from TRUNK PORT '".$arg{'PORT'}."', switch '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg{'VLAN'} ) < 1 );
@@ -201,7 +195,7 @@ sub GS_vlan_remove  {
     );
     # login
     my $sw;  return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN from switch '".$arg{'IP'}."' ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN from switch '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"configure" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"no vlan ".$arg{'VLAN'} ) < 1 );

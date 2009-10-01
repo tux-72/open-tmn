@@ -48,19 +48,19 @@ my $port_ctl_mcast      = 1;    my $port_ctl_bcast      = 2;
 ############ SUBS ##############
 
 sub CATIOS_conf_first {
-    print STDERR "Switch '$arg{'IP'}' first configured MANUALLY!!!\n";
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' first configured MANUALLY!!!" ) ;
     return -1;
 }
 
 
 sub CATIOS_pass_change {
-    print STDERR "Switch '$arg{'IP'}' changed password MANUALLY!!!\n" if $debug;
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' changed password MANUALLY!!!" );
     return -1;
 }
 
 sub CATIOS_login {
     my ($swl, $ip, $login, $pass) = @_;
-    #print STDERR " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass."\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
@@ -68,21 +68,20 @@ sub CATIOS_login {
     ${$swl}->open($ip);
     ${$swl}->print("");
     ${$swl}->login($login,$pass) || return -1;
-    print STDERR "Login - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Login - Ok");
     return 1;
 }
 
 sub CATIOS_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
+
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    if ($debug) {
-        print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
-        print STDERR @lines; print STDERR "\n";
-    }
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 
@@ -93,7 +92,7 @@ sub CATIOS_fix_vlan {
     my %arg = (
         @_,
     );
-    print STDERR "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ..." );
     my $vlan = 0;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
@@ -125,10 +124,9 @@ sub CATIOS_fix_macport {
     );
     # login
     my $sw; return -1 if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ..." );
 
     my $mac=CATIOS_mac_fix($arg{'MAC'});
-    print STDERR "MAC transfer - $mac \n" if $debug > 1;
     my $port = -1; my $pref; my $max=3; my $count=0;
 
     while ($count < $max) {
@@ -156,7 +154,6 @@ sub CATIOS_fix_macport {
 	}
     }
     $sw->close();
-    print STDERR "MAC Port - $pref / $port\n" if $debug > 1;
     return ($pref, $port);
 }
 
@@ -166,17 +163,13 @@ sub CATIOS_conf_save {
     my %arg = (
         @_,
     );
-    print STDERR "SAVING $LIB config in switch ".$arg{'IP'}." ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "SAVING $LIB config in switch ".$arg{'IP'}." ..." );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
 
-    if ($debug < 2) {
-        $sw->print("copy runn startup");
-        $sw->waitfor("/\[startup-config\]/");
-        return -1  if (&$command(\$sw, $prompt, "\n" ) < 1 );
-    } else {
-        print STDERR $LIB."_conf_save function not running in DEBUG mode\n";
-    }
+    $sw->print("copy runn startup");
+    $sw->waitfor("/\[startup-config\]/");
+    return -1  if (&$command(\$sw, $prompt, "" ) < 1 );
     $sw->close();
     return 1;
 }
@@ -188,7 +181,7 @@ sub CATIOS_port_up {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -207,7 +200,7 @@ sub CATIOS_port_down {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -225,7 +218,7 @@ sub CATIOS_port_defect {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -252,7 +245,7 @@ sub CATIOS_port_free {
     return -1 if (not $arg{'VLAN'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "Configure FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,   "vlan ".$arg{'VLAN'} ) < 1 );
@@ -303,7 +296,7 @@ sub CATIOS_port_trunk {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "Configure TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
@@ -338,7 +331,7 @@ sub CATIOS_port_system {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "Configure SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "Configure SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,   "vlan ".$arg{'VLAN'} ) < 1 );
@@ -379,7 +372,7 @@ sub CATIOS_port_setparms {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "SET PORT parameters in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "SET PORT parameters in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
@@ -422,7 +415,8 @@ sub CATIOS_vlan_trunk_add  {
     my %arg = (
         @_,
     );
-    print STDERR "ADD VLAN in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
+
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
 
@@ -450,7 +444,7 @@ sub CATIOS_vlan_trunk_remove  {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN from ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
 
@@ -472,7 +466,7 @@ sub CATIOS_vlan_remove  {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' from switch '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from switch ".$arg{'IP'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,        "no vlan ".$arg{'VLAN'} ) < 1);
@@ -491,7 +485,7 @@ sub CATIOS_term_l3subnet_add {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "ADD VLAN '".$arg{'VLAN'}."' Subnet Iface to terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg{'VLAN'}."' Subnet Iface to terminator '".$arg{'IP'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg{'VLAN'} ) < 1);
@@ -518,7 +512,7 @@ sub CATIOS_term_l3subnet_remove {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' Subnet Iface from terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' Subnet Iface from terminator '".$arg{'IP'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg{'VLAN'} ) < 1);
@@ -546,7 +540,7 @@ sub CATIOS_term_l3subnet_down {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "BLOCK VLAN '".$arg{'VLAN'}."' Subnet Iface in terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "BLOCK VLAN '".$arg{'VLAN'}."' Subnet Iface in terminator '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg{'VLAN'} ) < 1);
@@ -569,7 +563,7 @@ sub CATIOS_term_l3subnet_up {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "UNBLOCK VLAN '".$arg{'VLAN'}."' Subnet Iface in terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "UNBLOCK VLAN '".$arg{'VLAN'}."' Subnet Iface in terminator '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg{'VLAN'} ) < 1);
@@ -592,8 +586,7 @@ sub CATIOS_term_l3realnet_add {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-
-    print STDERR "ADD Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' to terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' to terminator '".$arg{'IP'}."'" );
 
     my $loop_if = ''; my $ifn = -1;
 
@@ -639,8 +632,7 @@ sub CATIOS_term_l3realnet_remove {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-
-    print STDERR "REMOVE Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' to terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' from terminator '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,      "no ip route ".$arg{'IPCLI'}." 255.255.255.255 Vlan".$arg{'VLAN'} ) < 1);
@@ -669,7 +661,7 @@ sub CATIOS_term_l3realnet_down {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "BLOCK Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' in terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "BLOCK Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' in terminator '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg{'VLAN'} ) < 1);
@@ -691,7 +683,7 @@ sub CATIOS_term_l3realnet_up {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    print STDERR "UNBLOCK Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' in terminator '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "UNBLOCK Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' in terminator '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg{'VLAN'} ) < 1);

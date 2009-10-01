@@ -46,7 +46,7 @@ my $prompt_conf_subif ='/.*\(config\-subif\)#.*/';
 
 sub C73_login {
     my ($swl, $ip, $login, $pass, $ena_pass) = @_;
-    print STDERR " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass.", ENA_PASS =".$ena_pass." \n" if $debug > 1 ;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass.", ENA_PASS =".$ena_pass);
     ${$swl}=new Net::Telnet (   prompt => $prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
@@ -57,22 +57,21 @@ sub C73_login {
     ${$swl}->waitfor("/.*assword.*/");
     ${$swl}->print($ena_pass);
     ${$swl}->waitfor($prompt) || return -1;
-    print STDERR "Connect user - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect user - Ok" );
     return 1;
 }
 
 
 sub C73_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
+
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    if ($debug) {
-	print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
-	print STDERR @lines; print STDERR "\n";
-    }
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 
@@ -81,17 +80,13 @@ sub C73_conf_save {
     my %arg = (
         @_,
     );
-    print STDERR "SAVING $LIB config in router ".$arg{'IP'}." ...\n" if $debug > 1;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in router '".$arg{'IP'}."'");
 
-    if ($debug < 2) {
-        $sw->print("copy runn startup");
-        $sw->waitfor("/\[startup-config\]/");
-        return -1  if ( &$command(\$sw, $prompt, "\n" ) < 1 );
-    } else {
-        print STDERR $LIB."_conf_save function not running in DEBUG mode\n";
-    }
+    $sw->print("copy runn startup");
+    $sw->waitfor("/\[startup-config\]/");
+    return -1  if ( &$command(\$sw, $prompt, "\n" ) < 1 );
     $sw->close();
     return 1;
 }
@@ -102,8 +97,8 @@ sub C73_term_l3net4_add {
         @_,
     );
     # IP LOGIN PASS ENA_PASS IFACE VLAN VLANNAME IPGW NETMASK UP_ACLIN UP_ACLOUT
-    print STDERR "ADD Transport Net Iface in router ".$arg{'IP'}." ...\n" if $debug;
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD Transport Net Iface in router '".$arg{'IP'}."'");
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "interface ".$arg{'IFACE'}.'.'.$arg{'VLAN'} ) < 1);
@@ -129,9 +124,8 @@ sub C73_term_l3net4_remove {
         @_,
     );
     # IP LOGIN PASS ENA_PASS IFACE VLAN 
-    print STDERR "REMOVE Transport Net Iface in router ".$arg{'IP'}." ...\n" if $debug;
-
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE Transport Net Iface from router '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "interface ".$arg{'IFACE'}.'.'.$arg{'VLAN'} ) < 1);
@@ -158,9 +152,9 @@ sub C73_term_l3net4_down {
         @_,
     );
     # IP LOGIN PASS ENA_PASS IFACE VLAN DOWN_ACLIN DOWN_ACLOUT
-    print STDERR "BLOCK Transport Net Iface in router ".$arg{'IP'}." ...\n" if $debug;
-
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "BLOCK Transport Net Iface from router '".$arg{'IP'}."'" );
+
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "interface ".$arg{'IFACE'}.'.'.$arg{'VLAN'} ) < 1);
@@ -181,9 +175,8 @@ sub C73_term_l3net4_up {
         @_,
     );
     # IP LOGIN PASS ENA_PASS IFACE VLAN UP_ACLIN UP_ACLOUT
-    print STDERR "UNBLOCK Transport Net Iface in router ".$arg{'IP'}." ...\n" if $debug;
-
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "UNBLOCK Transport Net Iface from router '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "interface ".$arg{'IFACE'}.'.'.$arg{'VLAN'} ) < 1);

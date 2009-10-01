@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 $debug=1;
 my $ver='0.5';
@@ -62,7 +62,6 @@ $stm0->execute();
 while (my $ref0 = $stm0->fetchrow_hashref()) {
     $sw_models[$ref0->{'id'}]		= $ref0->{'model'}	if defined($ref0->{'model'});
     $sw_descr{$ref0->{'sysdescr'}}	= $ref0->{'id'}		if defined($ref0->{'sysdescr'});
-    $sw_libs{$ref0->{'id'}}		= $ref0->{'lib'}	if defined($ref0->{'lib'});
 }
 $stm0->finish();
 
@@ -91,8 +90,7 @@ my $point='';
 my $Querry_portfix = '';
 
 if (not defined($ARGV[0])) {
-    print STDERR 
-    "Usage: $script_name ( chk_model|chk_trunk  <hostname|ip|allhosts> )\n"
+    print STDERR  "Usage: $script_name ( chk_model|chk_trunk  <hostname|ip|allhosts> )\n";
 
 ############################################## CHECK SWITCH MODEL & MAC ##############################################
 } elsif ( $ARGV[0] eq "chk_model" and defined($ARGV[1]) ) {

@@ -70,14 +70,13 @@ sub DES_conf_save {
 
 sub DES_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
-				#Cmd_remove_mode => 0,
                             );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@lines );
-    undef @lines;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 

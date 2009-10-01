@@ -48,18 +48,19 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 ############ SUBS ##############
 
 sub CAT2950_conf_first {
-    print STDERR "Switch '$arg{'IP'}' first configured MANUALLY!!!\n";
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub CAT2950_pass_change {
-    print STDERR "Switch '$arg{'IP'}' changed password MANUALLY!!!\n" if $debug;
+    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
 
+
 sub CAT2950_login {
     my ($swl, $ip, $pass, $ena_pass) = @_;
-    print STDERR " IP = ".$ip.", PASS = ".$pass.", ENA_PASS =".$ena_pass." \n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass.", ENA_PASS =".$ena_pass );
     ${$swl}=new Net::Telnet (	prompt => $prompt,
                             	Timeout => $timeout,
                         	Errmode => 'return',
@@ -72,13 +73,13 @@ sub CAT2950_login {
     ${$swl}->waitfor("/.*assword.*/");
     ${$swl}->print($ena_pass);
     ${$swl}->waitfor($prompt) || return -1;
-    print STDERR "Connect superuser - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect superuser - Ok");
     return 1;
 }
 
 sub CAT2950_login_nopriv {
     my ($swl, $ip, $pass) = @_;
-    print STDERR " IP - ".$ip.", PASS ".$pass." \n\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (	prompt => $prompt_nopriv,
 				Timeout => $timeout,
 				Errmode => 'return',
@@ -87,21 +88,20 @@ sub CAT2950_login_nopriv {
     ${$swl}->waitfor("/.*assword.*/");
     ${$swl}->print($pass);
     ${$swl}->waitfor($prompt_nopriv) || return -1;
-    print STDERR "Connected non privilege user - Ok\n" if $debug > 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect non privilege user - Ok");
     return 1;
 }
 
 sub CAT2950_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
+
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    if ($debug) {
-        print STDERR "\n>>> CMD '".$cmd."'\n>>> PRT '".${$swl}->last_prompt()."'\n";
-        print STDERR @lines; print STDERR "\n";
-    }
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 
@@ -110,7 +110,7 @@ sub CAT2950_fix_vlan {
     my %arg = (
         @_,
     );
-    print STDERR "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ...\n" if $debug;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."'" );
     my $vlan = 0;
     # login
     my $sw;  return -1  if (&$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
@@ -133,7 +133,7 @@ sub CAT2950_fix_macport {
     );
     # login
     my $sw; return -1  if ( &$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    print STDERR "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ...\n" if $debug > 1 ;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."'" );
 
     my $port = -1; my $pref; my $max=3; my $count=0;
 
@@ -154,7 +154,6 @@ sub CAT2950_fix_macport {
         }
     }
     $sw->close();
-    print STDERR "MAC Port - $pref / $port\n" if $debug > 1;
     return ($pref, $port);
 }
 
@@ -164,31 +163,25 @@ sub CAT2950_conf_save {
     my %arg = (
         @_,
     );
-    print STDERR "SAVING $LIB config in switch ".$arg{'IP'}." ...\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in switch '".$arg{'IP'}."'" );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
     
-    if ($debug < 2) {
-	$sw->print("copy running-config startup-config");
-	$sw->waitfor("/\[startup-config\]/");
-	return -1  if (&$command(\$sw, $prompt, "" ) < 1 );
-    } else {
-	print STDERR $LIB."_conf_save function not running in DEBUG mode\n";
-    }
+    $sw->print("copy running-config startup-config");
+    $sw->waitfor("/\[startup-config\]/");
+    return -1  if (&$command(\$sw, $prompt, "" ) < 1 );
     $sw->close();
     return 1;
 }
-
-
 
 sub CAT2950_port_up {
 #    IP LOGIN PASS ENA_PASS PORT PORTPREF
     my %arg = (
         @_,
     );
-    print STDERR "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in '".$arg{'IP'}."', port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -204,9 +197,9 @@ sub CAT2950_port_down {
     my %arg = (
         @_,
     );
-    print STDERR "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in '".$arg{'IP'}."', port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
@@ -226,7 +219,8 @@ sub CAT2950_port_defect {
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
 
-    print STDERR "Configure DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in '".$arg{'IP'}."', port ".$arg{'PORTPREF'}.$arg{'PORT'} );
+
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
@@ -249,7 +243,7 @@ sub CAT2950_port_free {
         @_,
     );
     return -1 if (not $arg{'VLAN'});
-    print STDERR "Configure FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}." !!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure FREE port in '".$arg{'IP'}."', port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
@@ -300,7 +294,7 @@ sub CAT2950_port_trunk {
     my %arg = (
         @_,
     );
-    print STDERR "configure TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure TRUNK port in '".$arg{'IP'}."', port ".$arg{'PORTPREF'}.$arg{'PORT'} );
 
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     # login
@@ -336,7 +330,7 @@ sub CAT2950_port_system {
     my %arg = (
         @_,
     );
-    print STDERR "configure SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure SYSTEM port in '".$arg{'IP'}."', port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
@@ -377,7 +371,7 @@ sub CAT2950_port_setparms {
     my %arg = (
         @_,
     );
-    print STDERR "SET PORT parameters in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PORT parameters in '".$arg{'IP'}."', port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
@@ -418,7 +412,7 @@ sub CAT2950_vlan_trunk_add {
     my %arg = (
         @_,
     );
-    print STDERR "ADD VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg{'VLAN'}."' in '".$arg{'IP'}."', trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
 
@@ -444,7 +438,7 @@ sub CAT2950_vlan_trunk_remove  {
     my %arg = (
         @_,
     );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' in ".$arg{'IP'}.", trunk port ".$arg{'PORTPREF'}.$arg{'PORT'}."!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from '".$arg{'IP'}."', trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
 
@@ -464,7 +458,7 @@ sub CAT2950_vlan_remove  {
     my %arg = (
         @_,
     );
-    print STDERR "REMOVE VLAN '".$arg{'VLAN'}."' from switch '".$arg{'IP'}."'!!!\n\n" if $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from '".$arg{'IP'}."'" );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
 

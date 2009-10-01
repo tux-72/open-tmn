@@ -3,23 +3,24 @@
 use POSIX qw(strftime);
 use DBI();
 
-if (not defined($ARGV[0])) {
-    print STDERR "\nUsage: clear_ap.pl ( switch <hostname> | point <idport> )\n\n";
-    exit;
-};
-
 my $ver = "0.1";
 my $debug=0;
 
-
 my $PROG=$0;
+my $script_name=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
     require $1.'/conf/config.pl';
-    print STDERR "USE PROGRAMM DIRECTORY => $1\n\n";
+    $script_name="$2";
+    print STDERR "RUN in DIR => $1\n" if $debug;
 } else {
-    print STDERR "USE STANDART PROGRAMM DIRECTORY\n\n";
     require '/usr/local/swctl/conf/config.pl';
+    print STDERR "USE STANDART PROGRAMM DIRECTORY\n\n";
 }
+
+if (not defined($ARGV[0])) {
+    print STDERR "\nUsage: $script_name ( switch <hostname> | point <idport> )\n\n";
+    exit;
+};
 
 ### MYSQL Connect
 my $dbm = DBI->connect("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
