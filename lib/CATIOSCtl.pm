@@ -86,7 +86,89 @@ sub CATIOS_cmd {
 }
 
 
+sub CATIOS_mac_fix {
+        my $mac = shift;
+        $mac =~ /^(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)$/ || return -1 ;
+        return "$1$2\.$3$4\.$5$6";
+}
+
+
 sub CATIOS_fix_vlan {
+
+    # IP LOGIN PASS MAC RSH
+    my %arg = (
+        @_,
+    );
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ..." );
+    my $vlan = 0; my @ln = ''; 	my $sw; 
+
+    if ( $arg{'RSH'} ) {
+        @ln = IOS_rsh( PID => $$, HOST => $arg{'IP'}, REMOTE_USER => $arg{'LOGIN'}, CMD => "show mac-address-table dynamic address ".$arg{'MAC'} );
+    } else {
+	# login
+	return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+	@ln= $sw->cmd("show mac-address-table dynamic address ".$arg{'MAC'}) if ( not arg{'RSH'} );
+	$sw->close();
+    }
+    foreach (@ln) {
+	#vlan   mac address     type        protocols               port
+	#-------+---------------+--------+---------------------+--------------------
+	#464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
+        if ( /(\d+)\s+\w\w\w\w\.\w\w\w\w\.\w\w\w\w\s+dynamic\s+\S+\s+\S+/ and $1 > 1 ) {
+            $vlan = $1;
+        }
+    }
+    return $vlan;
+}
+
+sub CATIOS_fix_macport {
+    # IP LOGIN PASS MAC VLAN RSH
+    my %arg = (
+        @_,
+    );
+    $arg{'RSH'} = 1;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ..." );
+
+    my $mac=CATIOS_mac_fix($arg{'MAC'});
+    my $port = -1; my $pref; my $max=3; my $count=0; my @ln = ''; my $sw;
+
+
+    while ($count < $max) {
+	if ( $arg{'RSH'} ) {
+	    @ln = IOS_rsh( PID => $$, HOST => $arg{'IP'}, REMOTE_USER => $arg{'LOGIN'}, CMD => "show mac-address-table dynamic address ".$mac." vlan ".$arg{'VLAN'} );
+	    #@ln = rsh( $arg{'IP'}, "show mac-address-table dynamic address ".$mac." vlan ".$arg{'VLAN'}.' | inc dynamic'  );
+	} else {
+	    # login
+	    return -1 if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+	    @ln = $sw->cmd("show mac-address-table dynamic address ".$mac." vlan ".$arg{'VLAN'} );
+	    $sw->close();
+	}
+        foreach (@ln) {
+		    #vlan   mac address     type        protocols               port
+		    #-------+---------------+--------+---------------------+--------------------
+		    #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
+		    #*    1  001b.1105.3d8e   dynamic  Yes          5   Fa4/46
+		    #     1  001e.589f.0c61   dynamic  Yes   Gi3/16
+            if      ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Fa|Gi)(\D+|.*)(\d+\/)(\d+)/ ) {
+		$port = $6+0;
+		$pref = "$3$5";
+		    # *   1  001b.1105.3d8e   dynamic  Yes          5   Po1
+		    #     1  0013.4991.f9a5   dynamic  Yes   Po1
+            } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Po|Lo)(\D+|.*)(\d+)/ ) {
+		$port = $5+0;
+		$pref = "$3";
+	    }
+	}
+	if ($port>0) {
+	    last;
+	} else {
+	    $count+=1;
+	}
+    }
+    return ($pref, $port);
+}
+
+sub CATIOS_fix_vlan_old {
 
     # IP LOGIN PASS MAC
     my %arg = (
@@ -110,14 +192,7 @@ sub CATIOS_fix_vlan {
     return $vlan;
 }
 
-sub CATIOS_mac_fix {
-        my $mac = shift;
-        $mac =~ /^(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)$/ || return -1 ;
-        return "$1$2\.$3$4\.$5$6";
-}
-
-
-sub CATIOS_fix_macport {
+sub CATIOS_fix_macport_old {
     # IP LOGIN PASS MAC VLAN
     my %arg = (
         @_,

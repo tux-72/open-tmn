@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DIR="/usr/local/swctl"
+DIR="/usr/local/switch-ctl"
 
 if [ "$1" = "real" ]; then
     $DIR/sync_link_state.pl > /dev/null 2>&1

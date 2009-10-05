@@ -1,6 +1,6 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
-$debug=1;
+$debug=0;
 my $ver='0.5';
 #$VERSION = 0.97;
 
@@ -17,6 +17,7 @@ my $PROG=$0;
 my $script_name=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
     require $1.'/conf/config.pl';
+    require $1.'/conf/lib.pl';
     $script_name="$2";
     print STDERR "RUN in DIR => $1\n" if $debug;
 } else {
@@ -172,7 +173,8 @@ if (not defined($ARGV[0])) {
 
 ############################################## CHECK & UPDATE TRUNK PORTS ##############################################
 } elsif ( $ARGV[0] eq "chk_trunk" and defined($ARGV[1])) {
-    my $Q_end = " order by h.hostname" ;
+    #my $Q_end = " order by h.hostname" ;
+    my $Q_end = " and h.model=19 order by h.hostname" ;
     if ( $ARGV[1] ne "allhosts" ) {
 	if ( $ARGV[1] =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) {
 	    $Q_end = " and h.ip='".$ARGV[1]."'";
@@ -204,6 +206,7 @@ if (not defined($ARGV[0])) {
 	if ( $ref->{'lib'} ) {
 	    $fix_rez = "-------- HOST '".$ref->{'hostname'}."' --------\n"; 
 	    $LIB_action = $ref->{'lib'}."_fix_macport";
+	    dlog ( SUB =>'chk_trunk', DBUG => 2, MESS => "Checking MAC = ".$checkmac{$ref->{'control_vlan'}} );
 	    ( $uplink_portpref, $uplink_port ) = &$LIB_action( IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, MAC => $checkmac{$ref->{'control_vlan'}}, VLAN => $ref->{'control_vlan'} );
 	    if ( $uplink_port > 0 ) {
 		$fix_rez .= "FIX uplink port = ".lspaced($uplink_portpref.$uplink_port,6).", \t";
@@ -276,8 +279,8 @@ if (not defined($ARGV[0])) {
 	dlog ( SUB =>'chk_trunk', DBUG => 2, MESS => $Q_downlink.";" );
 
 	if ( $ARGV[1] ne "allhosts" and $debug < 2 ) {
-	    $dbm->do($Q_uplink);
-	    $dbm->do($Q_downlink);
+            $dbm->do($Q_uplink)         if $Q_uplink    =~ /\S/;
+            $dbm->do($Q_downlink)       if $Q_downlink  =~ /\S/;
 	}
 
 	# ------ END check switch parameters -------

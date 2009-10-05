@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+
+use lib '/usr/local/switch-control/lib';
+use SWALLCtl;
+use C73Ctl;
+use CATIOSCtl;
+use CAT2950Ctl;
+#use CAT3508GCtl;
+use CATOSCtl;
+use DESCtl;
+use ESCtl;
+use GSCtl;
+use BPSCtl;
+use TCOM4500Ctl;
+
+1;

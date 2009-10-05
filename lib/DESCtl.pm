@@ -25,7 +25,7 @@ $VERSION = 1.16;
 		DES_vlan_trunk_add	DES_vlan_trunk_remove	DES_vlan_remove
 	    );
 
-my $debug=1;
+my $debug=0;
 my $timeout=20;
 
 my $LIB='DES';
@@ -119,7 +119,7 @@ sub DES_port_set_vlan {
     my ($swl, $port, $vlan_id, $tag, $trunk ) = @_;
     my $tagging='untagged ';
     $tagging = 'tagged ' if $tag > 0;
-    #print STDERR "PARMS - ' $swl, $port, $vlan_id ' \n" if $debug;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PARMS - ' $port, $vlan_id '" );
     my $vln = ''; my $vln_num = 0; my $vlanname = ''; 
     my $ranges_vlan = ''; my @range = '';
 
@@ -238,7 +238,6 @@ sub DES_conf_first {
         @_,
     );
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "First config new switch - '".$arg{'IP'}."'" );
-    #print STDERR "First config new switch - '".$arg{'IP'}."'\n" if $debug;
     my $vlan = 0;
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
@@ -251,7 +250,6 @@ sub DES_conf_first {
 	return -1  if (&$command(\$sw, $prompt,    "y") < 1 );
 	#$sw->print("y");
 	sleep(10);
-	#print STDERR "Config resetting successfull \n" if $debug;
 	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Config resetting successfull!" );
 
     } else {
@@ -306,7 +304,6 @@ sub DES_conf_first {
     }
 
     ####### ADD ADMIN LOGIN
-    #print STDERR "Create login ".$arg{'LOGIN'}."\n" if $debug;
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create login ".$arg{'LOGIN'} );
     $sw->print("create account admin $arg{'LOGIN'}");
     $sw->waitfor("/.* new password.*/");
@@ -338,7 +335,6 @@ sub DES_pass_change {
         @_,
     );
     # login
-    $arg{'IP'}='192.168.128.210' if $debug;
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Change ACCOUNTS in switch '".$arg{'IP'}."'" );
 

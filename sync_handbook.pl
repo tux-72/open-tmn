@@ -11,7 +11,8 @@ my $debug=0;
 my $PROG=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
     require $1.'/conf/config.pl';
-    print STDERR "USE PROGRAMM DIRECTORY => $1\n\n" if $debug ;
+    require $1.'/conf/libsw.pl';
+     print STDERR "USE PROGRAMM DIRECTORY => $1\n\n" if $debug ;
 } else {
     print STDERR "USE STANDART PROGRAMM DIRECTORY\n\n";
     require '/usr/local/swctl/conf/config.pl';

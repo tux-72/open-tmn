@@ -9,6 +9,7 @@ package SWALLCtl;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
 use POSIX qw(strftime);
+use IO::Socket;
 
 $VERSION = 1.1;
 
@@ -17,10 +18,10 @@ $VERSION = 1.1;
 @EXPORT_OK = qw();
 @EXPORT_TAGS = ();
 
-@EXPORT = qw(	dlog  rspaced  lspaced
+@EXPORT = qw(	dlog  rspaced  lspaced	IOS_rsh
 	    );
 
-my $debug=1;
+my $debug=2;
 
 #my $LIB='SWALL';
 
@@ -45,6 +46,7 @@ sub dlog {
         #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', MESS => 'mess' )
 	my $subchar = 30; my @lines = ();
 	$arg{'PROMPT'} .= ' ';
+	$arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\#\>\</ /cs;
 
         if ( not $arg{'DBUG'} > $debug ) {
             my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
@@ -61,5 +63,58 @@ sub dlog {
             }
         }
 }
+
+
+{
+    #my $pid_decr = (($$ & 127) << 1 );
+    my $pid_decr = (($$ & 7) << 1 );
+    my $end_port = 20000 - 1024 * $pid_decr;
+    my $start_port = $end_port - 1024;
+
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PID decr = $pid_decr, start_port = $start_port, end_port = $end_port"  );
+    my $src_port = $end_port ;
+
+    sub IOS_rsh {
+	#HOST CMD REMOTE_USER LOCAL_USER
+        my %arg = (
+            @_,
+        );
+	$arg{'LOCAL_USER'} = 'root'; $arg{'REMOTE_USER'} = 'admin';
+	dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => ' LOCAL USER = '.$arg{'LOCAL_USER'}.' REMOTE USER = '.$arg{'REMOTE_USER'} );
+	
+	$src_port -= 1;
+
+    	if ( $src_port < $start_port ) {
+	    $src_port = $end_port;
+	}
+	
+        my $try = 1;
+        my $socket;
+        while ($try) {
+                last if ( $src_port < $start_port - 1 );
+		dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " PID=".$$.", HOST = ".$arg{'HOST'}." port = $src_port" );
+                eval {
+                        local $SIG{'__DIE__'};
+                        $socket = IO::Socket::INET->new(PeerAddr	=> $arg{'HOST'},
+                                                	PeerPort	=> '514',
+                                                        LocalPort	=> $src_port,
+                                                        Proto		=> 'tcp' );
+                };
+                ( $@ || ( not defined $socket )) ? ( $src_port -= 1 ) : ( $try = 0 );
+        }
+        if ($try) {
+		dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "All ports in use!" );
+                return ();
+        }
+        print $socket "0\0";
+        print $socket $arg{'LOCAL_USER'}."\0";
+        print $socket $arg{'REMOTE_USER'}."\0";
+        print $socket $arg{'CMD'}."\0";
+        my @c=<$socket>;
+	$socket->shutdown(HOW);
+        return @c;
+    }
+}
+
 
 1;

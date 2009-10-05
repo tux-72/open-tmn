@@ -11,6 +11,7 @@ my $debug=0;
 my $PROG=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
     require $1.'/conf/config.pl';
+    require $1.'/conf/libsw.pl';
 #    print STDERR "USE PROGRAMM DIRECTORY => $1\n\n" if $debug;
 } else {
     print STDERR "USE STANDART PROGRAMM DIRECTORY\n\n";
@@ -54,13 +55,13 @@ foreach $ap (sort keys %apclose) {
         $query1 ="UPDATE swports SET autoconf=".$link_type{'free'}." WHERE port_id=".$ap." and link_type>".$conf{'STARTLINKCONF'}." and autoconf<".$conf{'STARTPORTCONF'};
         $query2="UPDATE InfoModem SET FlagClose=0 WHERE IdModem=".$ap;
     if ($debug) {
-	print STDERR $query1."\n";
-	print STDERR  $query2."\n";
+        dlog ( DBUG => 1, SUB => 'Sync_FREE_AP', MESS => $query1 );
+        dlog ( DBUG => 1, SUB => 'Sync_FREE_AP', MESS => $query2 );
     } else {
-	print STDERR $query1."\n";
+        dlog ( DBUG => 0, SUB => 'Sync_FREE_AP', MESS => $query1 );
 	$dbm->do($query1) or die $dbm->errstr; # Отмечаем порт для освобождения
 	$dbh->do($query2) or die $dbh->errstr;	# подтверждаем обработку порта
-	print STDERR "Closed AP, id N'".$ap."'\n";
+        dlog ( DBUG => 0, SUB => 'Sync_FREE_AP', MESS => "Closed AP, id N'".$ap."'" );
     }
 }
 
@@ -86,7 +87,8 @@ foreach $swid (sort keys %swname) {
 $dbh->do("set dateformat dmy set language russian set ansi_null_dflt_on on");
 $dbh->func("ISO","_date_fmt");
 
-print STDERR "\n>>> -- GET DATA from Billing --\n" if $debug;
+dlog ( DBUG => 2, SUB => 'Sync_TransportNet_state', MESS => ">>> -- GET DATA from Billing --" );
+
 my %trsubnet = (); my $subip = '';
 my $sth = $dbh->prepare(&$convert2("SELECT ip1, ip2, ip3, ip4, Active FROM vwTransportNetState"));
 die "Unable to prepare $DBI::errstr" unless defined($sth);
@@ -94,7 +96,7 @@ $sth->execute or die "Exec Error $DBI::errstr";
 while (my $trnet = $sth->fetchrow_hashref()) {
     next if $trnet->{'ip1'} == 10;
     $subip = $trnet->{'ip1'}.".".$trnet->{'ip2'}.".".$trnet->{'ip3'}.".".$trnet->{'ip4'}."/30";
-    print STDERR "$subip -> ".$trnet->{'Active'}." \n" if $debug;
+    dlog ( DBUG => 2, SUB => 'Sync_TransportNet_state', MESS => "$subip -> ".$trnet->{'Active'} );
     $subip = GET_IP3 ($subip);
     $trsubnet{$subip} = 2 if ( $trnet->{'Active'} == 0);
     $trsubnet{$subip} = 1 if ( $trnet->{'Active'} == 1);
@@ -102,7 +104,7 @@ while (my $trnet = $sth->fetchrow_hashref()) {
 $sth->finish;
 
 
-print STDERR "\n>>> -- GET DATA from Hardware --\n" if $debug;
+dlog ( DBUG => 2, SUB => 'Sync_TransportNet_state', MESS => ">>> -- GET DATA from Hardware --" );
 my %trnet_real = (); $hw_subip = '';
 $stm24 = $dbm->prepare("SELECT port_id, status, set_status, ip_subnet FROM head_link where head_id=4 order by ip_subnet");
 die "Unable to prepare $DBI::errstr" unless defined($stm24);
@@ -113,17 +115,16 @@ while (my $ip_sub = $stm24->fetchrow_hashref()) {
     if ( defined($trsubnet{$hw_subip}) and ( $ip_sub->{'status'} ne $trsubnet{$hw_subip})) {
 	my $Querry_24 =  "UPDATE head_link SET set_status=".$trsubnet{$hw_subip}." WHERE port_id=".$ip_sub->{'port_id'};
 	$dbm->do($Querry_24) || die $dbm->errstr;
-	print STDERR $Querry_24."\n";
+	dlog ( DBUG => 0, SUB => 'Sync_TransportNet_state', MESS => $Querry_24 );
     } elsif (not defined($trsubnet{$hw_subip})) {
-	print STDERR "Transport_net ".$hw_subip." Not defined in Billing... \n"
+	dlog ( DBUG => 0, SUB => 'Sync_TransportNet_state', MESS => "Transport_net ".$hw_subip." Not defined in Billing!!!" );
     }
     $trnet_real{$hw_subip} = $ip_sub->{'status'};
 }
 $stm24->finish;
-print STDERR "\n" x 3  if $debug;
 
 foreach my $net (sort(keys %trsubnet)) {
-    print STDERR "Transport_net $net not configured in Hardware...\n" if ( not defined($trnet_real{$net}) );
+	dlog ( DBUG => 0, SUB => 'Sync_TransportNet_state', MESS => "Transport_net $net not configured in Hardware!!!\n" ) if ( not defined($trnet_real{$net}) );
 }
 
 $dbm->disconnect;
@@ -136,7 +137,7 @@ sub GET_IP3 {
     foreach (@ln) {
         #if ( /HostMax\:\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+/ and ( $subip3 ne $1."/30") ) {
         if ( /HostMax\:\s+(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\s+/ and  $subip3 ne "$1.$2.$3.$4".'/30' and  $3 < 212 and $1 > 10 ) {
-	    print STDERR "change '$subip3' to '$1/30'\n";
+	    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Change '".$subip3."' to '$1.$2.$3.$4'/30'" );
 	    $subip3 = "$1.$2.$3.$4".'/30';
         }
     }

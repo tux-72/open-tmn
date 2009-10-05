@@ -10,6 +10,7 @@ my $PROG=$0;
 my $script_name=$0;
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
     require $1.'/conf/config.pl';
+    require $1.'/conf/libsw.pl';
     $script_name="$2";
     print STDERR "RUN in DIR => $1\n" if $debug;
 } else {
@@ -50,7 +51,7 @@ if ( $ARGV[0] eq 'switch' and defined($ARGV[1])) {
     $link_type{'free'}." order by p.portpref, p.port");
     $stm1->execute();
     while (my $ref1 = $stm1->fetchrow_hashref()) {
-	print STDERR "Host $hostname, ".$ref1->{'port_id'}."\n";
+	dlog ( DBUG => 0, SUB => 'Clear_AP', MESS => "Host $hostname, ".$ref1->{'port_id'} );
 	$dbh->do("EXECUTE ClosePointAccess \@IdPoint=".$ref1->{'port_id'}) || die $dbh->errstr; # Отправляем текущую точку доступа в архив
     }
     $stm1->finish;

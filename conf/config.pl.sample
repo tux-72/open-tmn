@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w 
+#!/usr/bin/perl
 
 %conf = (
     'def_swip',		'172.20.20.200',
@@ -32,16 +32,3 @@
     '10'        =>      '00:09:3d:12:c6:59',
     '870'       =>      '00:09:3d:12:c6:58',
 );
-
-use lib '/usr/local/switch-control/lib';
-use SWALLCtl;
-use C73Ctl;
-use CATIOSCtl;
-use CAT2950Ctl;
-use CAT3508GCtl;
-use CATOSCtl;
-use DESCtl;
-use ESCtl;
-use GSCtl;
-use BPSCtl;
-use TCOM4500Ctl;
