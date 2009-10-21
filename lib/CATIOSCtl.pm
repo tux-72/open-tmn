@@ -99,7 +99,8 @@ sub CATIOS_fix_vlan {
     my %arg = (
         @_,
     );
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ..." );
+    $arg{'RSH'} = 0;
+     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."' ..." );
     my $vlan = 0; my @ln = ''; 	my $sw; 
 
     if ( $arg{'RSH'} ) {
@@ -107,7 +108,7 @@ sub CATIOS_fix_vlan {
     } else {
 	# login
 	return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-	@ln= $sw->cmd("show mac-address-table dynamic address ".$arg{'MAC'}) if ( not arg{'RSH'} );
+	@ln= $sw->cmd("show mac-address-table dynamic address ".$arg{'MAC'}) if ( not $arg{'RSH'} );
 	$sw->close();
     }
     foreach (@ln) {
@@ -126,7 +127,7 @@ sub CATIOS_fix_macport {
     my %arg = (
         @_,
     );
-    $arg{'RSH'} = 1;
+    $arg{'RSH'} = 0;
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."' ..." );
 
     my $mac=CATIOS_mac_fix($arg{'MAC'});
@@ -693,7 +694,7 @@ sub CATIOS_term_l3realnet_add {
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip route-cache cef" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "no shutdown" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,      "exit" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf,      "ip route ".$arg{'IPCLI'}." 255.255.255.255 Vlan".$arg{'VLAN'} ) < 1);
+    if ( defined($arg{'IPCLI'}) ) { return -1  if (&$command(\$sw, $prompt_conf,      "ip route ".$arg{'IPCLI'}." 255.255.255.255 Vlan".$arg{'VLAN'} ) < 1); }
     return -1  if (&$command(\$sw, $prompt,           "exit" ) < 1);
     $sw->close();
     return 1;

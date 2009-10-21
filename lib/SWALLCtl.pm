@@ -18,12 +18,12 @@ $VERSION = 1.1;
 @EXPORT_OK = qw();
 @EXPORT_TAGS = ();
 
-@EXPORT = qw(	dlog  rspaced  lspaced	IOS_rsh
+@EXPORT = qw(	dlog_ap_get dlog  rspaced  lspaced	IOS_rsh
 	    );
 
-my $debug=2;
+my $debug=1;
 
-#my $LIB='SWALL';
+#my $ap_log="/var/log/dispatcher/ap_get.log";
 
 ############ SUBS ##############
 
@@ -37,6 +37,34 @@ sub lspaced {
     $str = shift;
     $len = shift;
     $r = sprintf("%${len}s",$str);
+}
+
+sub dlog_ap_get {
+        my %arg = (
+            @_,
+        );
+        #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', LOGFILE => '/var/log/dispatcher/ap_get.log', MESS => 'mess' )
+        open(AP_LOG,">>$arg{LOGFILE}");
+
+        my $subchar = 30; my @lines = ();
+        $arg{'PROMPT'} .= ' ';
+        $arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\#\>\</ /cs;
+
+        if ( not $arg{'DBUG'} > $debug ) {
+            my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
+            my $timelog = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year+1900, $month + 1, $day, $hour, $min, $sec);
+            if ( ref($arg{'MESS'}) ne 'ARRAY' ) {
+                @lines = split /\n/,$arg{'MESS'};
+            } else {
+                @lines = @{$arg{'MESS'}};
+            }
+            foreach my $mess ( @lines ) {
+                #$mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs;
+                next if (not $mess =~ /\S+/);
+                print AP_LOG $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
+            }
+        }
+        close AP_LOG;
 }
 
 sub dlog {
@@ -63,7 +91,6 @@ sub dlog {
             }
         }
 }
-
 
 {
     #my $pid_decr = (($$ & 127) << 1 );

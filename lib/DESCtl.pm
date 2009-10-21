@@ -61,11 +61,7 @@ sub DES_conf_save {
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "SAVE config on $LIB switch ".$arg{'IP'}." ..." );
     return -1  if (&$command(\$sw, $prompt, "save" ) < 1 );
     $sw->close();
-    if ( $debug > 0 ) {
-	return -1;
-    } else {
-	return 1;
-    }
+    return 1;
 }
 
 sub DES_cmd {

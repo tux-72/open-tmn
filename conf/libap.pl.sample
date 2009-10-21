@@ -1,0 +1,7 @@
+#!/usr/bin/perl
+
+use lib '/usr/local/switch-control/lib';
+
+use SWAPCtl;
+
+1;

@@ -6,20 +6,17 @@ use DBI();
 my $ver = "0.1";
 my $debug=0;
 
-my $PROG=$0;
+
+use FindBin '$Bin';
+require $Bin . '/../conf/config.pl';
+require $Bin . '/../conf/lib.pl';
+
 my $script_name=$0;
-if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
-    require $1.'/conf/config.pl';
-    require $1.'/conf/libsw.pl';
-    $script_name="$2";
-    print STDERR "RUN in DIR => $1\n" if $debug;
-} else {
-    require '/usr/local/swctl/conf/config.pl';
-    print STDERR "USE STANDART PROGRAMM DIRECTORY\n\n";
-}
+$script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
+dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
 
 if (not defined($ARGV[0])) {
-    print STDERR "\nUsage: $script_name ( switch <hostname> | point <idport> )\n\n";
+    print STDERR "!\nUsage: $script_name ( switch <hostname> | point <idport> )\n";
     exit;
 };
 

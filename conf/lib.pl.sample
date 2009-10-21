@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use lib '/usr/local/switch-control/lib';
+
 use SWALLCtl;
 use C73Ctl;
 use CATIOSCtl;

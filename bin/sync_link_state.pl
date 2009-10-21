@@ -8,15 +8,13 @@ my $ver = "0.4";
 my $debug=0;
 
 
-my $PROG=$0;
-if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
-    require $1.'/conf/config.pl';
-    require $1.'/conf/libsw.pl';
-#    print STDERR "USE PROGRAMM DIRECTORY => $1\n\n" if $debug;
-} else {
-    print STDERR "USE STANDART PROGRAMM DIRECTORY\n\n";
-    require '/usr/local/swctl/conf/config.pl';
-}
+use FindBin '$Bin';
+require $Bin . '/../conf/config.pl';
+require $Bin . '/../conf/libsw.pl';
+
+my $script_name=$0;
+$script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
+dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
 
 my $dbm = DBI->connect("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
 $dbm->do("SET NAMES 'koi8r'");

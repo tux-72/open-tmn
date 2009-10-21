@@ -11,6 +11,7 @@ use locale;
 
 # Switch Control
 require '/usr/local/swctl/conf/config.pl';
+require '/usr/local/swctl/conf/lib.pl';
 
 my $ver="1.8";
 
@@ -35,21 +36,20 @@ my $k2w = cset_factory 20866, 1251;
 my %NAS_IP2 = (
         '192.168.100.12', 13,
         '192.168.100.21', 13,
-        '192.168.100.30', 23,
 );
 
 my %AC = (
         '192.168.100.12', 1,
         '192.168.100.30', 2,
         '192.168.100.21', 0,
-        '192.168.29.21', 0,
+        '192.168.100.20', 0,
 );
 
 my %NAS_Secrets = (
         '192.168.100.12', '10secret',
         '192.168.100.30', '7505ppp',
         '192.168.100.21', '13secret',
-        '192.168.29.21', '13secret',
+        '192.168.100.20', 'dhCP2rAd',
 );
 #--- last field - type service
 #0 - pppoe
@@ -59,27 +59,26 @@ my %NAS_SQL_Request = (
         '192.168.100.12', 'exec UserAuth \'$_[0]\', 0',
         '192.168.100.30', 'exec UserAuth \'$_[0]\', 0',
         '192.168.100.21', 'exec UserAuth \'$_[0]\', 1',
-        '192.168.29.21',  'exec UserAuth \'$_[0]\', 1',
 );
 #test
 my %NAS_SQL_Reply_Count = (
         '192.168.100.12', 7,
         '192.168.100.30', 7,
         '192.168.100.21', 7,
-        '192.168.29.21', 7,
 );
+
 my %NAS_Reply = (
         '192.168.100.12', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.17 77.239.208.17\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Welcome $_[0]\nint=1\n\n',
         '192.168.100.30', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.17 77.239.208.17\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Welcome $_[0]\nint=1\n\n',
         '192.168.100.21', 'clear-password=$_[1]\nint=$_[4]\n\n',
-        '192.168.29.21', 'clear-password=$_[1]\nint=$_[4]\n\n',
+        '192.168.100.20', 'int=0\n\n',
 # ftp   '82.116.12.44', 'str=$_[3]\nclear-password=$_[1]\nint=$_[4]\n\n',
 );
 my %NAS_Fake_Reply = (
         '192.168.100.12', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.22 77.239.208.22\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Blocked $_[0]\nint=1\n\n',
         '192.168.100.30', 'Cisco-AVPair=\\"ip:dns-servers=77.239.208.22 77.239.208.22\\"\nSession-Timeout=$_[3]\nclear-password=$_[1]\nService-Type=Framed\nFramed-Protocol=PPP\nFramed-IP-Address=$_[2]\nstr=Blocked $_[0]\nint=1\n\n',
         '192.168.100.21', 'int=0\n\n',
-        '192.168.29.21', 'int=0\n\n',
+        '192.168.100.20', 'int=0\n\n',
 );
 
 ## Если требуется тупо обламывать авторизацию, к примеру при попытке выйти из недоверенной ТД
@@ -87,8 +86,9 @@ my %NAS_Deny_Reply = (
         '192.168.100.12', 'str=$_[0] blocked in current Access Point\nint=0\n\n',
         '192.168.100.30', 'str=$_[0] blocked in current Access Point\nint=0\n\n',
         '192.168.100.21', 'int=0\n\n',
-        '192.168.29.21', 'int=0\n\n',
+        '192.168.100.20', 'int=0\n\n',
 );
+
 #################################
 # Don't change after this point #
 #################################
