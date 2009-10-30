@@ -72,7 +72,7 @@ sub GS_cmd {
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), NORMA => 1,  MESS => \@lines );
     return 1;
 }
 
@@ -88,7 +88,7 @@ sub GS_conf_save {
 			prompt  =>      $prompt,
 			Timeout =>      20,
 		      );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@res );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], NORMA => 1,  MESS => \@res );
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVE config in GS switch '".$arg{'IP'}."' - OK " );
     $sw->close();
     return 1;

@@ -115,7 +115,7 @@ sub CATIOS_fix_vlan {
 	#vlan   mac address     type        protocols               port
 	#-------+---------------+--------+---------------------+--------------------
 	#464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
-        if ( /(\d+)\s+\w\w\w\w\.\w\w\w\w\.\w\w\w\w\s+dynamic\s+\S+\s+\S+/ and $1 > 1 ) {
+        if ( /(\d+)\s+\w\w\w\w\.\w\w\w\w\.\w\w\w\w\s+dynamic\s+\S+\s+\S+/ and $1 > 99 ) {
             $vlan = $1;
         }
     }

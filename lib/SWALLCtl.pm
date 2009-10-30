@@ -18,12 +18,10 @@ $VERSION = 1.1;
 @EXPORT_OK = qw();
 @EXPORT_TAGS = ();
 
-@EXPORT = qw(	dlog_ap_get dlog  rspaced  lspaced	IOS_rsh
+@EXPORT = qw(	dlog_ap dlog  rspaced  lspaced	IOS_rsh
 	    );
 
 my $debug=1;
-
-#my $ap_log="/var/log/dispatcher/ap_get.log";
 
 ############ SUBS ##############
 
@@ -39,7 +37,7 @@ sub lspaced {
     $r = sprintf("%${len}s",$str);
 }
 
-sub dlog_ap_get {
+sub dlog_ap {
         my %arg = (
             @_,
         );
@@ -48,7 +46,7 @@ sub dlog_ap_get {
 
         my $subchar = 30; my @lines = ();
         $arg{'PROMPT'} .= ' ';
-        $arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\#\>\</ /cs;
+        $arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\>\</ /cs;
 
         if ( not $arg{'DBUG'} > $debug ) {
             my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
@@ -59,7 +57,6 @@ sub dlog_ap_get {
                 @lines = @{$arg{'MESS'}};
             }
             foreach my $mess ( @lines ) {
-                #$mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs;
                 next if (not $mess =~ /\S+/);
                 print AP_LOG $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
             }
@@ -85,7 +82,7 @@ sub dlog {
                 @lines = @{$arg{'MESS'}};
             }
             foreach my $mess ( @lines ) {
-                $mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs;
+		if ( defined($arg{'NORMA'}) and $arg{'NORMA'} ) { $mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs; }
                 next if (not $mess =~ /\S+/);
                 print STDERR $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
             }

@@ -72,7 +72,7 @@ sub DES_cmd {
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), NORMA => 1,  MESS => \@lines );
     return 1;
 }
 
@@ -158,11 +158,11 @@ sub DES_port_set_vlan {
 	$vlanname = "Vlan".$vlan_id;
 	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create VLAN ".$vlanname );
 	@ln = ${$swl}->cmd("create vlan ".$vlanname." tag ".$vlan_id ); 
-	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@ln );
+	dlog ( DBUG => 1, SUB => (caller(0))[3], NORMA => 1,  MESS => \@ln );
     }
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Use vlan name '".$vlanname."'" );
     @ln = ${$swl}->cmd( "config vlan ".$vlanname." add ".$tagging." ".$port );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@ln );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], NORMA => 1,  MESS => \@ln );
     undef @ln;
     #return -1  if (&$command(\${$swl}, $prompt,	"config vlan ".$vlanname." add ".$tagging." ".$port ) < 1 );
 

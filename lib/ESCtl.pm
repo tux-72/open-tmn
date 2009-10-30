@@ -97,7 +97,9 @@ sub ES_cmd {
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
+    my $last_prompt = ${$swl}->last_prompt();
+    $last_prompt  =~ tr/7 / /cs;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => $last_prompt, NORMA => 1,  MESS => \@lines );
     return 1;
 }
 
@@ -149,7 +151,7 @@ sub ES_conf_save {
 			prompt  =>      $prompt,
 			Timeout =>      20,
 		      );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@res );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], NORMA => 1,  MESS => \@res );
     $sw->close();
     return 1;
 }
@@ -176,7 +178,7 @@ sub ES_conf_first {
 				prompt	=>	$prompt,
 				Timeout	=>	20,
 			    );
-    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => \@res  );
+    dlog ( DBUG => 0, SUB => (caller(0))[3], NORMA => 1,  MESS => \@res  );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Erasing VLAN config ... "  );
     my @lnv = $sw->cmd("show vlan \nc");
     $sw->cmd("");
@@ -278,7 +280,7 @@ sub ES_conf_first {
 			prompt	=>	$prompt,
 			Timeout	=>	20,
 		    );	
-    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => \@res );
+    dlog ( DBUG => 0, SUB => (caller(0))[3], NORMA => 1,  MESS => \@res );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Save config - OK" );
     $sw->close();
 
@@ -311,7 +313,7 @@ sub ES_pass_change {
 			prompt	=>	$prompt,
 			Timeout	=>	20,
 		    ) if not $debug;	
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => \@res )  if not $debug;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], NORMA => 1,  MESS => \@res )  if not $debug;
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Save config - OK" );
     $sw->close();
     return 1;

@@ -21,7 +21,7 @@ $script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
 dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
 
 
-my $dbm = DBI->connect("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
+my $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
 $dbm->do("SET NAMES 'koi8r'");
 
 my %libs = ();

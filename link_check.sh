@@ -7,4 +7,4 @@ if [ "$1" = "real" ]; then
     $DIR/switch_control.pl checkterm
     $DIR/switch_control.pl checkport
     #$DIR/switch_control.pl checklink
-fi 
+fi

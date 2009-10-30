@@ -1,8 +1,5 @@
 #!/usr/bin/perl
 
-$debug=1;
-my $ver='1.12';
-#$VERSION = 0.97;
 
 use Getopt::Long;
 
@@ -16,11 +13,17 @@ use FindBin '$Bin';
 require $Bin . '/../conf/config.pl';
 require $Bin . '/../conf/lib.pl';
 
+my $ver='1.12';
+#$VERSION = 0.97;
+
+$debug=1;
+$cycle_run=1;
+
 my $script_name=$0;
 $script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
 dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
 
-my $dbm = DBI->connect("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
+my $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
 $dbm->do("SET NAMES 'koi8r'");
 
 my %libs = ();
@@ -84,7 +87,7 @@ my $resport=0;
 my $point='';
 my $Querry_portfix = '';
 
-if (not defined($ARGV[0])) {
+if ( not defined($ARGV[0]) ) {
     print "Usage:  $script_name (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink | pass_change)\n"
 
 } elsif ( $ARGV[0] eq "newswitch" ) {
@@ -144,6 +147,8 @@ if (not defined($ARGV[0])) {
 	$stm->finish();
 
 } elsif ( $ARGV[0] eq "checkterm" ) {
+  while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
+    dlog ( SUB => 'checkport', DBUG => 1, MESS => "############### Checking cycle N $cycle_run ###############" );
     ################################ SYNC LINK STATES
     my $stml = $dbm->prepare("SELECT l.head_id, l.port_id, l.vlan_id, l.status, l.set_status, p.link_type, p.login, p.ip_subnet, p.login \
     FROM swports p, head_link l WHERE l.set_status>0 and l.port_id=p.port_id ORDER BY l.head_id");
@@ -171,8 +176,14 @@ if (not defined($ARGV[0])) {
     }
     $stml->finish;
 
-} elsif ( $ARGV[0] eq "checkport" ) {
+    exit if ( $script_name ne 'cycle_check.pl' );
+    sleep(10);
+    $cycle_run += 1;
+  }
 
+} elsif ( $ARGV[0] eq "checkport" ) {
+  while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
+    dlog ( SUB => 'checkport', DBUG => 1, MESS => "############### Checking cycle N $cycle_run ###############" );
     ################################ SET PORT PARAMETERS
     $SW{'change'} = 0;
     $SW{'sw_id'}=0;
@@ -272,6 +283,11 @@ if (not defined($ARGV[0])) {
     SAVE_config( LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'})
     if ($SW{'change'} and defined($libs{$SW{'lib'}}));
     $stm2->finish();
+
+    exit if ( $script_name ne 'cycle_check.pl' );
+    sleep(10);
+    $cycle_run += 1;
+  }
 
 } elsif ( $ARGV[0] eq "checklink" ) {
     ################################ SET PORT PARAMETERS
@@ -909,11 +925,12 @@ sub VLAN_remove {
 
 
 sub VLAN_get {
-	#VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
+	#VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, 
+	# VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
         my %arg = (
             @_,         # список пар аргументов
         );
-	# PORT_ID VLAN LINK_TYPE ZONE 
+	# PORT_ID VLAN_MIN VLAN_MAX LINK_TYPE ZONE 
 
 	my $res = -1; my $increment = 1;
 
@@ -944,8 +961,9 @@ sub VLAN_get {
 	    }
 	}
 
-	$dbm->do("INSERT into vlan_list SET info='AUTO INSERT VLAN record from vlan range', vlan_id=".$res.", zone_id=".$arg{'ZONE'}.", port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}.
-	" ON DUPLICATE KEY UPDATE info='AUTO UPDATE VLAN record', port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}) if ($res > 0 and $debug < 2);
+	$dbm->do("INSERT into vlan_list SET info='AUTO INSERT VLAN record from vlan range', vlan_id=".$res.", zone_id=".$arg{'ZONE'}.
+	", port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}." ON DUPLICATE KEY UPDATE info='AUTO UPDATE VLAN record', port_id=".
+	$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}) if ($res > 0 and $debug < 2);
 	return $res;
 }
 

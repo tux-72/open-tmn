@@ -21,11 +21,11 @@ if (not defined($ARGV[0])) {
 };
 
 ### MYSQL Connect
-my $dbm = DBI->connect("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
+my $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
 $dbm->do("SET NAMES 'koi8r'");
 
 ### MSSQL Connect
-my $dbh = DBI->connect("dbi:Sybase:server=".$conf{'MSSQL_host'}.";language=russian", $conf{'MSSQL_user'},$conf{'MSSQL_pass'}) or die "Unable to connect. $DBI::errstr";
+my $dbh = DBI->connect_cached("dbi:Sybase:server=".$conf{'MSSQL_host'}.";language=russian", $conf{'MSSQL_user'},$conf{'MSSQL_pass'}) or die "Unable to connect. $DBI::errstr";
 $dbh->do("set dateformat ymd set language russian set ansi_null_dflt_on on");
 $dbh->func("ISO","_date_fmt");
 
