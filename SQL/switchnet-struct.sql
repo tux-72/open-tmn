@@ -184,6 +184,7 @@ CREATE TABLE `hosts` (
   `parent_portpref` varchar(20) DEFAULT NULL,
   `idhouse` int(11) NOT NULL,
   `podezd` int(11) NOT NULL DEFAULT '0',
+  `unit` int(11) DEFAULT NULL,
   `grp` varchar(15) NOT NULL,
   `stamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `clients_vlan` int(11) DEFAULT NULL,
@@ -196,10 +197,11 @@ CREATE TABLE `hosts` (
   UNIQUE KEY `ip` (`ip`),
   UNIQUE KEY `hw_mac` (`hw_mac`),
   UNIQUE KEY `cli_vlan` (`clients_vlan`),
+  UNIQUE KEY `sw_unit` (`idhouse`,`podezd`,`unit`) USING BTREE,
   KEY `swmodel` (`model`),
   KEY `house` (`idhouse`),
   CONSTRAINT `idmodel` FOREIGN KEY (`model`) REFERENCES `models` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=284 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=296 DEFAULT CHARSET=koi8r CHECKSUM=1;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -371,7 +373,8 @@ SET character_set_client = utf8;
 CREATE TABLE `swports` (
   `snmp_portindex` int(11) DEFAULT NULL,
   `port_id` int(11) NOT NULL AUTO_INCREMENT,
-  `link_type` tinyint(4) NOT NULL DEFAULT '20',
+  `link_type` tinyint(4) DEFAULT '20',
+  `communal_port` tinyint(1) NOT NULL DEFAULT '0',
   `type` tinyint(4) NOT NULL DEFAULT '1',
   `sw_id` int(11) NOT NULL,
   `portpref` varchar(20) DEFAULT NULL,
@@ -385,6 +388,7 @@ CREATE TABLE `swports` (
   `info` varchar(60) DEFAULT NULL,
   `start_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `portvlan` int(11) DEFAULT '-1',
+  `new_portvlan` int(11) DEFAULT NULL,
   `tag` tinyint(1) NOT NULL DEFAULT '0',
   `complete_q` tinyint(4) NOT NULL DEFAULT '0',
   `login` varchar(15) DEFAULT NULL,
@@ -408,7 +412,7 @@ CREATE TABLE `swports` (
   KEY `PHY` (`phy_type`),
   KEY `port_type` (`type`),
   CONSTRAINT `switch` FOREIGN KEY (`sw_id`) REFERENCES `hosts` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4786 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=4936 DEFAULT CHARSET=koi8r CHECKSUM=1;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -552,4 +556,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2009-09-30 19:05:01
+-- Dump completed on 2009-10-30 20:05:01

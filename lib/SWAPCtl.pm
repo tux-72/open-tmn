@@ -11,7 +11,7 @@ use cyrillic qw/cset_factory/;
 
 use DBI();
 use SWALLCtl;
-#use SWDBCtl;
+use SWDBCtl;
 use C73Ctl;
 use CATIOSCtl;
 use CAT2950Ctl;
@@ -50,20 +50,12 @@ dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "Use BI
 
 ############ SUBS ##############
 
-#my $dbm; $res = DB_mysql_connect(\$dbm);
-#if ($res < 1) {
-#    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Connect to DB FAILED, RESULT = $res" );
-#    exit;
-#}
 
-#my $dbm = DBI->connect("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'})
-#or dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "Unable to connect MYSQL DB host ".$conf{'MYSQL_host'}."$DBI::errstr" );
-#$dbm->do("SET NAMES 'koi8r'");
-
-my $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'})
-or dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "Unable to connect MYSQL DB host ".$conf{'MYSQL_host'}."$DBI::errstr" );
-$dbm->do("SET NAMES 'koi8r'");
-
+my $dbm; $res = DB_mysql_connect(\$dbm, \%conf);
+if ($res < 1) {
+    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
+    DB_mysql_check_connect(\$dbm, \%conf);
+}
 
 my $LIB_ACT ='';
 
@@ -95,8 +87,8 @@ $stm->finish();
 
 sub SW_AP_get {
 
-        my $mysql_life = $dbm->ping;
-
+	DB_mysql_check_connect(\$dbm, \%conf);
+	
         my $fparm = shift;
 #	$fparm->{ap_id} =
 #	$fparm->{nas_ip} = 192.168.100.30
@@ -335,9 +327,9 @@ sub SW_AP_get {
 				    $Fvalue .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( $fparm->{'vlan_id'} > 1 );
 		    		    $Query .= ", link_head=".$AP{'link_head'}   if ( $AP{'link_head'} > 1 );
 				}
-		    		$Query .= ", portvlan=".$fparm->{'vlan_id'} if ( $fparm->{'vlan_id'} > 1 );
+		    		$Query .= ", new_portvlan=".$fparm->{'vlan_id'} if ( $fparm->{'vlan_id'} > 1 );
 			    } elsif (not $AP{'DB_portinfo'}) {
-		    		$Query .= ", portvlan=".$AP{'VLAN'};
+		    		$Query .= ", new_portvlan=".$AP{'VLAN'};
 			    }
 		    	    $Query .= ", ip_subnet='".$AP{'ip_subnet'}."/30'" if $AP{'link_type'} == $link_type{'l3net4'};
 			    if ( $AP{'db_link_type'} == $link_type{'free'} ) {
@@ -375,7 +367,7 @@ sub SW_AP_get {
 
 sub SW_AP_free {
 
-    my $mysql_life = $dbm->ping;
+    DB_mysql_check_connect(\$dbm, \%conf);
 
     my $fparm = shift;
     #	$fparm->{ap_id} = 1234
@@ -404,7 +396,7 @@ sub SW_AP_free {
 
 sub SW_AP_tune {
 
-    my $mysql_life = $dbm->ping;
+    DB_mysql_check_connect(\$dbm, \%conf);
 
     my $fparm = shift;
     #	$fparm->{ap_id} = 
@@ -443,7 +435,7 @@ sub SW_AP_tune {
 
 sub VLAN_VPN_get {
 
-        my $mysql_life = $dbm->ping;
+	DB_mysql_check_connect(\$dbm, \%conf);
 
         my %arg = (
             @_,         # список пар аргументов
@@ -487,7 +479,7 @@ sub VLAN_VPN_get {
 
 sub GET_Terminfo {
 
-    my $mysql_life = $dbm->ping;
+    DB_mysql_check_connect(\$dbm, \%conf);
 
     dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => 'GET Terminator info (debug)' );
     my %arg = (
