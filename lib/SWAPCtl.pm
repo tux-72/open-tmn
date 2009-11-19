@@ -31,10 +31,10 @@ use Exporter ();
 @EXPORT_OK = qw();
 @EXPORT_TAGS = ();
 
-@EXPORT = qw(	SW_AP_get SW_AP_tune SW_AP_free
+@EXPORT = qw(	SW_AP_get SW_AP_tune SW_AP_free SW_AP_linkstate
 	    );
 
-$VERSION = 1.3;
+$VERSION = 1.7;
 
 my $w2k = cset_factory 1251, 20866;
 my $k2w = cset_factory 20866, 1251;
@@ -58,6 +58,8 @@ if ($res < 1) {
 }
 
 my $LIB_ACT ='';
+
+my @RES = ( 'PASS', 'DENY', 'UNKNOWN' );
 
 %link_type = ();
 my @link_types = '';
@@ -87,39 +89,91 @@ $stm->finish();
 
 sub SW_AP_get {
 
+        dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "--" );
 	DB_mysql_check_connect(\$dbm, \%conf);
-	
         my $fparm = shift;
-#	$fparm->{ap_id} =
-#	$fparm->{nas_ip} = 192.168.100.30
-#	$fparm->{login} = pppoe
-#	$fparm->{ip_addr} = 10.13.64.3
+	my $Fres = 2; my $Fvalue = 'ap_id:-1;';	
 
-#	$fparm->{port_rate_ds} = 10000
-#	$fparm->{port_rate_us} = 10000
-#	$fparm->{inet_rate} = 1000
-	
-	####################### ACCESS POINT ####################
-	my $Query = ""; my $Query0 = ""; my $Query1 = ""; my $ip =''; my $Fres = 2; my $Fvalue = 'ap_id:-1;';
-	my $VZONE = -1;
-        my $date = strftime "%Y%m%d%H%M%S", localtime(time);
+	#	$fparm->{ap_id} =
+	#	$fparm->{nas_ip} = 192.168.100.30
+	#	$fparm->{login} = pppoe
+	#	$fparm->{link_type} = 21
+	#	$fparm->{mac} = 0017.3156.7fd9
 
+	#	$fparm->{port_rate_ds} = 10000
+	#	$fparm->{port_rate_us} = 10000
+	#	$fparm->{inet_rate} = 1000
+	#	$fparm->{ap_vlan} = 239
+	#	$fparm->{ip_addr} = 10.13.64.3
 
-	if      ( $fparm->{'mac'} =~ /^(\w\w)(\w\w)\.(\w\w)(\w\w)\.(\w\w)(\w\w)$/ ) {
+	############ Проверка обязатеьных параметров
+	if ( not ( defined($fparm->{'link_type'}) && $fparm->{'link_type'} =~ /^\d+$/ ) ) {
+	    return ( $Fres, "error:not defined or broken parameter 'link_type' => '".$fparm->{'link_type'}."';" );
+	} else {
+	    $fparm->{'link_type'}+0;
+	}
+	if ( not ( defined($fparm->{'login'}) && "x".$fparm->{'login'} ne "x" ) ) {
+	    return ( $Fres, "error:not defined or broken parameter 'login' => '".$fparm->{'login'}."';" );
+	}
+	if ( not ( defined($fparm->{'nas_ip'}) && $fparm->{'nas_ip'} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ ) ) {
+	    return ( $Fres, "error:not defined or broken parameter 'nas_ip' => '".$fparm->{'nas_ip'}."';" );
+	}
+
+	if ( not ( defined($fparm->{'mac'}) && "x".$fparm->{'mac'} ne "x" ) ) {
+	    return ( $Fres, "error:not defined parameter 'MAC';" );
+	}
+
+	if	( $fparm->{'mac'} =~ /^(\w\w)(\w\w)\.(\w\w)(\w\w)\.(\w\w)(\w\w)$/ ) {
 	    $fparm->{'mac'} = "$1\:$2\:$3\:$4\:$5\:$6";
 	} elsif ( $fparm->{'mac'} =~ /^(\w\w)\-(\w\w)\-(\w\w)\-(\w\w)\-(\w\w)\-(\w\w)$/ ) {
 	    $fparm->{'mac'} = "$1\:$2\:$3\:$4\:$5\:$6";
 	} elsif ( $fparm->{'mac'} =~ /^(\w\w)(\w\w)(\w\w)(\w\w)(\w\w)(\w\w)$/ ) {
 	    $fparm->{'mac'} = "$1\:$2\:$3\:$4\:$5\:$6";
-	} elsif (! $fparm->{'mac'} =~ /^(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)$/) {
+	} elsif ( $fparm->{'mac'} =~ /^(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)$/) {
+	    $fparm->{'mac'} = "$1\:$2\:$3\:$4\:$5\:$6";
+	} else {
            dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "MAC '".$fparm->{'mac'}."' unknown format, exiting ..." );
-	    return ( $Fres, $Fvalue );
+	    return ( $Fres, "error: broken format in parameter 'mac' => '".$fparm->{'mac'}."';" );
 	}
+
+
+	###################### normalize port speeds #################
+	if ( defined($fparm->{'port_rate_ds'}) ) {
+	    if ( "x".$fparm->{'port_rate_ds'} eq 'x0' ) {
+		$fparm->{'port_rate_ds'} = -1;
+	    } elsif ( "x".$fparm->{'port_rate_ds'} eq 'x' ) {
+		delete($fparm->{'port_rate_ds'});
+	    } elsif ( not $fparm->{'port_rate_ds'} =~ /^\d+$/ ) {
+        	return ( $Fres, "error: broken format in parameter 'port_rate_ds' => '".$fparm->{'port_rate_ds'}."';" );
+	    }
+	}
+	if ( defined($fparm->{'port_rate_us'}) ) {
+	    if ( "x".$fparm->{'port_rate_us'} eq 'x0' ) {
+		$fparm->{'port_rate_us'} = -1;
+	    } elsif ( "x".$fparm->{'port_rate_us'} eq 'x' ) {
+		delete($fparm->{'port_rate_us'});
+	    } elsif ( not $fparm->{'port_rate_us'} =~ /^\d+$/ ) {
+        	return ( $Fres, "error: broken format in parameter 'port_rate_us' => '".$fparm->{'port_rate_us'}."';" );
+	    }
+	}
+	###### чистка пустых необязательных параметров
+	if ( defined($fparm->{'ap_vlan'}) && "x".$fparm->{'ap_vlan'} eq "x") {
+	    delete($fparm->{'ap_vlan'});
+	}
+	if ( defined($fparm->{'ip_addr'}) && "x".$fparm->{'ip_addr'} eq "x") {
+	    delete($fparm->{'ip_addr'});
+	}
+
+	####################### GET ACCESS POINT ####################
+	my $Query = ""; my $Query0 = ""; my $Query1 = "";
+        my $date = strftime "%Y%m%d%H%M%S", localtime(time);
 
 	my %AP = (
 	    'trust',	0,
 	    'set',	0,
 	    'VLAN',	0,
+	    'vlan_zone',	-1,
+	    'update_db',	0,
 	    'DB_portinfo',	0,
 	    'MAC',	$fparm->{'mac'},
 	    'id',	0,
@@ -153,20 +207,20 @@ sub SW_AP_get {
 	    $Fvalue = 'error:MAC VLAN not fixed... :-(;';
 	} else {
 		if ( $AP{'VLAN'} < $conf{'FIRST_ZONEVLAN'} || $headinfo{'ZONE_'.$fparm->{'nas_ip'}} == -1 ) {
-		    $VZONE = 1;
+		    $AP{'vlan_zone'} = 1;
 		} else {
-		    $VZONE = $headinfo{'ZONE_'.$fparm->{'nas_ip'}};
+		    $AP{'vlan_zone'} = $headinfo{'ZONE_'.$fparm->{'nas_ip'}};
 		}
 		############# GET Switch IP's
 		$stm0 = $dbm->prepare("SELECT s.automanage, s.bw_ctl, s.id, s.ip, s.model, s.hostname, s.idhouse, s.podezd, s.unit, h.idhouse, h.street, h.dom, m.lib, ".
 		"m.mon_login, m.mon_pass FROM hosts s, houses h, models m WHERE s.model=m.id and s.idhouse=h.idhouse and m.lib is not NULL and s.clients_vlan=".
-		$AP{'VLAN'}." and s.vlan_zone=".$VZONE );
+		$AP{'VLAN'}." and s.vlan_zone=".$AP{'vlan_zone'} );
 		$stm0->execute();
 		#$swrw  = $stm0->rows;
 		dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Greater by one switches in VLAN '".$AP{'VLAN'}."'!!!" ) if $stm0->rows>1;
 
 		while ($ref = $stm0->fetchrow_hashref() and not $AP{'id'}) {
-			$AP{'autoconf'}=1 if ($ref->{'automanage'} == 1);
+			$AP{'automanage'}=1 if ($ref->{'automanage'} == 1);
 			$AP{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
 
 			$LIB_ACT = $ref->{'lib'}.'_fix_macport';
@@ -197,9 +251,9 @@ sub SW_AP_get {
 				my $stm1 = $dbm->prepare($Query0);
 				$stm1->execute();
 			    	while (my $refp = $stm1->fetchrow_hashref()) {
-					$AP{'db_autoconf'} = $refp->{'autoconf'};
-					$AP{'db_link_type'} = $link_type{'free'};
-					$AP{'db_link_type'} = $refp->{'link_type'} if defined($refp->{'link_type'});
+					$AP{'autoconf'} = $refp->{'autoconf'};
+					$AP{'link_type'} = $link_type{'free'};
+					$AP{'link_type'} = $refp->{'link_type'} if defined($refp->{'link_type'});
 					$AP{'lastlogin'} = $refp->{'login'} if defined($refp->{'login'});
 					$AP{'id'} = $refp->{'port_id'};
 					$AP{'communal'} = $refp->{'communal_port'};
@@ -213,17 +267,17 @@ sub SW_AP_get {
                                         $AP{'name'} .= ", порт ".$AP{'port'};
 					$stm1->finish;
 			}
-			dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => 
+			dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => 
 			"CLI_VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."' AP -> '".$AP{'id'}."', '".$AP{'name'}."'" );
 		}
 		$stm0->finish;
 		if (not $AP{'id'}) {
-			dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "FIND PORT VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."', MAC:'".$fparm->{'mac'}."'" );
+			dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "FIND PORT VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."', MAC:'".$fparm->{'mac'}."'" );
 			$AP{'DB_portinfo'}=1;
 			$stm0 = $dbm->prepare( "SELECT s.automanage, s.bw_ctl, s.id, s.ip, s.model, s.hostname, s.idhouse, s.podezd, s.unit, h.idhouse, ".
 			"h.street, h.dom, p.sw_id, p.autoconf, p.port_id, p.link_type, p.communal_port, p.portpref, p.port, p.ds_speed, p.us_speed, p.login, ".
 			"p.portvlan, p.ip_subnet, p.autoneg, p.speed, p.duplex, p.maxhwaddr FROM hosts s, houses h, swports p ".
-			"WHERE s.idhouse=h.idhouse and p.sw_id=s.id and p.portvlan=".$AP{'VLAN'}." and s.vlan_zone=".$VZONE );
+			"WHERE s.idhouse=h.idhouse and p.sw_id=s.id and p.portvlan=".$AP{'VLAN'}." and s.vlan_zone=".$AP{'vlan_zone'} );
                     	$stm0->execute();
                     	while ($ref = $stm0->fetchrow_hashref()) {
 			    $AP{'port'} = $ref->{'port'} if not defined($ref->{'portpref'});
@@ -235,12 +289,12 @@ sub SW_AP_get {
                             $AP{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
                             $AP{'name'} .= ", порт ".$AP{'port'};
 
-			    $AP{'db_link_type'} = $link_type{'free'};
-			    $AP{'db_link_type'} = $ref->{'link_type'} if defined($ref->{'link_type'});
-			    $AP{'db_autoconf'} = $ref->{'autoconf'};
+			    $AP{'link_type'} = $link_type{'free'};
+			    $AP{'link_type'} = $ref->{'link_type'} if defined($ref->{'link_type'});
+			    $AP{'autoconf'} = $ref->{'autoconf'};
 
 			    $AP{'lastlogin'} = $ref->{'login'}  if defined($ref->{'login'});
-			    $AP{'autoconf'}=1 if ($ref->{'automanage'} == 1);
+			    $AP{'automanage'}=1 if ($ref->{'automanage'} == 1);
 			    $AP{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
 
 			    $AP{'ds'} = $ref->{'ds_speed'} if defined($ref->{'ds_speed'});
@@ -256,61 +310,32 @@ sub SW_AP_get {
 			    }
 			    $AP{'id'} = $ref->{'port_id'};
 			    $AP{'communal'} = $ref->{'communal_port'};
-			    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => 
+			    dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => 
 			    "VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."' AP -> '".$AP{'id'}."', '".$AP{'name'}."'" );
 			}
 			    $stm0->finish;
 		}
 
-		#	$fparm->{ap_id} =
-		#	$fparm->{nas_ip} = 192.168.100.30
-		#	$fparm->{login} = pppoe
-		#	$fparm->{link_type} = 21
-		#	$fparm->{mac} = 0017.3156.7fd9
-		#	$fparm->{ip_addr} = 10.13.64.3
-
-		#	$fparm->{port_rate_ds} = 10000
-		#	$fparm->{port_rate_us} = 10000
-		#	$fparm->{inet_rate} = 1000
-		#	$fparm->{ap_vlan} = 239
-
+		################### Если выяснили AP_ID ######################
 		if ($AP{'id'}) {
 			$Fres = 1;
 			$Fvalue = 'ap_id:'.$AP{'id'}.';ap_name:'.&$k2w($AP{'name'}).';bw_ctl:'.$AP{'bw_ctl'}.';ap_swid:'.$AP{'swid'}.';ap_communal:'.$AP{'communal'}.';';
 			if ( $fparm->{'ap_id'} and $fparm->{'ap_id'} == $AP{'id'} ) {
-			    $Fres = 0;
-			    # normalize port speed
-			    if ( defined($fparm->{'port_rate_ds'}) and $fparm->{'port_rate_ds'} == 0 ) {
-				$fparm->{'port_rate_ds'} = -1;
-			    }
-			    if ( defined($fparm->{'port_rate_us'}) and $fparm->{'port_rate_us'} == 0 ) {
-				$fparm->{'port_rate_us'} = -1;
-			    }
+			    $Fres = 0; $AP{'trust'}=1;
 
-			    # добавил коммунальное условие!!!
-    			    if ( ( $AP{'db_link_type'} != $fparm->{'link_type'}
-				|| $AP{'us'} != $fparm->{'port_rate_us'}
-				|| $AP{'ds'} != $fparm->{'port_rate_ds'}
-				|| ( defined($fparm->{'vlan_id'}) and $AP{'portvlan'}  != $fparm->{'vlan_id'} )
-			    ) and not $AP{'communal'} ) { 
+    			    if ( ( $AP{'link_type'} != $fparm->{'link_type'}
+				|| ( 'x'.$fparm->{'port_rate_us'} ne 'x' and $AP{'us'} != $fparm->{'port_rate_us'} )
+				|| ( 'x'.$fparm->{'port_rate_ds'} ne 'x' and $AP{'ds'} != $fparm->{'port_rate_ds'} )
+				#|| ( defined($fparm->{'vlan_id'}) and $AP{'portvlan'} != $fparm->{'vlan_id'} )
+			    ) and ! $AP{'communal'} ) {
 				$AP{'set'} = 1;
 			    }
-			    #$AP{'inet_rate'}	= $fparm->{'inet_rate'} 	if defined($fparm->{'inet_rate'});
-			    $AP{'ds'} 		= $fparm->{'port_rate_ds'} 	if defined($fparm->{'port_rate_ds'});
-			    $AP{'us'} 		= $fparm->{'port_rate_us'} 	if defined($fparm->{'port_rate_us'});
-			    #NEW Parameters
-			    # Костылик
-			    $AP{'link_type'}	= $link_type{'pppoe'};
-			    $AP{'link_type'}	= $fparm->{'link_type'} if ( defined($fparm->{'link_type'}) and "x".$fparm->{'link_type'} ne "x");
-			    $AP{'portvlan'}	= $fparm->{'vlan_id'}	if ( defined($fparm->{'vlan_id'})   and "x".$fparm->{'vlan_id'} ne "x" );
-			    $AP{'ip_subnet'}	= $fparm->{'ip_addr'}	if ( defined($fparm->{'ip_addr'})   and "x".$fparm->{'ip_addr'} ne "x" );
+			    #if ($AP{'communal'}) { $AP{'set'} = 0; } 
 
                             dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS =>
-			    "TD_set = '".$AP{'set'}."', AP_DS = '".$AP{'ds'}."', AP_US = '".$AP{'us'}."'" );
-			    $AP{'trust'}=1;
+			    "TD_set = '".$AP{'set'}."', AP_DS = '".$fparm->{'port_rate_ds'}."', AP_US = '".$fparm->{'port_rate_us'}."'" );
 			} else {
-			    $AP{'trust'}=0;
-			    $AP{'set'} = 0
+			    $AP{'trust'} = 0; $AP{'set'} = 0
 			}
 			$Query = "INSERT INTO user_mac_port SET trust=".$AP{'trust'}.", login='".$fparm->{'login'}."', start_date='".$date."', last_date='".$date."', mac='".$fparm->{'mac'}."', vlan='".$AP{'VLAN'}."', td='".$AP{'id'}."'";
 			$Query .= ", td_name='".$AP{'name'}."', idhouse='".$AP{'house'}."', podezd='".$AP{'podezd'}."', sw_id='".$AP{'swid'}."', port='".$AP{'port'}."' ON DUPLICATE KEY UPDATE trust=".$AP{'trust'};
@@ -318,52 +343,81 @@ sub SW_AP_get {
 			$dbm->do("$Query");
 			#### TEMP SET
 			#$AP{'lastlogin'} = '';
-			if ($AP{'set'} and $AP{'autoconf'} and !($fparm->{'login'} =~ /^(jur|com)test\d+$/ )) {
-		    	    $Query = "UPDATE swports SET start_date='".$date."', login='".$fparm->{'login'}."', mac_port='".$fparm->{'mac'}."', ds_speed=".$AP{'ds'}.", us_speed=".$AP{'us'};
+			# SET PARMS!!!
+			#if ($AP{'set'} and $AP{'automanage'} and !( $fparm->{'login'} =~ /^(jur|com)test\d+$/ )) {
+			if ( $AP{'set'} and $AP{'automanage'} ) {
+			    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Access Point parm change" );
+		    	    $Query = "UPDATE swports SET start_date='".$date."', login='".$fparm->{'login'}."', mac_port='".$fparm->{'mac'}."'";
+			    $Query .= ", ds_speed=".$fparm->{'port_rate_ds'} if defined($fparm->{'port_rate_ds'});
+			    $Query .= ", us_speed=".$fparm->{'port_rate_us'} if defined($fparm->{'port_rate_us'});
 			    ########  VPN  VLAN  ########
 			    if ( $fparm->{'link_type'} == $link_type{'l2link'} ) {
-				if ( "x".$fparm->{'vlan_id'} eq "x" and $AP{'db_autoconf'} != $link_type{'l2link'} ) {
-				    ( $fparm->{'vlan_id'}, $AP{'link_head'} ) = VLAN_VPN_get ( PORT_ID => $AP{'id'}, LINK_TYPE => $link_type{'l2link'}, ZONE => $VZONE ); 
+				if ( "x".$fparm->{'vlan_id'} eq "x" and $AP{'autoconf'} != $link_type{'l2link'} ) {
+				    ( $fparm->{'vlan_id'}, $AP{'link_head'} ) = VLAN_VPN_get ( PORT_ID => $AP{'id'}, LINK_TYPE => $link_type{'l2link'}, ZONE => $AP{'vlan_zone'} );
 				    $Fvalue .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( $fparm->{'vlan_id'} > 1 );
 		    		    $Query .= ", link_head=".$AP{'link_head'}   if ( $AP{'link_head'} > 1 );
 				}
-		    		$Query .= ", new_portvlan=".$fparm->{'vlan_id'} if ( $fparm->{'vlan_id'} > 1 );
-			    } elsif (not $AP{'DB_portinfo'}) {
-		    		$Query .= ", new_portvlan=".$AP{'VLAN'};
+		    		#$Query .= ", new_portvlan=".$fparm->{'vlan_id'} if ( $fparm->{'vlan_id'} > 1 );
+			    #} elsif (not $AP{'DB_portinfo'}) {
+		    	    #	$Query .= ", new_portvlan=".$AP{'VLAN'};
 			    }
-		    	    $Query .= ", ip_subnet='".$AP{'ip_subnet'}."/30'" if $AP{'link_type'} == $link_type{'l3net4'};
-			    if ( $AP{'db_link_type'} == $link_type{'free'} ) {
-				$Query .= ", autoconf=".$AP{'link_type'}." WHERE port_id=".$AP{'id'}." and link_type=".$link_type{'free'};
-			    } elsif ( $AP{'link_type'}>$conf{'STARTLINKCONF'} ) {
-				$Query .= ", autoconf=".$link_type{'setparms'}." WHERE port_id=".$AP{'id'};
-			    }
+			    ## Transport Net
+		    	    $Query .= ", ip_subnet='".$fparm->{'ip_addr'}."/30'" if ( defined($fparm->{'ip_addr'}) and $fparm->{'link_type'} == $link_type{'l3net4'} );
 
-                    	    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Update port DB parameters info" );
-			    $dbm->do($Query) or dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "ERROR update speed fields in table SWPORTS Querry '".$Query );
-			} elsif ($AP{'trust'} and ("x".$fparm->{'login'} ne "x".$AP{'lastlogin'} ) and !($fparm->{'login'} =~ /^(jur|com)test\d+$/ )) {
+			    # Проверка изменений link_type
+			    ## Если порт был свободен и задействуется под PPPoE
+			    if ( $AP{'link_type'} == $link_type{'free'} and $fparm->{'link_type'} == $conf{'CLI_VLAN_LINKTYPE'} ) {
+		    		$Query .= ", portvlan=".$AP{'VLAN'};
+			    	$Query .= ", link_type=".$fparm->{'link_type'}.", autoconf=".$link_type{'setparms'}.
+				" WHERE port_id=".$fparm->{'ap_id'}." and link_type=".$link_type{'free'};
+				$AP{'update_db'}=1;
+			    ## Иначе если порт был свободен и задействуется под другие типы подключений  
+			    } elsif ( $AP{'link_type'} == $link_type{'free'} ) {
+		    		$Query .= ", new_portvlan=".$fparm->{'vlan_id'} if ( $fparm->{'vlan_id'} > 1 );
+				$Query .= ", autoconf=".$fparm->{'link_type'}." WHERE port_id=".$fparm->{'ap_id'}." and link_type=".$link_type{'free'};
+				$AP{'update_db'}=1;
+			    ## Иначе если порт не был свободен и его тип подключения не изменился
+			    } elsif ( $AP{'link_type'} > $conf{'STARTLINKCONF'} and $fparm->{'link_type'}+0 == $AP{'link_type'}+0 ) {
+		    		$Query .= ", portvlan=".$AP{'VLAN'};
+				$Query .= ", autoconf=".$link_type{'setparms'}." WHERE port_id=".$fparm->{'ap_id'};
+				$AP{'update_db'}=1;
+			    }
+			    if ( $AP{'update_db'} ) {
+                    		dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Update port DB parameters info" );
+				$dbm->do($Query) or dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "ERROR update speed fields in table SWPORTS Querry '".$Query );
+			    } else {
+				dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Error: Different link_types, possible PORT type is FREE?" );
+			    }
+			# NOT SET PARMS
+			#} elsif ($AP{'trust'} and ("x".$fparm->{'login'} ne "x".$AP{'lastlogin'} ) and !($fparm->{'login'} =~ /^(jur|com)test\d+$/ )) {
+			} elsif ( $AP{'trust'} and ( "x".$fparm->{'login'} ne "x".$AP{'lastlogin'} ) ) {
 			    $Query = "UPDATE swports SET start_date='".$date."', login='".$fparm->{'login'}."', mac_port='".$fparm->{'mac'}."'";
 			    if ( not $AP{'DB_portinfo'} )  { $Query .= ", portvlan=".$AP{'VLAN'}; }
 			    $Query .= " WHERE port_id=".$AP{'id'}." and link_type>".$conf{'STARTLINKCONF'};
-                	    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Update port login DB info" );
+                	    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Update port login DB info" );
 			    $dbm->do($Query) or dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "ERROR update LOGIN in table SWPORTS Query '".$Query );
 			}
 
 			if ( not $AP{'trust'} ) {
-			    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "'".$fparm->{'login'}."' access point not agree !!!" );
+			    dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "'".$fparm->{'login'}."' access point not agree !!!" );
 	    		    $Fres = 1;
 			    $Fvalue = 'ap_id:'.$AP{'id'}.';ap_name:'.&$k2w($AP{'name'}).';bw_ctl:'.$AP{'bw_ctl'}.';ap_swid:'.$AP{'swid'}.';ap_communal:'.$AP{'communal'}.';';
 			}
 
 		} elsif ( $AP{'VLAN'} ) {
-		    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "AP ID '".$fparm->{'login'}."' in VLAN ".$AP{'VLAN'}." not fixed!!!" );
+		    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "AP ID '".$fparm->{'login'}."' in VLAN ".$AP{'VLAN'}." not fixed!!!" );
 		    $Fres = 2;
 	            $Fvalue = 'error:MAC found in VLAN '.$AP{'VLAN'}.'. Access point not fixed... :-(;';
 		}
 	}
+        dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => 
+	"QUERY: Login  = '".$fparm->{'login'}."', MAC = '".$fparm->{'mac'}."', NAS_IP = ".$fparm->{'nas_ip'}."\n".
+	"AP_CHECK: ".$RES[$Fres].'('.$Fres.')'.", Login = '".$fparm->{'login'}."', AP_ID = '".$AP{'id'}."', '".$AP{'name'}.", ZONE = ".$AP{'vlan_zone'}.", VLAN = ".$AP{'VLAN'}."'\n".
+	"REPLY: ".$Fres.", '".&$w2k($Fvalue)."'" );
 
-        dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Return Res = '".$Fres."', Val = '".$Fvalue."', ZONE = ".$VZONE );
 	return ($Fres+0, $Fvalue);
 }
+
 
 sub SW_AP_free {
 
@@ -371,10 +425,13 @@ sub SW_AP_free {
 
     my $fparm = shift;
     #	$fparm->{ap_id} = 1234
+    if  ( not ( defined($fparm->{'ap_id'}) && $fparm->{'ap_id'} =~ /^\d+$/ ) ) {
+        return ( $Fres, "error:not defined parameter 'ap_id';" );
+    }
     ############################ Освобождeние AP
     my $Q_free; my $Fres = 0; my $Fvalue = '';
 
-    $Q_free ="UPDATE swports SET autoconf=".$link_type{'free'}." WHERE port_id=".$fparm{'ap_id'}." and link_type>".$conf{'STARTLINKCONF'}.
+    $Q_free ="UPDATE swports SET autoconf=".$link_type{'free'}." WHERE port_id=".$fparm->{'ap_id'}." and link_type>".$conf{'STARTLINKCONF'}.
     " and autoconf<".$conf{'STARTPORTCONF'}." and type>0 and communal_port=0" ;
     if ( $debug > 1 ) {
         dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "DEBUG mode, Query '".$Q_free."'" );
@@ -402,24 +459,45 @@ sub SW_AP_tune {
     #	$fparm->{ap_id} = 
     #	$fparm->{port_rate_ds} = 10000
     #	$fparm->{port_rate_us} = 10000
-    my $Q_tune; my $Fres = 0; my $Fvalue = '';
-
-    $Q_tune = "UPDATE swports SET autoconf=".$link_type{'setparms'};
-
+    if  ( not ( defined($fparm->{'ap_id'}) && $fparm->{'ap_id'} =~ /^\d+$/ ) ) {
+        return ( $Fres, "error:not defined or broken parameter 'ap_id';" );
+    }
     if ( defined($fparm->{'port_rate_ds'}) ) {
-	$fparm->{'port_rate_ds'} = -1 if ( $fparm->{'port_rate_ds'} == 0 );
-	$Q_tune .= ", ds_speed=".$fparm->{'port_rate_ds'} if ( "x".$fparm->{'port_rate_ds'} ne "x" );
+	if ( "x".$fparm->{'port_rate_ds'} eq 'x0' ) {
+	    $fparm->{'port_rate_ds'} = -1;
+	} elsif ( "x".$fparm->{'port_rate_ds'} eq 'x' ) {
+	    delete($fparm->{'port_rate_ds'});
+	} elsif ( not $fparm->{'port_rate_ds'} =~ /^\d+$/ ) {
+	    return ( $Fres, "error: broken format in parameter 'port_rate_ds' => '".$fparm->{'port_rate_ds'}."';" );
+	}
     }
     if ( defined($fparm->{'port_rate_us'}) ) {
-	$fparm->{'port_rate_us'} = -1 if ( $fparm->{'port_rate_us'} == 0 );
-	$Q_tune .= ", us_speed=".$fparm->{'port_rate_us'} if ( "x".$fparm->{'port_rate_us'} ne "x" );
+	if ( "x".$fparm->{'port_rate_us'} eq 'x0' ) {
+	    $fparm->{'port_rate_us'} = -1;
+	} elsif ( "x".$fparm->{'port_rate_us'} eq 'x' ) {
+	    delete($fparm->{'port_rate_us'});
+	} elsif ( not $fparm->{'port_rate_us'} =~ /^\d+$/ ) {
+    	    return ( $Fres, "error: broken format in parameter 'port_rate_us' => '".$fparm->{'port_rate_us'}."';" );
+	}
     }
+    #if ( not ( defined($fparm->{'port_rate_ds'}) || defined($fparm->{'port_rate_us'}) )
+    #	return ( $Fres, "error:not defined parameters 'port_rate_ds' and 'port_rate_us';" );
+    #}
 
-    $Q_tune .= " WHERE port_id=".$fparm->{'ap_id'}." and communal_port=0 and type>0";
+    my $Q_tune; my $Fres = 0; my $Fvalue = ''; my $parmset = 0;
+
+    $Q_tune = "UPDATE swports SET autoconf=".$link_type{'setparms'};
+    if ( defined($fparm->{'port_rate_ds'}) ) { $Q_tune .= ", ds_speed=".$fparm->{'port_rate_ds'}; $parmset += 1; }
+    if ( defined($fparm->{'port_rate_us'}) ) { $Q_tune .= ", us_speed=".$fparm->{'port_rate_us'}; $parmset += 1; }
+    $Q_tune .= " WHERE port_id=".$fparm->{'ap_id'}." and communal_port=0 and type>0 and link_type>".$conf{'STARTLINKCONF'};
+
     if ( $debug > 1 ) {
         dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "DEBUG mode, Query '".$Q_tune."'" );
-        $Fres = 2;
-        $Fvalue = "error: AP_free info in debug mode not update;";;
+	#$Fres = 2;
+	#$Fvalue = "error: ap_free info in debug mode not update;";
+    } elsif (not $parmset) {
+	$Fres = 2;
+	$Fvalue = "error: not found change parameters;";
     } else {
         $dbm->do($Q_tune) or $Fres = 1;
         if ($Fres) {
@@ -430,6 +508,39 @@ sub SW_AP_tune {
 	}
     }
     return ($Fres+0, $Fvalue );
+}
+
+sub SW_AP_linkstate {
+    DB_mysql_check_connect(\$dbm, \%conf);
+    my $Fres = 2; my $Fvalue = 'error:unknown error...;';
+    my %state = (   'lock' 	=> 2,
+		    'unlock'	=> 1,
+		);
+
+    my $fparm = shift;
+    #	$fparm->{ap_id} = 1234
+    #	$fparm->{state}=lock
+    #	$fparm->{state}=unlock
+    if		( not ( defined($fparm->{'ap_id'}) && $fparm->{'ap_id'} =~ /^\d+$/ ) ) {
+	return ( $Fres, "error:not defined parameter 'ap_id';" );
+    } elsif	( not ( defined($fparm->{'state'}) && $fparm->{'state'} =~ /^(unl|l)ock$/ ) ) {
+	return ( $Fres, "error:not defined or broken parameter 'state';" );
+    }
+    my $stm_state = $dbm->prepare( "SELECT status FROM head_link where port_id=".$fparm->{'ap_id'} );
+    $stm_state->execute or $Fres = 1;
+    if ( $Fres == 1 || not $stm_state->rows == 1 ) {
+	$Fres = 2;
+	$Fvalue = 'error:AP head link not found;';
+    } else {
+	$dbm->do( "UPDATE head_link SET set_status=".$state{$fparm->{'state'}}." WHERE port_id=".$fparm->{'ap_id'}." and status<>".$state{$fparm->{'state'}} ) or $Fres = 1;
+	if ( $Fres == 1 ) {
+	    $Fvalue = 'error:Error update AP state info;';
+	} else {
+	    $Fres = 0;
+	    $Fvalue = 'result:state sync success;';
+	}
+    }
+    return ( $Fres+0, $Fvalue );
 }
 
 

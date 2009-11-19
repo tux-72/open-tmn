@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 
 
-my $debug=1;
+my $debug=0;
 
-$VERSION = 0.1;
+$VERSION = 0.7;
 
 #use strict;
 
@@ -22,15 +22,16 @@ sub startup {
 }
 
 sub ap_check {
-    &dispatcher::log(1, "perl sub ap_check\n");
+    &dispatcher::log(1, "-- SUB ap_check --\n");
 
     my %param;
     %param=split(/[:;]/,shift);
 
+    parm_log(\%param); 
     #print params to log
-    while(my ($k,$v)=each(%param)) {
-	&dispatcher::log(1, "$k = $v\n");
-    }
+    #while(my ($k,$v)=each(%param)) {
+    #	&dispatcher::log(1, "$k = $v\n");
+    #}
 
     ## GET AP_ID from SWCTL
     my ($ap_res, $ap_val) = SW_AP_get (\%param);
@@ -40,29 +41,37 @@ sub ap_check {
 
 sub ap_tune {
 
-    &dispatcher::log(1, "perl sub ap_tune\n");
+    &dispatcher::log(1, "-- SUB ap_tune --\n");
     my %param;
     %param=split(/[:;]/,shift);
     # ap_id
-    #print params to log
-    while(my ($k,$v)=each(%param)) {
-	&dispatcher::log(1, "$k = $v\n");
-    }
+    parm_log(\%param); 
+
     ## SEND FREE AP_ID to SWCTL
     my ($ap_res, $ap_val) = SW_AP_tune (\%param);
     return ($ap_res+0, $ap_val);
 }
 
-sub ap_free {
+sub ap_link_state {
 
-    &dispatcher::log(1, "perl sub ap_free\n");
+    &dispatcher::log(1, "-- SUB ap_set_state --\n");
     my %param;
     %param=split(/[:;]/,shift);
-    #print params to log
     # ap_id
-    while(my ($k,$v)=each(%param)) {
-	&dispatcher::log(1, "$k = $v\n");
-    }
+    parm_log(\%param); 
+
+    ## SEND FREE AP_ID to SWCTL
+    my ($ap_res, $ap_val) = SW_AP_linkstate (\%param);
+    return ($ap_res+0, $ap_val);
+}
+
+sub ap_free {
+
+    &dispatcher::log(1, "-- SUB ap_free --\n");
+    my %param;
+    %param=split(/[:;]/,shift);
+    parm_log(\%param); 
+
     ## SEND FREE AP_ID to SWCTL
     my ($ap_res, $ap_val) = SW_AP_free (\%param);
     return ($ap_res+0, $ap_val);
@@ -71,14 +80,11 @@ sub ap_free {
 
 sub send_pod  {
 
-    &dispather::log(1, "send_pod\n");
+    &dispatcher::log(1, "-- SUB send_pod --\n");
     my %param;
     %param=split(/[:;]/,shift);
+    parm_log(\%param); 
     # nas_ip nas_port nas_secret login
-    #print params to log
-    while(my ($k,$v)=each(%param)) {
-	&dispatcher::log(1, "$k = $v\n");
-    }
 
     my ( $res, $a, $err, $strerr );
     my 	$res_attr = "attr:";
@@ -117,4 +123,15 @@ sub send_pod  {
 
     &dispather::log(1, "res = $res\n");
     return ( $res+0, "strerr:".$strerr.";".$res_attr ) ;
+}
+
+
+sub parm_log {
+    my $parm = shift;
+    my $str_log = 'receive parms: ';
+    while(my ($k,$v)=each(%$parm)) {
+	$str_log .= "$k='$v', ";
+    }
+    $str_log .= "\n";
+    &dispatcher::log(1, $str_log );
 }

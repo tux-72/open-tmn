@@ -5,7 +5,7 @@ use Getopt::Long;
 
 #use strict;
 use POSIX qw(strftime);
-use DBI();
+#use DBI();
 use locale;
 
 
@@ -24,8 +24,6 @@ my $script_name=$0;
 $script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
 dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
 
-#my $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
-#$dbm->do("SET NAMES 'koi8r'");
 my $dbm; $res = DB_mysql_connect(\$dbm, \%conf);
 if ($res < 1) {
     dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
@@ -95,7 +93,7 @@ my $point='';
 my $Querry_portfix = '';
 
 if ( not defined($ARGV[0]) ) {
-    print "Usage:  $script_name (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink | pass_change)\n"
+    print STDERR "Usage:  $script_name (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink )\n"
 
 } elsif ( $ARGV[0] eq "newswitch" ) {
         DB_mysql_check_connect(\$dbm, \%conf);
@@ -158,11 +156,11 @@ if ( not defined($ARGV[0]) ) {
 } elsif ( $ARGV[0] eq "checkterm" ) {
   while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
     DB_mysql_check_connect(\$dbm, \%conf);
-    dlog ( SUB => 'checkport', DBUG => 1, MESS => "############### Checking cycle N $cycle_run ###############" );
     ################################ SYNC LINK STATES
     my $stml = $dbm->prepare("SELECT l.head_id, l.port_id, l.vlan_id, l.status, l.set_status, p.link_type, p.login, p.ip_subnet, p.login \
     FROM swports p, head_link l WHERE l.set_status>0 and l.port_id=p.port_id ORDER BY l.head_id");
     $stml->execute();
+    if ( $stml->rows ) { dlog ( SUB => 'checkterm', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30 ); }
 
     while (my $ref = $stml->fetchrow_hashref()) {
     $point = " ip_subnet => ".$ref->{'ip_subnet'};
@@ -187,14 +185,13 @@ if ( not defined($ARGV[0]) ) {
     $stml->finish;
 
     exit if ( $script_name ne 'cycle_check.pl' );
-    sleep($cycle_sleep);
+    sleep($conf{'CYCLE_SLEEP'});
     $cycle_run += 1;
   }
 
 } elsif ( $ARGV[0] eq "checkport" ) {
   while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
     DB_mysql_check_connect(\$dbm, \%conf);
-    dlog ( SUB => 'checkport', DBUG => 1, MESS => "############### Checking cycle N $cycle_run ###############" );
     ################################ SET PORT PARAMETERS
     $SW{'change'} = 0;
     $SW{'sw_id'}=0;
@@ -207,6 +204,7 @@ if ( not defined($ARGV[0]) ) {
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m \
     WHERE h.model=m.id and h.id=p.sw_id and p.type>0 and p.autoconf>0 and p.autoconf<=".$conf{'STARTLINKCONF'}." and p.autoconf<>".$link_type{'uplink'}." and h.automanage=1 order by h.model, p.sw_id, p.portpref, p.port");
     $stm2->execute();
+    if ( $stm2->rows ) { dlog ( SUB => 'checkport', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30  ); }
 
     while (my $ref = $stm2->fetchrow_hashref()) {
 
@@ -296,11 +294,13 @@ if ( not defined($ARGV[0]) ) {
     $stm2->finish();
 
     exit if ( $script_name ne 'cycle_check.pl' );
-    sleep($cycle_sleep);
+    sleep($conf{'CYCLE_SLEEP'});
     $cycle_run += 1;
   }
 
 } elsif ( $ARGV[0] eq "checklink" ) {
+
+  while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
     DB_mysql_check_connect(\$dbm, \%conf);
 
     $SW{'change'} = 0;
@@ -313,8 +313,8 @@ if ( not defined($ARGV[0]) ) {
     p.link_type, p.login, p.ip_subnet, p.login, \
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m \
     WHERE h.model=m.id and h.id=p.sw_id and p.type>0 and p.autoconf>=".$conf{'STARTPORTCONF'}." and h.automanage=1 order by h.model, p.sw_id, p.portpref, p.port");
-
     $stm2->execute();
+    if ( $stm2->rows ) { dlog ( SUB => 'checklink', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30  ); }
 
     while (my $ref = $stm2->fetchrow_hashref()) {
 	############ SAVE PREVIOUS SWITCH CONFIG
@@ -368,11 +368,6 @@ if ( not defined($ARGV[0]) ) {
 	        $trunking_vlan = 0;
 	    } elsif ( $ref->{'portvlan'} > 0 ) {
 		$trunking_vlan = VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, HEAD => $ref->{'link_head'}) if defined($ref->{'link_head'});
-	    #    my $stm32 = $dbm->prepare("SELECT port_id FROM swports WHERE portvlan=".$ref->{'portvlan'}." and port_id<>".$ref->{'port_id'});
-	    #   $stm32->execute();
-	        # если VLAN используется на других точках подключения, кроме текущей
-	    #   $trunking_vlan = 0 if ($stm32->rows > 0 );
- 	    #   $stm32->finish();
 
 	    } else {
 	        $trunking_vlan = 0;
@@ -524,9 +519,11 @@ if ( not defined($ARGV[0]) ) {
 	    || ( $ref->{'new_portvlan'} > 1 and $ref->{'new_portvlan'} < $conf{'FIRST_ZONEVLAN'} ));
 
             $head = GET_Terminfo( TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'});
+	    
 
 	    ### Выясняем необходимость выделения и номер влана для использования
-	    if ( $ref->{'new_portvlan'} < 1 and defined($head->{'VLAN_ZONE'}) ) {
+            #if ( ( not defined($ref->{'new_portvlan'}) || $ref->{'new_portvlan'} < 1 ) and defined($head->{'VLAN_ZONE'}) ) {
+            if ( $ref->{'new_portvlan'} < 1 and defined($head->{'VLAN_ZONE'}) ) {
 		$ref->{'new_portvlan'} = VLAN_get( PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $head->{'VLAN_ZONE'}, 
 		VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
 	    }
@@ -621,6 +618,12 @@ if ( not defined($ARGV[0]) ) {
     SAVE_config( LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'} )
     if ($SW{'change'} and defined($libs{$SW{'lib'}}));
     $stm2->finish();
+
+    exit if ( $script_name ne 'cycle_check.pl' );
+    sleep($conf{'CYCLE_SLEEP'});
+    $cycle_run += 1;
+  }
+
 }
 
 $dbm->disconnect();
@@ -804,7 +807,6 @@ sub VLAN_link {
 		    SAVE_config(LIB => $ref21->{'lib'}, SWID => $ref21->{'id'}, IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'}, PASS => $ref21->{'admin_pass'}, 
 		    ENA_PASS => $ref21->{'ena_pass'});
 		}
-		#$count = $conf{'MAXPARENTS'} if ($PAR{'id'} == $arglnk{'L2HEAD'}); # завершаем  если добрались до головного коммутатора цепочки!
 		# Прекращаем, если не найден вышестоящий коммутатор и текущий коммутатор не является головным свичём цепочки терминирования
 		if ( not defined($ref21->{'parent'}) and $PAR{'id'} != $arglnk{'L2HEAD'} ) {
 		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Trunking vlan chains lost in switch ".$ref21->{'hostname'}.", PARENT not SET  :-(" );
@@ -902,7 +904,7 @@ sub SAVE_config {
 }
 
 sub VLAN_remove {
-	#VLAN_remove(PORT_ID => $ref->{'port_id'}, VLAN => $ref->{'portvlan'}, HEAD => $ref->{'link_head'});
+
         my %arg = (
             @_,         # список пар аргументов
         );
@@ -937,8 +939,7 @@ sub VLAN_remove {
 
 
 sub VLAN_get {
-	#VLAN_get(PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'autoconf'}, ZONE => $ref->{'vlan_zone'}, 
-	# VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
+
         my %arg = (
             @_,         # список пар аргументов
         );
