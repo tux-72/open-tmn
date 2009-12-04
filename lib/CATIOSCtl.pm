@@ -656,7 +656,7 @@ sub CATIOS_term_l3subnet_up {
 ############################ TERMINATE IP UNNUMBERED IFACES ######################################
 
 sub CATIOS_term_l3realnet_add {
-    # IP LOGIN PASS ENA_PASS VLAN VLANNAME IPCLI UP_ACLIN UP_ACLOUT
+    # IP LOGIN PASS ENA_PASS VLAN VLANNAME IPCLI UP_ACLIN UP_ACLOUT LOOP_IF DHCP_HELPER
     my %arg = (
         @_,
     );
@@ -675,11 +675,21 @@ sub CATIOS_term_l3realnet_add {
 		# ip address 192.168.40.1 255.255.255.0
 		if ( /ip\s+address\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/ and $1 eq $arg{'IPGW'} and $2 eq $arg{'NETMASK'} ) {
 		    $loop_if = "Loopback".$ifn;
+		    last;
 		    #print STDERR "Loopback iface N".$ifn."\n";
 		}
 	    }
+	    if ( "x".$loop_if ne 'x' ) { last; }
         }
     }
+    if ( "x".$loop_if eq 'x' ) {
+        foreach (@lnvl) {
+	    if ( /interface\s+(Loopback\d+)/ and $arg{'LOOP_IF'} eq $1 ) {
+		$loop_if = $arg{'LOOP_IF'};
+	    }
+	}
+    }
+
     return -1 if ($loop_if eq '');
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
@@ -692,9 +702,15 @@ sub CATIOS_term_l3realnet_add {
     return -1  if (&$command(\$sw, $prompt_conf_if,   "no ip unreachables" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip proxy-arp" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip route-cache cef" ) < 1);
+    if ( defined($arg{'DHCP_HELPER'}) and not ( defined($arg{'STATIC'}) and $arg{'STATIC'} ) ) {
+	return -1  if (&$command(\$sw, $prompt_conf,  "ip dhcp relay information trusted"  ) < 1);
+	return -1  if (&$command(\$sw, $prompt_conf,  "ip helper-address ".$arg{'DHCP_HELPER'} ) < 1);
+    }
     return -1  if (&$command(\$sw, $prompt_conf_if,   "no shutdown" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,      "exit" ) < 1);
-    if ( defined($arg{'IPCLI'}) ) { return -1  if (&$command(\$sw, $prompt_conf,      "ip route ".$arg{'IPCLI'}." 255.255.255.255 Vlan".$arg{'VLAN'} ) < 1); }
+    if ( defined($arg{'STATIC'}) and $arg{'STATIC'} and defined($arg{'IPCLI'}) ) { 
+	return -1  if (&$command(\$sw, $prompt_conf,  "ip route ".$arg{'IPCLI'}." 255.255.255.255 Vlan".$arg{'VLAN'} ) < 1);
+    }
     return -1  if (&$command(\$sw, $prompt,           "exit" ) < 1);
     $sw->close();
     return 1;
@@ -711,9 +727,11 @@ sub CATIOS_term_l3realnet_remove {
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE Real IP Unnumbered Iface Vlan'".$arg{'VLAN'}."' from terminator '".$arg{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,      "no ip route ".$arg{'IPCLI'}." 255.255.255.255 Vlan".$arg{'VLAN'} ) < 1);
+    if ( defined($arg{'IPCLI'}) and "x".$arg{'IPCLI'} ne "x" ) { return -1  if (&$command(\$sw, $prompt_conf,      "no ip route ".$arg{'IPCLI'}." 255.255.255.255 Vlan".$arg{'VLAN'} ) < 1) };
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "shutdown" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,   "no ip helper-address" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,   "no ip dhcp relay information trusted" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip redirects" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip unreachables" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip proxy-arp" ) < 1);

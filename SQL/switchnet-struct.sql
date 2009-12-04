@@ -150,6 +150,8 @@ CREATE TABLE `heads` (
   `pass1` varchar(12) DEFAULT NULL,
   `login2` varchar(15) DEFAULT NULL,
   `pass2` varchar(12) DEFAULT NULL,
+  `loop_if` varchar(12) DEFAULT NULL,
+  `dhcp_helper` varchar(15) DEFAULT NULL,
   `up_acl-in` varchar(15) DEFAULT NULL,
   `up_acl-out` varchar(15) DEFAULT NULL,
   `down_acl-in` varchar(15) DEFAULT NULL,
@@ -201,7 +203,7 @@ CREATE TABLE `hosts` (
   KEY `swmodel` (`model`),
   KEY `house` (`idhouse`),
   CONSTRAINT `idmodel` FOREIGN KEY (`model`) REFERENCES `models` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=296 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=304 DEFAULT CHARSET=koi8r CHECKSUM=1;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -412,7 +414,7 @@ CREATE TABLE `swports` (
   KEY `PHY` (`phy_type`),
   KEY `port_type` (`type`),
   CONSTRAINT `switch` FOREIGN KEY (`sw_id`) REFERENCES `hosts` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4936 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=5022 DEFAULT CHARSET=koi8r CHECKSUM=1;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -556,4 +558,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2009-10-30 20:05:01
+-- Dump completed on 2009-12-03 20:05:02

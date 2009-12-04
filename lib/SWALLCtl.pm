@@ -28,13 +28,13 @@ my $debug=1;
 sub rspaced {
     $str = shift;
     $len = shift;
-    $r = sprintf("%-${len}s",$str);
+    return sprintf("%-${len}s",$str);
 }
 
 sub lspaced {
     $str = shift;
     $len = shift;
-    $r = sprintf("%${len}s",$str);
+    return sprintf("%${len}s",$str);
 }
 
 sub dlog_ap {
@@ -42,13 +42,13 @@ sub dlog_ap {
             @_,
         );
         #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', LOGFILE => '/var/log/dispatcher/ap_get.log', MESS => 'mess' )
-        open(AP_LOG,">>$arg{LOGFILE}");
-
-        my $subchar = 30; my @lines = ();
-        $arg{'PROMPT'} .= ' ';
-        $arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\>\</ /cs;
-
         if ( not $arg{'DBUG'} > $debug ) {
+	    open(AP_LOG,">>$arg{LOGFILE}");
+
+	    my $subchar = 30; my @lines = ();
+	    $arg{'PROMPT'} .= ' ';
+	    $arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\>\</ /cs;
+
             my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
             my $timelog = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year+1900, $month + 1, $day, $hour, $min, $sec);
             if ( ref($arg{'MESS'}) ne 'ARRAY' ) {
@@ -60,8 +60,8 @@ sub dlog_ap {
                 next if (not $mess =~ /\S+/);
                 print AP_LOG $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
             }
-        }
-        close AP_LOG;
+    	    close AP_LOG;
+	}
 }
 
 sub dlog {
