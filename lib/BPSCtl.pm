@@ -91,6 +91,69 @@ sub BPS_cmd {
     return 1;
 }
 
+sub BPS_port_set_vlan {
+
+    my ( $swl, $port, $vlan_id, $tag, $trunk ) = @_;
+
+    my $sw = ${$swl};
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PARMS - ' $port, $vlan_id '" );
+    my %vlan_del = ();
+
+    #BPS2000#show vlan interface vids 24
+    #Port VLAN VLAN Name         VLAN VLAN Name         VLAN VLAN Name
+    #---- ---- ----------------  ---- ----------------  ---- ----------------
+    #24   1    default           14   Office            17   Office_voip
+    #     91   RSS_VoIP          111  copirtehnika      130  Quant
+    #     131  Server            157  RSS_157           186  Ural_VTB
+    #     215  AUTOBOSS          242  Leon              259  RiveraTur
+    #     269  VUZ_bank          327  RSS_327           332  RSS_332
+    #     355  Elekto_Montaz
+    if (not $trunk ) {
+	my @ln = $sw->cmd( String  => "sh vlan interface vids ".$port,
+                                Prompt  => $prompt,
+                                Timeout => $timeout,
+                                Errmode => 'return',
+	);
+	foreach (@ln) {
+	    #24   1    default           14   Office            17   Office_voip
+	    if 	( /\s+(\d+)\s+\S+\s+(\d+)\s+\S+\s+(\d+)\s+\S+/ ) {
+		$vlan_del{$1}=1; $vlan_del{$2}=1; $vlan_del{$3}=1;
+	    } elsif ( /\s+(\d+)\s+\S+\s+(\d+)\s+\S+/ ) {
+		$vlan_del{$1}=1; $vlan_del{$2}=1;
+	    } elsif ( /\s+(\d+)\s+\S+/ ) {
+		$vlan_del{$1}=1;
+	    }
+	}
+    }
+    return -1  if (&$command(\$sw, $prompt_conf, "conf t" ) < 1 );
+    #############
+    if (not $trunk ) {
+	foreach my $vdel ( sort keys %vlan_del ) {
+	    if ( $vdel != $vlan_id ) { return -1 if (&$command(\$sw, $prompt_conf, "vlan members remove ".$vdel." ".$port ) < 1); }
+	}
+    }
+    if ($vlan_id != 1 ) {
+	return -1  if (&$command(\$sw, $prompt_conf,    "vlan create ".$vlan_id." name Vlan".$vlan_id." type port learning ivl" ) < 1);
+    }
+    return -1  if (&$command(\$sw, $prompt_conf,        "vlan members add ".$vlan_id." ".$port ) < 1);
+    if ($tag) {
+	return -1  if (&$command(\$sw, $prompt_conf,    "vlan ports ".$port." tagging tagAll untagPvidOnly pvid ".$vlan_id.
+	" filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
+    } else {
+	if ( $trunk ) {
+	    return -1  if (&$command(\$sw, $prompt_conf,    "vlan ports ".$port." tagging untagPvidOnly pvid ".$vlan_id.
+	    " filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
+	} else {
+	    return -1  if (&$command(\$sw, $prompt_conf,    "vlan ports ".$port." tagging disable pvid ".$vlan_id.
+	    " filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
+	}
+    }
+    #############
+    return -1  if (&$command(\$sw, $prompt,      "exit" ) < 1);
+
+    return 1;
+}
+
 sub BPS_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my %arg = (
@@ -183,6 +246,7 @@ sub BPS_port_defect {
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in '".$arg{'IP'}."', port ".$arg{'PORT'});
 
+    #BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'BLOCK_VLAN'}, 0, 0 );
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'BLOCK_VLAN'}." name Block".$arg{'BLOCK_VLAN'}." type port learning ivl" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'BLOCK_VLAN'}." ".$arg{'PORT'} ) < 1);
@@ -209,13 +273,10 @@ sub BPS_port_free {
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
 
-    return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'VLAN'}." name PPPoE_vlan".$arg{'VLAN'}." type port learning ivl" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging disable pvid ".$arg{'VLAN'}.
-    " filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
+    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, 0, 0 );
 
+    return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
+    #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex auto" ) < 1);
@@ -257,18 +318,9 @@ sub BPS_port_trunk {
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
 
+    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 );
+
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    if ($arg{'VLAN'} != 1 ) {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'VLAN'}." name Vlan".$arg{'VLAN'}." type port learning ivl" ) < 1);
-    }
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
-    if ($arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging tagAll untagPvidOnly pvid ".$arg{'VLAN'}.
-	" filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    } else {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging untagPvidOnly pvid ".$arg{'VLAN'}.
-	" filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    }
     #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg{'PORT'}." learning disable" ) < 1);
@@ -297,18 +349,9 @@ sub BPS_port_system {
 
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
+    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 );
+
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    if ($arg{'VLAN'} != 1 ) {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'VLAN'}." name Vlan".$arg{'VLAN'}." type port learning ivl" ) < 1);
-    }
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
-    if ($arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging tagAll untagPvidOnly pvid ".$arg{'VLAN'}.
-	" filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    } else {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging untagPvidOnly pvid ".$arg{'VLAN'}.
-	" filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    }
     #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg{'PORT'}." learning disable" ) < 1);
@@ -334,18 +377,9 @@ sub BPS_port_setparms {
 
     my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
+    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 );
+
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    if ($arg{'VLAN'} != 1 ) {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'VLAN'}." name Vlan".$arg{'VLAN'}." type port learning ivl" ) < 1);
-    }
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
-    if ($arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging tagAll untagPvidOnly pvid ".$arg{'VLAN'}.
-	" filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    } else {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging untagPvidOnly pvid ".$arg{'VLAN'}.
-	" filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    }
     #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg{'PORT'}." learning disable" ) < 1);
