@@ -138,7 +138,7 @@ sub ES_hw_char {
     return ( $maxhw, $adm_state );
 }
 
-sub ES_port_set_vlan {
+sub ES_port_set_vlan1 {
 
     my ( $swl, $port, $vlan_id, $tag, $trunk ) = @_;
     my $sw = ${$swl};
@@ -156,6 +156,7 @@ sub ES_port_set_vlan {
 	    $lnd[$count] = $1;
 	}
     }
+
     return -1  if (&$command(\$sw, $prompt_conf,	"config" ) < 1 );
     if (not $trunk ) {
 	foreach my $lnd (@lnd) {
@@ -179,6 +180,72 @@ sub ES_port_set_vlan {
     #-----------------------------------------
 
 }
+
+sub ES_port_set_vlan {
+
+    my ( $swl, $port, $vlan_id, $tag, $trunk ) = @_;
+    my $sw = ${$swl};
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PARMS - ' $port, $vlan_id '" );
+    #-----------------------------------------
+    my @lnv = $sw->cmd("show vlan \nc");
+    $sw->cmd("");
+    my %vlan_del = ();
+     my  @range = ();
+    my $current_vid = 0; $range_ports = '';
+    foreach my $ln (@lnv) {
+	#	1     1     Static    330:44:15  Untagged :20-22,24-26
+	#	                                 Tagged   :23
+	#	2    91     Static    330:44:15  Untagged :
+	#	                                 Tagged   :19,21-22,25-26
+        if ( $ln =~ /^\s+\d+\s+(\d+)\s+Static\s+\S+\s+Untagged\s+\:(.*)/ and $1 > 1 ) {
+	    $current_vid = $1;
+	    $range_ports = $2;
+	} elsif (  /^\s+Tagged\s+\:(\S+)/ and $current_vid > 1 ) {
+	    $range_ports = $1;
+	} else {
+	    next;
+	}
+	#5,7-8,23-26
+	$range_ports =~ s/\n//;
+	@range = split /\,/,$range_ports;
+	foreach my $c ( @range ) {
+	    if ( $port == $c ) {
+		$vlan_del{$current_vid} = 1;
+	    } else {
+		@d = split /-/,$c;
+		for my $e ( $d[0]..$d[1] ) {
+		    if ( $port == $e ) {
+			$vlan_del{$current_vid} = 1;
+		    }
+		}
+	    }
+	}
+    }
+
+    return -1  if (&$command(\$sw, $prompt_conf,	"config" ) < 1 );
+    if (not $trunk ) {
+	foreach my $lnd ( sort keys %vlan_del ) {
+	  if ( $lnd != $vlan_id ) {
+	    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$lnd ) < 1 );
+	    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"forbidden ".$port ) < 1 );
+	    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+	  }
+	}
+    }
+
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$vlan_id ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"name Vlan".$vlan_id ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"fixed ".$port ) < 1 );
+    if ($tag) {
+	return -1 if (&$command(\$sw, $prompt_conf_vlan,"no untagged ".$port ) < 1 );
+    } else {
+	return -1 if (&$command(\$sw, $prompt_conf_vlan,"untagged ".$port ) < 1 );
+    }
+    return -1  if (&$command(\$sw, $prompt,		"exit") < 1 );
+    #-----------------------------------------
+
+}
+
 
 sub ES_conf_save {
 #   IP LOGIN PASS 
