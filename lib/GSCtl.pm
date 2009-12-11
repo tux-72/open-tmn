@@ -22,7 +22,7 @@ $VERSION = 1.07;
 	    );
 
 my $debug 	= 1;
-my $timeout	= 10;
+my $timeout	= 5;
 
 
 my $LIB	= 'GS';

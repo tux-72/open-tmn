@@ -11,17 +11,21 @@ use Exporter ();
 use POSIX qw(strftime);
 use IO::Socket;
 
-$VERSION = 1.1;
+$VERSION = 1.2;
 
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
 @EXPORT_TAGS = ();
 
-@EXPORT = qw(	dlog_ap dlog  rspaced  lspaced	IOS_rsh
+@EXPORT = qw(	dlog  rspaced  lspaced	IOS_rsh
 	    );
 
 my $debug=1;
+
+
+use FindBin '$Bin';
+require $Bin . '/../conf/loging.pl';
 
 ############ SUBS ##############
 
@@ -37,13 +41,18 @@ sub lspaced {
     return sprintf("%${len}s",$str);
 }
 
-sub dlog_ap {
+sub dlog {
         my %arg = (
+	    'LOGTYPE' => 'LOGDFLT',
             @_,
         );
         #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', LOGFILE => '/var/log/dispatcher/ap_get.log', MESS => 'mess' )
         if ( not $arg{'DBUG'} > $debug ) {
-	    open(AP_LOG,">>$arg{LOGFILE}");
+	    my $stderrout=1;
+	    if ( defined($conflog{$arg{'LOGTYPE'}}) ) {
+		open( LOGFILE,">> ".$conflog{$arg{'LOGTYPE'}} );
+		$stderrout=0;
+	    }
 
 	    my $subchar = 30; my @lines = ();
 	    $arg{'PROMPT'} .= ' ';
@@ -57,36 +66,17 @@ sub dlog_ap {
                 @lines = @{$arg{'MESS'}};
             }
             foreach my $mess ( @lines ) {
-                next if (not $mess =~ /\S+/);
-                print AP_LOG $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
-            }
-    	    close AP_LOG;
-	}
-}
-
-sub dlog {
-        my %arg = (
-            @_,
-        );
-        #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', MESS => 'mess' )
-	my $subchar = 30; my @lines = ();
-	$arg{'PROMPT'} .= ' ';
-	$arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\#\>\</ /cs;
-
-        if ( not $arg{'DBUG'} > $debug ) {
-            my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
-            my $timelog = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year+1900, $month + 1, $day, $hour, $min, $sec);
-            if ( ref($arg{'MESS'}) ne 'ARRAY' ) {
-                @lines = split /\n/,$arg{'MESS'};
-            } else {
-                @lines = @{$arg{'MESS'}};
-            }
-            foreach my $mess ( @lines ) {
 		if ( defined($arg{'NORMA'}) and $arg{'NORMA'} ) { $mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs; }
                 next if (not $mess =~ /\S+/);
-                print STDERR $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
+		$logline = $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
+		if ($stderrout) {
+            	    print STDERR $logline;
+		} else {
+            	    print LOGFILE $logline;
+		}
             }
-        }
+	    if (not $stderrout) { close LOGFILE; }
+	}
 }
 
 {

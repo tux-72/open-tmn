@@ -1,6 +1,5 @@
 #!/usr/bin/perl
 
-$debug=0;
 my $ver='0.5';
 #$VERSION = 0.97;
 
@@ -12,15 +11,15 @@ use POSIX qw(strftime);
 use DBI();
 use locale;
 
-
-
 use FindBin '$Bin';
 require $Bin . '/../conf/config.pl';
 require $Bin . '/../conf/lib.pl';
 
+$debug=0;
+
 my $script_name=$0;
 $script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
-dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
+dlog ( SUB => $script_name, DBUG => 2, MESS => "Use BIN directory - $Bin" );
 
 
 #my $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'}) or die("connect");
@@ -28,7 +27,7 @@ dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
 
 my $dbm; $res = DB_mysql_connect(\$dbm, \%conf);
 if ($res < 1) {
-    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
+    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
     DB_mysql_check_connect(\$dbm, \%conf);
 }
 

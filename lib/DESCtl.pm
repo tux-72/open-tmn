@@ -12,7 +12,7 @@ use Exporter ();
 use POSIX qw(strftime);
 use Net::Telnet();
 
-$VERSION = 1.16;
+$VERSION = 1.17;
 
 @ISA = qw(Exporter);
 
@@ -26,7 +26,8 @@ $VERSION = 1.16;
 	    );
 
 my $debug=0;
-my $timeout=20;
+my $timeout=15;
+my $timeout_login=5;
 
 my $LIB='DES';
 my $command	= $LIB."_cmd";
@@ -81,9 +82,10 @@ sub DES_cmd {
 sub DES_set_segmentation {
 
     my ($swl, $port, $fwd_ports ) = @_;
+    my $sw = ${$swl};
     my $ranges_vlan = ''; my @range = '';
     ## VLAN CONFIGURE
-    my @ln = ${$swl}->cmd("show vlan\na");
+    my @ln = $sw->cmd("show vlan\na");
     foreach (@ln) {
         # VID             : 14         VLAN Name       : Office-14
         if ( /Member\s+ports\s+:\s+(\S+)/ ) {
@@ -106,26 +108,27 @@ sub DES_set_segmentation {
     }
     if ( $fwd_ports ne '' ) {
 	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Normalize traffic_segmentation in ".$port." to ".$fwd_ports );
-	#return -1  if (&$command(\${$swl}, $prompt, "config traffic_segmentation ".$port." forward_list ".$fwd_ports ) < 1 );
+	#return -1  if (&$command(\$sw, $prompt, "config traffic_segmentation ".$port." forward_list ".$fwd_ports ) < 1 );
     }
     return 1;
 }
 
 sub DES_port_set_vlan {
     my ($swl, $port, $vlan_id, $tag, $trunk ) = @_;
+    my $sw = ${$swl};
     my $tagging='untagged ';
     $tagging = 'tagged ' if $tag > 0;
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PARMS - ' $port, $vlan_id '" );
     my $vln = ''; my $vln_num = 0; my $vlanname = ''; 
     my $ranges_vlan = ''; my @range = '';
 
-    my @ln = ${$swl}->cmd( String  => "show vlan\na",
+    my @ln = $sw->cmd( String  => "show vlan\na",
                                 #Prompt  => $prompt,
                                 Timeout => 30,
                                 #Errmode => 'return',
                                 #Cmd_remove_mode => 1,
                             );
-    ${$swl}->cmd("");  ## очищаем командную строку от ненужной 'a' если VLAN список короткий
+    $sw->cmd("");  ## очищаем командную строку от ненужной 'a' если VLAN список короткий
 
     foreach (@ln) {
 	# VID             : 998        VLAN Name       : ES-TEST
@@ -141,13 +144,13 @@ sub DES_port_set_vlan {
 	    foreach $c ( @range ) {
 		if ("x".$port eq "x".$c) {
 		    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$c." from vlan ".$vln_num );
-		    ${$swl}->cmd("config vlan ".$vln." delete ".$port );
+		    return -1  if (&$command(\$sw, $prompt, "config vlan ".$vln." delete ".$port ) < 1 );
 		} else {
 		    @d = split /-/,$c;
 		    for $e ($d[0]..$d[1]) {
 			if ($port == $e) {
 			    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$e." in portrange - ".$c." from vlan ".$vln_num );
-			    ${$swl}->cmd("config vlan ".$vln." delete ".$port );
+			    return -1  if (&$command(\$sw, $prompt, "config vlan ".$vln." delete ".$port ) < 1 );
 			}
 		    }
 		}
@@ -157,14 +160,10 @@ sub DES_port_set_vlan {
     if ("x".$vlanname eq "x" ) {
 	$vlanname = "Vlan".$vlan_id;
 	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Create VLAN ".$vlanname );
-	@ln = ${$swl}->cmd("create vlan ".$vlanname." tag ".$vlan_id ); 
-	dlog ( DBUG => 1, SUB => (caller(0))[3], NORMA => 1,  MESS => \@ln );
+	return -1  if (&$command(\$sw, $prompt, "create vlan ".$vlanname." tag ".$vlan_id ) < 1 );
     }
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Use vlan name '".$vlanname."'" );
-    @ln = ${$swl}->cmd( "config vlan ".$vlanname." add ".$tagging." ".$port );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], NORMA => 1,  MESS => \@ln );
-    undef @ln;
-    #return -1  if (&$command(\${$swl}, $prompt,	"config vlan ".$vlanname." add ".$tagging." ".$port ) < 1 );
+    return -1  if (&$command(\$sw, $prompt, "config vlan ".$vlanname." add ".$tagging." ".$port ) < 1 );
 
     return 1;
 }
@@ -219,7 +218,7 @@ sub DES_login {
     my ($swl, $ip, $login, $pass) = @_;
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "IP = ".$ip.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt,
-                                Timeout => $timeout,
+                                Timeout => $timeout_login,
                                 Errmode => 'return',
                             );
     ${$swl}->open($ip);
@@ -241,10 +240,8 @@ sub DES_conf_first {
 ######## ALL SWITCH conf
     if ($arg{'LASTPORT'} > 26 ) {
 	$sw->print("reset");
-	#$sw->waitfor("/.*except IP address, log and user account.*/");
 	$sw->waitfor("/.*log and user account.*/");
 	return -1  if (&$command(\$sw, $prompt,    "y") < 1 );
-	#$sw->print("y");
 	sleep(10);
 	dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Config resetting successfull!" );
 

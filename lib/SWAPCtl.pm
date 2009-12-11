@@ -39,21 +39,18 @@ $VERSION = 1.7;
 my $w2k = cset_factory 1251, 20866;
 my $k2w = cset_factory 20866, 1251;
 
-my $debug=1;
-
-### LOG 
-my $logfile='/var/log/dispatcher/ap_ctl.log';
+my $debug=2;
 
 use FindBin '$Bin';
 require $Bin . '/../conf/config.pl';
-dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "Use BIN directory - $Bin" );
+dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "Use BIN directory - $Bin" );
 
 ############ SUBS ##############
 
 
 my $dbm; $res = DB_mysql_connect(\$dbm, \%conf);
 if ($res < 1) {
-    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
+    dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
     DB_mysql_check_connect(\$dbm, \%conf);
 }
 
@@ -89,7 +86,7 @@ $stm->finish();
 
 sub SW_AP_get {
 
-        dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "--" );
+        dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "--" );
 	DB_mysql_check_connect(\$dbm, \%conf);
         my $fparm = shift;
 	my $Fres = 2; my $Fvalue = 'ap_id:-1;';	
@@ -132,7 +129,7 @@ sub SW_AP_get {
 	} elsif ( $fparm->{'mac'} =~ /^(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)\:(\w\w)$/) {
 	    $fparm->{'mac'} = "$1\:$2\:$3\:$4\:$5\:$6";
 	} else {
-           dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "MAC '".$fparm->{'mac'}."' unknown format, exiting ..." );
+           dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "MAC '".$fparm->{'mac'}."' unknown format, exiting ..." );
 	    return ( $Fres, "error: broken format in parameter 'mac' => '".$fparm->{'mac'}."';" );
 	}
 
@@ -202,10 +199,11 @@ sub SW_AP_get {
 	PASS => $headinfo{'MONPASS_'.$fparm->{'nas_ip'}}, MAC => $fparm->{'mac'});
 	
 	if ( $AP{'VLAN'} < 1) {
-	    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "User '".$fparm->{'login'}."'".' Access point VLAN is not FIX!!! Trobles connect to ZONE SWITCH???' );
+	    dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "User '".$fparm->{'login'}."'".' Access point VLAN is not FIX!!! Trobles connect to ZONE SWITCH???' );
 	    $Fres = 2;
 	    $Fvalue = 'error:MAC VLAN not fixed... :-(;';
 	} else {
+		dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "User '".$fparm->{'login'}."'".' Access point VLAN = '.$AP{'VLAN'} );
 		if ( $AP{'VLAN'} < $conf{'FIRST_ZONEVLAN'} || $headinfo{'ZONE_'.$fparm->{'nas_ip'}} == -1 ) {
 		    $AP{'vlan_zone'} = 1;
 		} else {
@@ -217,7 +215,7 @@ sub SW_AP_get {
 		$AP{'VLAN'}." and s.vlan_zone=".$AP{'vlan_zone'} );
 		$stm0->execute();
 		#$swrw  = $stm0->rows;
-		dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Greater by one switches in VLAN '".$AP{'VLAN'}."'!!!" ) if $stm0->rows>1;
+		dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Greater by one switches in VLAN '".$AP{'VLAN'}."'!!!" ) if $stm0->rows>1;
 
 		while ($ref = $stm0->fetchrow_hashref() and not $AP{'id'}) {
 			$AP{'automanage'}=1 if ($ref->{'automanage'} == 1);
@@ -245,7 +243,7 @@ sub SW_AP_get {
 				$stm10->execute();
 				if (not $stm10->rows) {
 			    		$dbm->do($Query1);
-					dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Insert New PORT record in swports" );
+					dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Insert New PORT record in swports" );
 				}
 				$stm10->finish;
 				my $stm1 = $dbm->prepare($Query0);
@@ -267,12 +265,12 @@ sub SW_AP_get {
                                         $AP{'name'} .= ", порт ".$AP{'port'};
 					$stm1->finish;
 			}
-			dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => 
+			dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => 
 			"CLI_VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."' AP -> '".$AP{'id'}."', '".$AP{'name'}."'" );
 		}
 		$stm0->finish;
 		if (not $AP{'id'}) {
-			dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "FIND PORT VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."', MAC:'".$fparm->{'mac'}."'" );
+			dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "FIND PORT VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."', MAC:'".$fparm->{'mac'}."'" );
 			$AP{'DB_portinfo'}=1;
 			$stm0 = $dbm->prepare( "SELECT s.automanage, s.bw_ctl, s.id, s.ip, s.model, s.hostname, s.idhouse, s.podezd, s.unit, h.idhouse, ".
 			"h.street, h.dom, p.sw_id, p.autoconf, p.port_id, p.link_type, p.communal_port, p.portpref, p.port, p.ds_speed, p.us_speed, p.login, ".
@@ -304,13 +302,13 @@ sub SW_AP_get {
 			    $AP{'ip_subnet'} = $ref->{'ip_subnet'} if defined($ref->{'ip_subnet'});
 
 			    if ($AP{'id'}) {
-				dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "MULTI TD's!!! = '".$AP{'id'}."' and '".$ref->{'port_id'}."'" );
+				dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "MULTI TD's!!! = '".$AP{'id'}."' and '".$ref->{'port_id'}."'" );
 				$AP{'id'} = 0; $AP{'swid'} = 0; $AP{'house'}=0; $AP{'podezd'}=0; $AP{'name'}=''; $AP{'port'}=0;
 				last;
 			    }
 			    $AP{'id'} = $ref->{'port_id'};
 			    $AP{'communal'} = $ref->{'communal_port'};
-			    dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => 
+			    dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => 
 			    "VLAN '".$AP{'VLAN'}."' User: '".$fparm->{'login'}."' AP -> '".$AP{'id'}."', '".$AP{'name'}."'" );
 			}
 			    $stm0->finish;
@@ -332,7 +330,7 @@ sub SW_AP_get {
 			    }
 			    #if ($AP{'communal'}) { $AP{'set'} = 0; } 
 
-                            dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS =>
+                            dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS =>
 			    "TD_set = '".$AP{'set'}."', AP_DS = '".$fparm->{'port_rate_ds'}."', AP_US = '".$fparm->{'port_rate_us'}."'" );
 			} else {
 			    $AP{'trust'} = 0; $AP{'set'} = 0
@@ -346,7 +344,7 @@ sub SW_AP_get {
 			# SET PARMS!!!
 			#if ($AP{'set'} and $AP{'automanage'} and !( $fparm->{'login'} =~ /^(jur|com)test\d+$/ )) {
 			if ( $AP{'set'} and $AP{'automanage'} ) {
-			    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Access Point parm change" );
+			    dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Access Point parm change" );
 		    	    $Query = "UPDATE swports SET start_date='".$date."', login='".$fparm->{'login'}."', mac_port='".$fparm->{'mac'}."'";
 			    $Query .= ", ds_speed=".$fparm->{'port_rate_ds'} if defined($fparm->{'port_rate_ds'});
 			    $Query .= ", us_speed=".$fparm->{'port_rate_us'} if defined($fparm->{'port_rate_us'});
@@ -383,10 +381,10 @@ sub SW_AP_get {
 				$AP{'update_db'}=1;
 			    }
 			    if ( $AP{'update_db'} ) {
-                    		dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Update port DB parameters info" );
-				$dbm->do($Query) or dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "ERROR update speed fields in table SWPORTS Querry '".$Query );
+                    		dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Update port DB parameters info" );
+				$dbm->do($Query) or dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "ERROR update speed fields in table SWPORTS Querry '".$Query );
 			    } else {
-				dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Error: Different link_types, possible PORT type is FREE?" );
+				dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "Error: Different link_types, possible PORT type is FREE?" );
 			    }
 			# NOT SET PARMS
 			#} elsif ($AP{'trust'} and ("x".$fparm->{'login'} ne "x".$AP{'lastlogin'} ) and !($fparm->{'login'} =~ /^(jur|com)test\d+$/ )) {
@@ -394,23 +392,23 @@ sub SW_AP_get {
 			    $Query = "UPDATE swports SET start_date='".$date."', login='".$fparm->{'login'}."', mac_port='".$fparm->{'mac'}."'";
 			    if ( not $AP{'DB_portinfo'} )  { $Query .= ", portvlan=".$AP{'VLAN'}; }
 			    $Query .= " WHERE port_id=".$AP{'id'}." and link_type>".$conf{'STARTLINKCONF'};
-                	    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "Update port login DB info" );
-			    $dbm->do($Query) or dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "ERROR update LOGIN in table SWPORTS Query '".$Query );
+                	    dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Update port login DB info" );
+			    $dbm->do($Query) or dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "ERROR update LOGIN in table SWPORTS Query '".$Query );
 			}
 
 			if ( not $AP{'trust'} ) {
-			    dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "'".$fparm->{'login'}."' access point not agree !!!" );
+			    dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "'".$fparm->{'login'}."' access point not agree !!!" );
 	    		    $Fres = 1;
 			    $Fvalue = 'ap_id:'.$AP{'id'}.';ap_name:'.&$k2w($AP{'name'}).';bw_ctl:'.$AP{'bw_ctl'}.';ap_swid:'.$AP{'swid'}.';ap_communal:'.$AP{'communal'}.';';
 			}
 
 		} elsif ( $AP{'VLAN'} ) {
-		    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "AP ID '".$fparm->{'login'}."' in VLAN ".$AP{'VLAN'}." not fixed!!!" );
+		    dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "AP ID '".$fparm->{'login'}."' in VLAN ".$AP{'VLAN'}." not fixed!!!" );
 		    $Fres = 2;
 	            $Fvalue = 'error:MAC found in VLAN '.$AP{'VLAN'}.'. Access point not fixed... :-(;';
 		}
 	}
-        dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => 
+        dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => 
 	"QUERY: Login  = '".$fparm->{'login'}."', MAC = '".$fparm->{'mac'}."', NAS_IP = ".$fparm->{'nas_ip'}."\n".
 	"AP_CHECK: ".$RES[$Fres].'('.$Fres.')'.", Login = '".$fparm->{'login'}."', AP_ID = '".$AP{'id'}."', '".$AP{'name'}.", ZONE = ".$AP{'vlan_zone'}.", VLAN = ".$AP{'VLAN'}."'\n".
 	"REPLY: ".$Fres.", '".&$w2k($Fvalue)."'" );
@@ -434,17 +432,17 @@ sub SW_AP_free {
     $Q_free ="UPDATE swports SET autoconf=".$link_type{'free'}." WHERE port_id=".$fparm->{'ap_id'}." and link_type>".$conf{'STARTLINKCONF'}.
     " and autoconf<".$conf{'STARTPORTCONF'}." and type>0 and communal_port=0" ;
     if ( $debug > 1 ) {
-        dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "DEBUG mode, Query '".$Q_free."'" );
+        dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "DEBUG mode, Query '".$Q_free."'" );
 	$Fres = 2;
 	$Fvalue = "error: AP_free info in debug mode not update;";;
     } else {
-	dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => $Q_free );
+	dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => $Q_free );
 	$dbm->do($Q_free) or $Fres = 1;
 	if ($Fres) {
 	    $Fvalue = "error:Error update AP_free info Query '".$Q_free."';";;
-	    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "ERROR update AP_free info Querry '".$Q_tune."'" ) 
+	    dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "ERROR update AP_free info Querry '".$Q_tune."'" ) 
 	} else {
-	    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Closed AP, id N'".$fparm->{'ap_id'}."'" );
+	    dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "Closed AP, id N'".$fparm->{'ap_id'}."'" );
 	}
     }
     return ($Fres+0, $Fvalue );
@@ -492,7 +490,7 @@ sub SW_AP_tune {
     $Q_tune .= " WHERE port_id=".$fparm->{'ap_id'}." and communal_port=0 and type>0 and link_type>".$conf{'STARTLINKCONF'};
 
     if ( $debug > 1 ) {
-        dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "DEBUG mode, Query '".$Q_tune."'" );
+        dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "DEBUG mode, Query '".$Q_tune."'" );
 	#$Fres = 2;
 	#$Fvalue = "error: ap_free info in debug mode not update;";
     } elsif (not $parmset) {
@@ -502,9 +500,9 @@ sub SW_AP_tune {
         $dbm->do($Q_tune) or $Fres = 1;
         if ($Fres) {
     	    $Fvalue = "error:Error update AP info Query '".$Q_tune."';";
-    	    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "ERROR update AP info Querry '".$Q_tune."'" ) 
+    	    dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "ERROR update AP info Querry '".$Q_tune."'" ) 
         } else {
-    	    dlog_ap ( SUB => (caller(0))[3], DBUG => 1, LOGFILE => $logfile, MESS => "UPDATED AP tune info, id N'".$fparm->{'ap_id'}."'" );
+    	    dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "UPDATED AP tune info, id N'".$fparm->{'ap_id'}."'" );
 	}
     }
     return ($Fres+0, $Fvalue );
@@ -569,14 +567,14 @@ sub VLAN_VPN_get {
 	if ($increment) {
 	    $vlan_id = $head->{'VLAN_MIN'};
 	    while ( $res < 1 and $vlan_id <= $head->{'VLAN_MAX'} ) {
-		dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS =>  "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
+		dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS =>  "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
 		$res = $vlan_id if not defined($vlanuse{$vlan_id});
 		$vlan_id += 1;
 	    }
 	} else {
 	    $vlan_id = $head->{'VLAN_MAX'};
 	    while ( $res < 1 and $vlan_id >= $head->{'VLAN_MIN'} ) {
-		dlog_ap ( SUB => (caller(0))[3], DBUG => 2, LOGFILE => $logfile, MESS => "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
+		dlog ( SUB => (caller(0))[3], DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
 		$res = $vlan_id if not defined($vlanuse{$vlan_id});
 		$vlan_id -= 1;
 	    }
@@ -592,7 +590,7 @@ sub GET_Terminfo {
 
     DB_mysql_check_connect(\$dbm, \%conf);
 
-    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => 'GET Terminator info (debug)' );
+    dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => 'GET Terminator info (debug)' );
     my %arg = (
         @_,         # список пар аргументов
     );
@@ -642,9 +640,9 @@ sub GET_Terminfo {
 	#$stm31->finish();
 	#return \%headinfo;
     } elsif ($stm31->rows > 1)  {
-	dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "MULTI TERMINATOR! 8-), count = ".$stm31->rows );
+	dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "MULTI TERMINATOR! 8-), count = ".$stm31->rows );
     } else {
-	dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => 'TERMINATOR NOT FOUND :-(' );
+	dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGDISP', MESS => 'TERMINATOR NOT FOUND :-(' );
     }
     $stm31->finish();
     return \%headinfo if ($res > 0);

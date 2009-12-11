@@ -8,25 +8,36 @@ use POSIX qw(strftime);
 #use DBI();
 use locale;
 
+$debug=1;
 
 use FindBin '$Bin';
 require $Bin . '/../conf/config.pl';
 require $Bin . '/../conf/lib.pl';
 
+my $script_name=$0;
+$script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
+dlog ( SUB => $script_name, DBUG => 2, MESS => "Use BIN directory - $Bin" );
+
+my $cycle_name='cycle_check.pl';
+if ( $script_name eq $cycle_name and $ARGV[0] ) {
+    my $proc = `/bin/ps ax | /usr/bin/grep $cycle_name | /usr/bin/grep $ARGV[0] | /usr/bin/grep -v ' -c ' | /usr/bin/grep -v grep | /usr/bin/awk '\{print \$1\}' | /usr/bin/grep -v $$`;
+    $proc +=0;
+    if ($proc) {
+	print "Another process '$cycle_name $ARGV[0]' already running!!!\nExiting...\n";
+	exit;
+    }
+}
+
+
 my $ver='1.12';
 #$VERSION = 0.97;
 
-$debug=1;
 $cycle_run=1;
 $cycle_sleep=30;
 
-my $script_name=$0;
-$script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
-dlog ( SUB => $script_name, DBUG => 1, MESS => "Use BIN directory - $Bin" );
-
 my $dbm; $res = DB_mysql_connect(\$dbm, \%conf);
 if ($res < 1) {
-    dlog_ap ( SUB => (caller(0))[3], DBUG => 0, LOGFILE => $logfile, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
+    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
     DB_mysql_check_connect(\$dbm, \%conf);
 }
 
@@ -93,7 +104,7 @@ my $point='';
 my $Querry_portfix = '';
 
 if ( not defined($ARGV[0]) ) {
-    print STDERR "Usage:  $script_name (newswitch <hostname old switch> <IP new switch> | checkterm | checkport | checklink )\n"
+    print STDERR "Usage:  $script_name ( newswitch <hostname old switch> <IP new switch> | [checkterm|checkport|checklink] [-Dlogfile.log] )\n"
 
 } elsif ( $ARGV[0] eq "newswitch" ) {
         DB_mysql_check_connect(\$dbm, \%conf);

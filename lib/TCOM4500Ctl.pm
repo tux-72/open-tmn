@@ -26,6 +26,7 @@ $VERSION = 1.0;
 
 my $debug=1;
 my $timeout=15;
+my $timeout_login=5;
 
 my $LIB='TCOM4500';
 my $command     = $LIB."_cmd";
@@ -65,7 +66,7 @@ sub TCOM4500_login {
     my ($swl, $ip, $login, $pass) = @_;
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt,
-                                Timeout => $timeout,
+                                Timeout => $timeout_login,
                                 Errmode => 'return',
                             );
     ${$swl}->open($ip);

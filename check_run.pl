@@ -5,6 +5,7 @@ use FindBin '$Bin';
 
 $exec_file	= "cycle_check.pl";
 $LOGDIR		= "/var/log/swctl";
+$run_user	= "billsync";
 
 my @processes = ( 	"checkterm",
 	    		"checkport",
@@ -20,7 +21,9 @@ if ( $ARGV[0] eq "real" ) {
 	#print STDERR "FOUND = $proc_found\n";
 	if ( $proc_found ) {
 	    print STDERR "$date\trun new process $PROC\n";
-	    $SH_CMD = "\( ".$Bin."/bin/".$exec_file." ".$PROC." \>\> ".$LOGDIR."/".$PROC.".log 2\>\&1 \) \&";
+	    #$SH_CMD = '/usr/bin/su '.$run_user.' -c "( '.$Bin.'/bin/'.$exec_file.' '.$PROC.' '.$LOGDIR.'/'.$PROC.'.log ) &"';
+	    $SH_CMD = '/usr/bin/su '.$run_user.' -c "( '.$Bin.'/bin/'.$exec_file.' '.$PROC.' >> '.$LOGDIR.'/'.$PROC.'-stderr.log 2>&1 ) &"';
+	    #print STDERR "$SH_CMD\n";
 	    system ( $SH_CMD );
 	#} else {
 	#    print STDERR "$date\tprocess $PROC already running\n";
@@ -28,5 +31,5 @@ if ( $ARGV[0] eq "real" ) {
     }
 
 } else {
-    print STDERR "Run CMD - $0\n"
+    print STDERR " USAGE - $0 real\n"
 }

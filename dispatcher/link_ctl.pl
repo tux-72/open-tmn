@@ -127,7 +127,17 @@ sub send_pod  {
     return ( $res+0, "strerr:".$strerr.";".$res_attr ) ;
 }
 
-
+sub parm_log {
+    my $parm = shift;
+    my $subs = shift;
+    my $str_log = 'receive parms: ';
+    while(my ($k,$v)=each(%$parm)) {
+	$str_log .= " $k='$v',";
+    }
+    dlog ( SUB => $subs, DBUG => 1, MESS => $str_log );
+    #$str_log .= "\n";
+    #&dispatcher::log(1, $str_log );
+}
 
 sub dlog {
         my %arg = (
@@ -157,14 +167,3 @@ sub rspaced {
     return sprintf("%-${len}s",$str);
 }
 
-sub parm_log {
-    my $parm = shift;
-    my $subs = shift;
-    my $str_log = 'receive parms: ';
-    while(my ($k,$v)=each(%$parm)) {
-	$str_log .= " $k='$v',";
-    }
-    dlog ( SUB => $subs, DBUG => 1, MESS => $str_log );
-    #$str_log .= "\n";
-    #&dispatcher::log(1, $str_log );
-}

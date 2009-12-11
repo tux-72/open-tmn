@@ -34,6 +34,7 @@ my $speed_char	= $LIB."_speed_char";
 #my $block_vlan=4094;
 
 my $timeout=15;
+my $timeout_login=5;
 #my $prompt='/\r{1,}CAT2950\-.*#$/i';
 my $prompt='/.*#.*/';
 my $prompt_nopriv='/.*[\>#].*/';
@@ -62,7 +63,7 @@ sub CAT2950_login {
     my ($swl, $ip, $pass, $ena_pass) = @_;
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass.", ENA_PASS =".$ena_pass );
     ${$swl}=new Net::Telnet (	prompt => $prompt,
-                            	Timeout => $timeout,
+                            	Timeout => $timeout_login,
                         	Errmode => 'return',
 			    );
     ${$swl}->open($ip);

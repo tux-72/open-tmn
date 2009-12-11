@@ -27,6 +27,7 @@ $VERSION = 1.12;
 
 my $debug 	= 1;
 my $timeout	= 10;
+my $timeout_login=5;
 
 my $LIB	= 'ES';
 my $command     = $LIB."_cmd";
@@ -57,7 +58,7 @@ sub ES_login {
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
-                            	Timeout => $timeout,
+                            	Timeout => $timeout_login,
                         	Errmode => 'return',
 			    );
     ${$swl}->open($ip);
@@ -76,7 +77,7 @@ sub ES_start_login {
     sleep(1);
 
     ${$swl}=new Net::Telnet (	prompt => $prompt,
-                            	Timeout => $timeout,
+                            	Timeout => $timeout_login,
                         	Errmode => 'return',
 			    );
     ${$swl}->open($ip);
