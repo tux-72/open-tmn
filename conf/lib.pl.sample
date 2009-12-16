@@ -3,6 +3,7 @@
 use lib '/usr/local/switch-control/lib';
 
 use SWALLCtl;
+use SWDBCtl;
 use C73Ctl;
 use CATIOSCtl;
 use CAT2950Ctl;

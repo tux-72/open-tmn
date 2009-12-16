@@ -104,7 +104,7 @@ my $point='';
 my $Querry_portfix = '';
 
 if ( not defined($ARGV[0]) ) {
-    print STDERR "Usage:  $script_name ( newswitch <hostname old switch> <IP new switch> | [checkterm|checkport|checklink] [-Dlogfile.log] )\n"
+    print STDERR "Usage:  $script_name ( newswitch <hostname old switch> <IP new switch> | [checkterm|checkport|checklink] )\n"
 
 } elsif ( $ARGV[0] eq "newswitch" ) {
         DB_mysql_check_connect(\$dbm, \%conf);
