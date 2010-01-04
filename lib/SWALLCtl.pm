@@ -30,14 +30,14 @@ require $Bin . '/../conf/loging.pl';
 ############ SUBS ##############
 
 sub rspaced {
-    $str = shift;
-    $len = shift;
+    my $str = shift;
+    my $len = shift;
     return sprintf("%-${len}s",$str);
 }
 
 sub lspaced {
-    $str = shift;
-    $len = shift;
+    my $str = shift;
+    my $len = shift;
     return sprintf("%${len}s",$str);
 }
 

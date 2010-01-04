@@ -107,7 +107,7 @@ sub SW_AP_get {
 	if ( not ( defined($fparm->{'link_type'}) && $fparm->{'link_type'} =~ /^\d+$/ ) ) {
 	    return ( $Fres, "error:not defined or broken parameter 'link_type' => '".$fparm->{'link_type'}."';" );
 	} else {
-	    $fparm->{'link_type'}+0;
+	    $fparm->{'link_type'} = $fparm->{'link_type'}+0;
 	}
 	if ( not ( defined($fparm->{'login'}) && "x".$fparm->{'login'} ne "x" ) ) {
 	    return ( $Fres, "error:not defined or broken parameter 'login' => '".$fparm->{'login'}."';" );
@@ -212,7 +212,7 @@ sub SW_AP_get {
 		############# GET Switch IP's
 		$stm0 = $dbm->prepare("SELECT s.automanage, s.bw_ctl, s.id, s.ip, s.model, s.hostname, s.idhouse, s.podezd, s.unit, h.idhouse, h.street, h.dom, m.lib, ".
 		"m.mon_login, m.mon_pass FROM hosts s, houses h, models m WHERE s.model=m.id and s.idhouse=h.idhouse and m.lib is not NULL and s.clients_vlan=".
-		$AP{'VLAN'}." and s.vlan_zone=".$AP{'vlan_zone'} );
+		$AP{'VLAN'}." and s.vlan_zone=".$AP{'vlan_zone'}." and s.visible>0" );
 		$stm0->execute();
 		#$swrw  = $stm0->rows;
 		dlog ( SUB => (caller(0))[3], DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Greater by one switches in VLAN '".$AP{'VLAN'}."'!!!" ) if $stm0->rows>1;

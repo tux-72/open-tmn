@@ -1,17 +1,17 @@
 #!/usr/bin/perl
 
-#use strict;
+use strict;
 use Authen::Radius;
 use FindBin '$Bin';
 require $Bin . '/../conf/libap.pl';
 Authen::Radius->load_dictionary();
 
-$VERSION = 0.8;
+my $VER = 0.8;
 
 my $debug = 1;
 
 my $LOGDIR = '/var/log/dispatcher';
-my $logfile = $LOGDIR.'/dispatcher_subs.log';
+my $logfile = $LOGDIR.'/ap_ctl.log';
 
 
 my $script_name=$0;
@@ -84,7 +84,7 @@ sub send_pod  {
     my ( $res, $a, $err, $strerr );
     my 	$res_attr = "attr:";
 
-    $r = new Authen::Radius(Host => $param{'nas_ip'}.":".$param{'nas_port'}, Secret => $param{'nas_secret'}, Debug => 0);
+    my $r = new Authen::Radius(Host => $param{'nas_ip'}.":".$param{'nas_port'}, Secret => $param{'nas_secret'}, Debug => 0);
     $r->add_attributes (
       { Name => 'User-Name', Value => $param{'login'} }
       #{ Name => 'Acct-Session-Id', Value => $cmd[4] }
@@ -130,7 +130,7 @@ sub send_pod  {
 sub parm_log {
     my $parm = shift;
     my $subs = shift;
-    my $str_log = 'receive parms: ';
+    my $str_log = "--\nreceive parms: ";
     while(my ($k,$v)=each(%$parm)) {
 	$str_log .= " $k='$v',";
     }
@@ -145,7 +145,7 @@ sub dlog {
         );
         if ( not $arg{'DBUG'} > $debug ) {
             open(LOG,">>$logfile");
-            my $subchar = 22; my @lines = ();
+            my $subchar = 30; my @lines = ();
             my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
             my $timelog = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year+1900, $month + 1, $day, $hour, $min, $sec);
             if ( ref($arg{'MESS'}) ne 'ARRAY' ) {
@@ -162,8 +162,7 @@ sub dlog {
 }
 
 sub rspaced {
-    $str = shift;
-    $len = shift;
+    my $str = shift;
+    my $len = shift;
     return sprintf("%-${len}s",$str);
 }
-
