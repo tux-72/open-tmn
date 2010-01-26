@@ -152,7 +152,7 @@ sub post_auth {
 			$RAD_REPLY{'DHCP-Router-Address'}	 = $ref_req->{'gw'};
 
 			my $Q_Request_up =  "UPDATE dhcp_addr SET end_lease=ADDDATE(now(), INTERVAL ".
-			( $ref_req->{'static_ip'} > 0 ? $conf{'DHCP_lease_static'} : $ref_req->{'dhcp_lease'} )." SECOND )".
+			( $ref_req->{'static_ip'} > 0 ? $conf{'DHCP_lease_max'} : $ref_req->{'dhcp_lease'} )." SECOND )".
 			" WHERE agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
 			" and ip='".$cli_addr."' and session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'";
 

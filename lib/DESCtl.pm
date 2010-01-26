@@ -86,6 +86,8 @@ sub DES_set_segmentation {
     my $ranges_vlan = ''; my @range = '';
     ## VLAN CONFIGURE
     my @ln = $sw->cmd("show vlan\na");
+    $sw->cmd("");  ## очищаем командную строку от ненужной 'a' если VLAN список короткий
+
     foreach (@ln) {
         # VID             : 14         VLAN Name       : Office-14
         if ( /Member\s+ports\s+:\s+(\S+)/ ) {
@@ -174,6 +176,7 @@ sub DES_vlan_char {
 
     ## VLAN CONFIGURE
     my @ln = ${$swl}->cmd("show vlan\na");
+     ${$swl}->cmd("");  ## очищаем командную строку от ненужной 'a' если VLAN список короткий
     foreach (@ln) {
         # VID             : 14         VLAN Name       : Office-14
         if ( /VID\s+\:\s+(\d+)\s+VLAN\s+Name\s+\:\s+(\S+)/ ) {

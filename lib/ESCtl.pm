@@ -139,48 +139,6 @@ sub ES_hw_char {
     return ( $maxhw, $adm_state );
 }
 
-sub ES_port_set_vlan1 {
-
-    my ( $swl, $port, $vlan_id, $tag, $trunk ) = @_;
-    my $sw = ${$swl};
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PARMS - ' $port, $vlan_id '" );
-    #-----------------------------------------
-    my @lnv = $sw->cmd("show vlan \nc");
-    $sw->cmd("");
-    #print STDERR @lnv;
-    my $count = -1;
-    my @lnd = ();
-    foreach my $ln (@lnv) {
-	#    27  1058     Static     15:36:11  Untagged :
-        if ( $ln =~ /^\s+\d+\s+(\d+)\s+Static\s+/ and $1 > 1 ) {
-	    $count +=1;
-	    $lnd[$count] = $1;
-	}
-    }
-
-    return -1  if (&$command(\$sw, $prompt_conf,	"config" ) < 1 );
-    if (not $trunk ) {
-	foreach my $lnd (@lnd) {
-	  if ( $lnd != $vlan_id ) {
-	    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$lnd ) < 1 );
-	    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"forbidden ".$port ) < 1 );
-	    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
-	  }
-	}
-    }
-
-    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$vlan_id ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"name Vlan".$vlan_id ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"fixed ".$port ) < 1 );
-    if ($tag) {
-	return -1 if (&$command(\$sw, $prompt_conf_vlan,"no untagged ".$port ) < 1 );
-    } else {
-	return -1 if (&$command(\$sw, $prompt_conf_vlan,"untagged ".$port ) < 1 );
-    }
-    return -1  if (&$command(\$sw, $prompt,		"exit") < 1 );
-    #-----------------------------------------
-
-}
 
 sub ES_port_set_vlan {
 
@@ -242,8 +200,9 @@ sub ES_port_set_vlan {
     } else {
 	return -1 if (&$command(\$sw, $prompt_conf_vlan,"untagged ".$port ) < 1 );
     }
-    return -1  if (&$command(\$sw, $prompt,		"exit") < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"exit") < 1 );
     #-----------------------------------------
+    return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
 
 }
 

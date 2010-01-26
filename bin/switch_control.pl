@@ -20,12 +20,17 @@ dlog ( SUB => $script_name, DBUG => 2, MESS => "Use BIN directory - $Bin" );
 
 my $cycle_name='cycle_check.pl';
 if ( $script_name eq $cycle_name and $ARGV[0] ) {
-    my $proc = `/bin/ps ax | /usr/bin/grep $cycle_name | /usr/bin/grep $ARGV[0] | /usr/bin/grep -v ' -c ' | /usr/bin/grep -v grep | /usr/bin/awk '\{print \$1\}' | /usr/bin/grep -v $$`;
-    $proc +=0;
-    if ($proc) {
-	print "Another process '$cycle_name $ARGV[0]' already running!!!\nExiting...\n";
-	exit;
-    }
+
+    $lockfile="/tmp/".$script_name."_".$ARGV[0];
+    open(LOCK,">",$lockfile) or die "Can't open file $!";
+    flock(LOCK,2|4) or die "$lockfile already run";
+    
+#    my $proc = `/bin/ps ax | /usr/bin/grep $cycle_name | /usr/bin/grep $ARGV[0] | /usr/bin/grep -v ' -c ' | /usr/bin/grep -v grep | /usr/bin/awk '\{print \$1\}' | /usr/bin/grep -v $$`;
+#    $proc +=0;
+#    if ($proc) {
+#	print "Another process '$cycle_name $ARGV[0]' already running!!!\nExiting...\n";
+#	exit;
+#    }
 }
 
 
