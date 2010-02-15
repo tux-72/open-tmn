@@ -105,6 +105,8 @@ sub C73_term_l3net4_add {
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "description ".$arg{'VLANNAME'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "encapsulation dot1Q ".$arg{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "ip address ".$arg{'IPGW'}." ".$arg{'NETMASK'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_subif,   "no ip access-group in"  ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_subif,   "no ip access-group out" ) < 1);
      if ( defined($arg{'UP_ACLIN'})  ) { return -1  if (&$command(\$sw, $prompt_conf_subif,   "ip access-group ".$arg{'UP_ACLIN'}. " in"  ) < 1); }
      if ( defined($arg{'UP_ACLOUT'}) ) { return -1  if (&$command(\$sw, $prompt_conf_subif,   "ip access-group ".$arg{'UP_ACLOUT'}." out" ) < 1); }
     return -1  if (&$command(\$sw, $prompt_conf_subif,   "no ip redirects" ) < 1);

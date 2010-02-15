@@ -369,8 +369,8 @@ if ( not defined($ARGV[0]) ) {
     	    $head = GET_Terminfo( TYPE => $ref->{'link_type'}, ZONE => $ref->{'vlan_zone'}, TERM_ID => $ref->{'link_head'});
 
 	    $Querry_portfix  .=  ", status=".$port_status{'enable'}.", us_speed=".$ref->{'bw_free'}.", ds_speed=".$ref->{'bw_free'}.
-	    ", tag=0, start_date=NULL, mac_port=NULL, info=NULL, login=NULL, maxhwaddr=-1, link_head=NULL, \
-	    autoneg=1, speed=NULL, duplex=NULL";
+	    ", tag=0, start_date=NULL, mac_port=NULL, info=NULL, login=NULL, maxhwaddr=-1, link_head=NULL, ip_subnet=NULL, ".
+	    " autoneg=1, speed=NULL, duplex=NULL";
 	    $ds=$ref->{'bw_free'}; $us=$ref->{'bw_free'}; $trunking_vlan = 1; 
 		
 
@@ -894,10 +894,13 @@ sub DB_trunk_vlan {
 	    my $Qr_check = "SELECT port_id FROM port_vlantag WHERE port_id=".$ref33->{'port_id'}." and vlan_id=".$argdb{'VLAN'};
 	    $stm331 = $dbm->prepare($Qr_check);
 	    $stm331->execute();
+	    # Temp 
 	    if ( $stm331->rows > 0 ) {
-		$res =  1 if ("x".$argdb{'ACT'} eq 'xadd');    # VLAN найден в транке, не добавлять
-		$res = -1 if ("x".$argdb{'ACT'} eq 'xremove'); # VLAN найден в транке, удалить
+		if ("x".$argdb{'ACT'} eq 'xadd')    { $res =  1; }   # VLAN найден в транке, не добавлять
+		#if ("x".$argdb{'ACT'} eq 'xremove') { $res = -1; } # VLAN найден в транке, удалить
 	    }
+	    if ("x".$argdb{'ACT'} eq 'xremove') { $res = -1; }  # VLAN в транке удалить
+
 	    $stm331->finish();
 	}
 	$stm33->finish();
