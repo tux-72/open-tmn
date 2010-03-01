@@ -193,7 +193,7 @@ sub DES_speed_char {
     );
     my @duplex = ''; $duplex[0] = 'half'; $duplex[1] = 'full';
     my $spd = 'auto';
-    if ( $arg{'SPEED'} =~ /^1(0|00|000)/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) { 
+    if ( $arg{'SPEED'} =~ /^1(0|00|000)$/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) { 
 	$spd = $arg{'SPEED'}."_".$duplex[$arg{'DUPLEX'}];
     }
     return $spd;

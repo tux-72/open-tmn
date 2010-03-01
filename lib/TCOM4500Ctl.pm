@@ -102,7 +102,7 @@ sub TCOM4500_speed_char {
     my @dpl = ''; $dpl[0] = 'half'; $dpl[1] = 'full';
 
     my $spd = 'auto';
-    if ( $arg{'SPEED'} =~ /^1(0|00|000)/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) {
+    if ( $arg{'SPEED'} =~ /^1(0|00|000)$/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) {
         $spd = $arg{'SPEED'};
         return ($spd, $dpl[$arg{'DUPLEX'}]);
     } else {
