@@ -2,7 +2,9 @@
 
 package ESCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 
@@ -16,7 +18,7 @@ $VERSION = 1.12;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	ES_pass_change ES_conf_first	ES_conf_save	ES_fix_macport
 		ES_port_up	ES_port_down	ES_port_defect	ES_port_free	ES_port_setparms
@@ -149,8 +151,8 @@ sub ES_port_set_vlan {
     my @lnv = $sw->cmd("show vlan \nc");
     $sw->cmd("");
     my %vlan_del = ();
-     my  @range = ();
-    my $current_vid = 0; $range_ports = '';
+    my  @range = (); my @d = ();
+    my $current_vid = 0; my $range_ports = '';
     foreach my $ln (@lnv) {
 	#	1     1     Static    330:44:15  Untagged :20-22,24-26
 	#	                                 Tagged   :23
@@ -377,7 +379,7 @@ sub ES_pass_change {
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1 );
     
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Save config ..." );
-    @res = $sw->cmd (	String	=>	"write memory",
+    my @res = $sw->cmd ( String	=>	"write memory",
 			prompt	=>	$prompt,
 			Timeout	=>	20,
 		    ) if not $debug;	

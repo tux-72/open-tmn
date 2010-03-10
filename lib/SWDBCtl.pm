@@ -3,6 +3,8 @@
 package SWDBCtl;
 
 use strict;
+no strict qw(refs);
+
 use locale;
 use DBI();
 use SWALLCtl;

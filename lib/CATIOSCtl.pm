@@ -2,7 +2,9 @@
 
 package CATIOSCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,7 +18,7 @@ $VERSION = 1.3;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	CATIOS_pass_change CATIOS_conf_first	CATIOS_conf_save	CATIOS_fix_macport	CATIOS_fix_vlan
 		CATIOS_port_up	CATIOS_port_down	CATIOS_port_defect	CATIOS_port_free	CATIOS_port_setparms
@@ -48,12 +50,18 @@ my $port_ctl_mcast      = 1;    my $port_ctl_bcast      = 2;
 ############ SUBS ##############
 
 sub CATIOS_conf_first {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' first configured MANUALLY!!!" ) ;
     return -1;
 }
 
 
 sub CATIOS_pass_change {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' changed password MANUALLY!!!" );
     return -1;
 }

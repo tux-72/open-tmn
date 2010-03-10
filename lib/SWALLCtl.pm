@@ -2,7 +2,11 @@
 
 package SWALLCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
+#no strict qw(refs subs);
+
 #use Net::SNMP;
 #use locale;
 
@@ -26,6 +30,8 @@ my $debug=1;
 
 use FindBin '$Bin';
 require $Bin . '/../conf/loging.pl';
+
+my $conflog = \%SWALLCtl::conflog;
 
 ############ SUBS ##############
 
@@ -51,8 +57,8 @@ sub dlog {
         #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', LOGFILE => '/var/log/dispatcher/ap_get.log', MESS => 'mess' )
         if ( not $arg{'DBUG'} > $debug ) {
 	    my $stderrout=1;
-	    if ( defined($conflog{$arg{'LOGTYPE'}}) ) {
-		open( LOGFILE,">> ".$conflog{$arg{'LOGTYPE'}} );
+	    if ( defined($conflog->{$arg{'LOGTYPE'}}) ) {
+		open( LOGFILE,">> ".$conflog->{$arg{'LOGTYPE'}} );
 		$stderrout=0;
 	    }
 
@@ -70,7 +76,7 @@ sub dlog {
             foreach my $mess ( @lines ) {
 		if ( defined($arg{'NORMA'}) and $arg{'NORMA'} ) { $mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs; }
                 next if (not $mess =~ /\S+/);
-		$logline = $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
+		my $logline = $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
 		if ($stderrout) {
             	    print STDERR $logline;
 		} else {
@@ -127,7 +133,8 @@ sub dlog {
         print $socket $arg{'REMOTE_USER'}."\0";
         print $socket $arg{'CMD'}."\0";
         my @c=<$socket>;
-	$socket->shutdown(HOW);
+	#$socket->shutdown(HOW);
+	$socket->shutdown();
         return @c;
     }
 }

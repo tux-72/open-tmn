@@ -2,7 +2,9 @@
 
 package TCOM4500Ctl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,7 +18,7 @@ $VERSION = 1.0;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	TCOM4500_pass_change TCOM4500_conf_first	TCOM4500_conf_save	TCOM4500_fix_macport	TCOM4500_fix_vlan
 		TCOM4500_port_up	TCOM4500_port_down	TCOM4500_port_defect	TCOM4500_port_free	TCOM4500_port_setparms
@@ -53,11 +55,17 @@ my $bw_free     = 64;
 ############ SUBS ##############
 
 sub TCOM4500_conf_first {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub TCOM4500_pass_change {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg{'IP'}' changed password MANUALLY!!!" );
     return -1;
 }

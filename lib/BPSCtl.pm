@@ -2,7 +2,9 @@
 
 package BPSCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,7 +18,7 @@ $VERSION = 1.13;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	BPS_pass_change BPS_conf_first	BPS_conf_save	BPS_fix_macport
 		BPS_port_up	BPS_port_down	BPS_port_defect	BPS_port_free	BPS_port_setparms
@@ -46,11 +48,17 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 ############ SUBS ##############
 
 sub BPS_conf_first {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub BPS_pass_change {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }

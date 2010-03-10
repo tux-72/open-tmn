@@ -2,7 +2,9 @@
 
 package DESCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -17,7 +19,7 @@ $VERSION = 1.17;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	DES_pass_change DES_conf_first	DES_conf_save	DES_fix_macport
 		DES_port_up	DES_port_down	DES_port_defect	DES_port_free	DES_port_setparms
@@ -94,12 +96,12 @@ sub DES_set_segmentation {
             $ranges_vlan = $1;
             $ranges_vlan =~ s/\n//;
             @range = split /\,/,$ranges_vlan;
-            foreach $c ( @range ) {
+            foreach my $c ( @range ) {
                 if ("x".$port eq "x".$c ) {
 		    $fwd_ports .= ",".$ranges_vlan;
                 } else {
-                    @d = split /-/,$c;
-                    for $e ($d[0]..$d[1]) {
+                    my @d = split /-/,$c;
+                    for my $e ($d[0]..$d[1]) {
                         if ($port == $e) {
 			    $fwd_ports .= ",".$ranges_vlan;
                         }
@@ -143,13 +145,13 @@ sub DES_port_set_vlan {
 	    $ranges_vlan = $1;
 	    $ranges_vlan =~ s/\n//;
 	    @range = split /\,/,$ranges_vlan;
-	    foreach $c ( @range ) {
+	    foreach my $c ( @range ) {
 		if ("x".$port eq "x".$c) {
 		    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$c." from vlan ".$vln_num );
 		    return -1  if (&$command(\$sw, $prompt, "config vlan ".$vln." delete ".$port ) < 1 );
 		} else {
-		    @d = split /-/,$c;
-		    for $e ($d[0]..$d[1]) {
+		    my @d = split /-/,$c;
+		    for my $e ($d[0]..$d[1]) {
 			if ($port == $e) {
 			    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$e." in portrange - ".$c." from vlan ".$vln_num );
 			    return -1  if (&$command(\$sw, $prompt, "config vlan ".$vln." delete ".$port ) < 1 );

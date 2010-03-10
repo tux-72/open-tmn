@@ -2,7 +2,8 @@
 
 package C73Ctl;
 
-#use strict;
+use strict;
+no strict qw(refs);
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,11 +17,9 @@ $VERSION = 1.0;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
-		#----------------------------------- LINK TYPES	----------------------------------
-		#	21		22		23		25		26
-@EXPORT = qw(	C73_term_l3net4_add C73_term_l3net4_remove C73_term_l3net4_up C73_term_l3net4_down 
-		C73_conf_save
+%EXPORT_TAGS = ();
+
+@EXPORT = qw(	C73_term_l3net4_add C73_term_l3net4_remove C73_term_l3net4_up C73_term_l3net4_down C73_conf_save  
 	    );
 
 my $debug=1;

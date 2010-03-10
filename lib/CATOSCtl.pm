@@ -2,7 +2,9 @@
 
 package CATOSCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,7 +18,7 @@ $VERSION = 1.1;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	CATOS_pass_change CATOS_conf_first	CATOS_conf_save	CATOS_fix_vlan	CATOS_fix_macport
 		CATOS_port_up	CATOS_port_down	CATOS_port_defect	CATOS_port_free	CATOS_port_setparms
@@ -44,16 +46,25 @@ my $port_ctl_mcast      = 1;    my $port_ctl_bcast      = 2;
 ############ SUBS ##############
 
 sub CATOS_conf_first {
+    my %arg = (
+        @_,         # список пар аргументов
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub CATOS_pass_change {
+    my %arg = (
+        @_,         # список пар аргументов
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
 
 sub CATOS_conf_save {
+    my %arg = (
+        @_,         # список пар аргументов
+    );
     dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "CATOS autosave config ;-)" );
     return 1;
 }

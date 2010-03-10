@@ -2,7 +2,9 @@
 
 package GSCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,7 +18,7 @@ $VERSION = 1.07;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw( GS_fix_vlan GS_fix_macport GS_conf_save GS_vlan_trunk_add GS_vlan_trunk_remove GS_vlan_remove
 	    );

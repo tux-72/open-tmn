@@ -2,7 +2,9 @@
 
 package CAT3508GCtl;
 
-#use strict;
+use strict;
+no strict qw(refs);
+
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,7 +18,7 @@ $VERSION = 1.2;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	CAT3508G_pass_change CAT3508G_conf_first	CAT3508G_conf_save	CAT3508G_fix_macport	CAT3508G_fix_vlan
 		CAT3508G_port_up	CAT3508G_port_down	CAT3508G_port_defect	CAT3508G_port_free	CAT3508G_port_setparms
@@ -43,11 +45,17 @@ my $prompt_conf_vlan ='/.*\(vlan\)#.*/';
 ############ SUBS ##############
 
 sub CAT3508G_conf_first {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub CAT3508G_pass_change {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }

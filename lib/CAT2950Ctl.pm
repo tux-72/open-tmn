@@ -2,7 +2,8 @@
 
 package CAT2950Ctl;
 
-#use strict;
+use strict;
+no strict qw(refs);
 #use Net::SNMP;
 #use locale;
 use SWALLCtl;
@@ -16,7 +17,7 @@ $VERSION = 1.2;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	CAT2950_pass_change CAT2950_conf_first	CAT2950_conf_save	CAT2950_fix_macport	CAT2950_fix_vlan
 		CAT2950_port_up	CAT2950_port_down	CAT2950_port_defect	CAT2950_port_free	CAT2950_port_setparms
@@ -49,11 +50,17 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 ############ SUBS ##############
 
 sub CAT2950_conf_first {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub CAT2950_pass_change {
+    my %arg = (
+        @_,
+    );
     dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
