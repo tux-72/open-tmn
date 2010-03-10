@@ -1,9 +1,12 @@
 #!/usr/bin/perl
 
 use strict;
+no strict qw(refs);
+
 use Authen::Radius;
 use FindBin '$Bin';
 require $Bin . '/../conf/libap.pl';
+
 Authen::Radius->load_dictionary();
 
 my $VER = 0.8;

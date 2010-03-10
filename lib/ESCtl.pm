@@ -92,14 +92,14 @@ sub ES_start_login {
 
 sub ES_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
-    my @lines = ${$swl}->cmd(   String  => $cmd,
+    ( my $last_prompt = ${$swl}->last_prompt() ) =~ s/\e7//gs;
+    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => $last_prompt, MESS => $cmd );
+    my @lines = map{s/\e7//gs} ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    my $last_prompt = ${$swl}->last_prompt();
-    $last_prompt  =~ tr/7 / /cs;
+    ( $last_prompt = ${$swl}->last_prompt() ) =~ s/\e7//gs;
     dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => $last_prompt, NORMA => 1,  MESS => \@lines );
     return 1;
 }

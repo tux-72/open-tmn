@@ -15,7 +15,7 @@
     'DEF_COMUNITY',     'public',
 
     'MYSQL_host',	'localhost',
-    'MYSQL_base',	'switchnet',
+    'MYSQL_base',	'vlancontrol',
     'MYSQL_user',	'mysqluser',
     'MYSQL_pass',	'mysqlpass',
 

@@ -16,7 +16,7 @@ $VERSION = 1.2;
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
-@EXPORT_TAGS = ();
+%EXPORT_TAGS = ();
 
 @EXPORT = qw(	dlog  rspaced  lspaced	IOS_rsh
 	    );
@@ -42,6 +42,8 @@ sub lspaced {
 }
 
 sub dlog {
+#	print join";",caller(2),$/;
+#	print join",",@_;
         my %arg = (
 	    'LOGTYPE' => 'LOGDFLT',
             @_,
