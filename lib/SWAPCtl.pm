@@ -140,6 +140,7 @@ sub SW_AP_get {
            dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "MAC '".$fparm->{'mac'}."' unknown format, exiting ..." );
 	    return ( $Fres, "error: broken format in parameter 'mac' => '".$fparm->{'mac'}."';" );
 	}
+	$fparm->{'mac_src'} = "$1$2$3$4$5$6";
 
 
 	###################### normalize port speeds #################
@@ -357,7 +358,7 @@ sub SW_AP_get {
 			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Access Point parm change" );
 			    $AP{'update_db'}=1;
 		    	    $Query = "INSERT INTO bundle_jobs SET port_id=".$AP{'id'};
-			    $job_parms  = 'login:'.$fparm->{'login'}.';hw_mac:'.$fparm->{'mac'}.';';
+			    $job_parms  = 'login:'.$fparm->{'login'}.';hw_mac:'.$fparm->{'mac_src'}.';';
 			    $job_parms .= 'ds_speed:'.$fparm->{'port_rate_ds'}.';' if defined($fparm->{'port_rate_ds'});
 			    $job_parms .= 'us_speed:'.$fparm->{'port_rate_us'}.';' if defined($fparm->{'port_rate_us'});
 
@@ -397,7 +398,8 @@ sub SW_AP_get {
 		    		$job_parms .= 'vlan_id:'.$AP{'VLAN'}.';';
 			    ## Иначе если порт ЗАНЯТ! и задействуется под другой тип подключения
 			    } elsif ( $AP{'link_type'} > $start_conf->{'STARTLINKCONF'} and $fparm->{'link_type'}+0 != $AP{'link_type'}+0  ) {
-				$PreQuery .= "INSERT INTO bundle_jobs SET port_id=".$AP{'id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date=NULL';
+				$PreQuery .= "INSERT INTO bundle_jobs SET port_id=".$AP{'id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date_insert=NULL';
+
 				$Query .= ", ltype_id=".$fparm->{'link_type'};
 		    		$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( $fparm->{'vlan_id'} > 1 );
 			    } else {
@@ -406,7 +408,7 @@ sub SW_AP_get {
 
 			    if ( $AP{'update_db'} ) {
 				if ("x".$PreQuery ne "x" ) { $dbm->do($PreQuery); }
-				$Query .= ", parm='".$job_parms."' ON DUPLICATE KEY UPDATE date=NULL, parm='".$job_parms."'";
+				$Query .= ", parm='".$job_parms."', archiv=0 ON DUPLICATE KEY UPDATE date_insert=NULL, parm='".$job_parms."'";
                     		dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Update port DB parameters info" );
 				$dbm->do($Query) or dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGDISP', 
 				MESS => "ERROR change table 'Bundle_jobs' Querry --".$Query."--" );

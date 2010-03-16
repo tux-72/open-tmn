@@ -27,7 +27,7 @@ $VERSION = 1.17;
 		DES_vlan_trunk_add	DES_vlan_trunk_remove	DES_vlan_remove
 	    );
 
-my $debug=0;
+my $debug=1;
 my $timeout=15;
 my $timeout_login=5;
 
@@ -151,10 +151,12 @@ sub DES_port_set_vlan {
 		    return -1  if (&$command(\$sw, $prompt, "config vlan ".$vln." delete ".$port ) < 1 );
 		} else {
 		    my @d = split /-/,$c;
-		    for my $e ($d[0]..$d[1]) {
-			if ($port == $e) {
-			    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$e." in portrange - ".$c." from vlan ".$vln_num );
-			    return -1  if (&$command(\$sw, $prompt, "config vlan ".$vln." delete ".$port ) < 1 );
+		    if (defined($d[1])) {
+			for my $e ($d[0]..$d[1]) {
+			    if ($port == $e) {
+				dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Remove port ".$e." in portrange - ".$c." from vlan ".$vln_num );
+				return -1  if (&$command(\$sw, $prompt, "config vlan ".$vln." delete ".$port ) < 1 );
+			    }
 			}
 		    }
 		}
@@ -195,7 +197,7 @@ sub DES_speed_char {
     );
     my @duplex = ''; $duplex[0] = 'half'; $duplex[1] = 'full';
     my $spd = 'auto';
-    if ( $arg{'SPEED'} =~ /^1(0|00|000)$/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) { 
+    if ( defined($arg{'SPEED'}) and  $arg{'SPEED'} =~ /^1(0|00|000)$/ and $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) { 
 	$spd = $arg{'SPEED'}."_".$duplex[$arg{'DUPLEX'}];
     }
     return $spd;
@@ -214,8 +216,8 @@ sub DES_hw_char {
     my %arg = (
         @_,
     );
-    my $maxhw =     ( ( $arg{'MAXHW'} > 0 and $arg{'MAXHW'} < 10 ) ? $arg{'MAXHW'} : 10 );
-    my $adm_state = ( ( $arg{'MAXHW'} > 0 and $arg{'MAXHW'} < 10 ) ? "enable" : "disable" );
+    my $maxhw =     ( ( defined($arg{'MAXHW'}) and $arg{'MAXHW'} > 0 and $arg{'MAXHW'} < 10 ) ? $arg{'MAXHW'} : 10 );
+    my $adm_state = ( ( defined($arg{'MAXHW'}) and $arg{'MAXHW'} > 0 and $arg{'MAXHW'} < 10 ) ? "enable" : "disable" );
     return ( $maxhw, $adm_state );
 }
 
@@ -399,7 +401,7 @@ sub DES_port_up {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in ".$arg{'IP'}.", port ".( defined($arg{'PORTPREF'}) ? $arg{'PORTPREF'} : '' ).$arg{'PORT'}  );
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state enable" ) < 1 );
     $sw->close();
     return 1;
@@ -413,7 +415,7 @@ sub DES_port_down {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in ".$arg{'IP'}.", port ".( defined($arg{'PORTPREF'}) ? $arg{'PORTPREF'} : '' ).$arg{'PORT'}  );
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state disable" ) < 1 );
     $sw->close();
     return 1;
@@ -427,7 +429,7 @@ sub DES_port_defect {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set DEFECT port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set DEFECT port in ".$arg{'IP'}.", port ".( defined($arg{'PORTPREF'}) ? $arg{'PORTPREF'} : '' ).$arg{'PORT'}  );
 
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state disable flow_control disable speed auto" ) < 1 );
     return -1  if (&$command(\$sw, $prompt, "config bandwidth_control ".$arg{'PORT'}." rx_rate no_limit tx_rate no_limit" ) < 1 );
@@ -446,7 +448,7 @@ sub DES_port_free {
     return -1 if (not $arg{'VLAN'});
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set FREE port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set FREE port in ".$arg{'IP'}.", port ".( defined($arg{'PORTPREF'}) ? $arg{'PORTPREF'} : '' ).$arg{'PORT'}  );
     my ( $ds, $us ) = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
 
     return -1  if (&$command(\$sw, $prompt, "config ports ".$arg{'PORT'}." state enable flow_control enable speed auto" ) < 1 );
@@ -468,7 +470,7 @@ sub DES_port_trunk {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set TRUNK port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set TRUNK port in ".$arg{'IP'}.", port ".( defined($arg{'PORTPREF'}) ? $arg{'PORTPREF'} : '' ).$arg{'PORT'}  );
     my $speed = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
 
     return -1  if (&$command(\$sw, $prompt, "config port_security ports ".$arg{'PORT'}." admin_state disable" ) < 1 );
@@ -491,7 +493,7 @@ sub DES_port_system {
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
 
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set SYSTEM port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set SYSTEM port in ".$arg{'IP'}.", port ".( defined($arg{'PORTPREF'}) ? $arg{'PORTPREF'} : '' ).$arg{'PORT'}  );
     my $speed = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $ds, $us ) = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );
 
@@ -511,7 +513,7 @@ sub DES_port_setparms {
     );
     # login
     my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PARAMETERS port in ".$arg{'IP'}.", port ".$arg{'PORTPREF'}.$arg{'PORT'}  );
+    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PARAMETERS port in ".$arg{'IP'}.", port ".( defined($arg{'PORTPREF'}) ? $arg{'PORTPREF'}: '' ).$arg{'PORT'}  );
 
     my $speed = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
     my ( $ds, $us ) = &$bw_char( DS => $arg{'DS'}, US => $arg{'US'} );

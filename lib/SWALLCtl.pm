@@ -55,7 +55,7 @@ sub dlog {
             @_,
         );
         #dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => 'prompt', LOGFILE => '/var/log/dispatcher/ap_get.log', MESS => 'mess' )
-        if ( not $arg{'DBUG'} > $debug ) {
+        if ( not $arg{'DBUG'} > $debug and defined($arg{'MESS'}) and $arg{'MESS'}."x" ne "x" ) {
 	    my $stderrout=1;
 	    if ( defined($conflog->{$arg{'LOGTYPE'}}) ) {
 		open( LOGFILE,">> ".$conflog->{$arg{'LOGTYPE'}} );
