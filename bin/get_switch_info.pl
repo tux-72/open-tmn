@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-my $ver='0.5';
+my $ver='0.7';
 #$VERSION = 0.97;
 
 use Getopt::Long;
@@ -127,7 +127,7 @@ if (not defined($ARGV[0])) {
 	    foreach my $key ( sort keys %sw_descr ) {
 		if ( $res->{$oid_model} =~ /$key/ ) {
 		    $fix_rez .= "FIX model ID = ".lspaced($sw_descr{$key},2)."  '".rspaced($sw_models[$sw_descr{$key}]."'",20);
-		    if ( $ref->{'model'} != $sw_descr{$key} ) {
+		    if ( $ref->{'model_id'} != $sw_descr{$key} ) {
 			$fix_rez .= ", OLD model_id (".$ref->{'model_id'}.") is WRONG!!!" if $debug > 1;
 			$Q_update .= ", model_id=".$sw_descr{$key};
 		    }

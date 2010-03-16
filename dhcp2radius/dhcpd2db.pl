@@ -37,9 +37,9 @@ use Data::Dumper;
 my $res = 0; 
 my %conf = (
     'MYSQL_host'	=> 'localhost',
-    'MYSQL_base'	=> 'switchnet',
-    'MYSQL_user'	=> 'swgen',
-    'MYSQL_pass'	=> 'SWgeneRatE',
+    'MYSQL_base'	=> 'vlancontrol',
+    'MYSQL_user'	=> 'swctl',
+    'MYSQL_pass'	=> 'GlaikMincy',
     'STARTLINKCONF'	=> 20,
     'DHCP_lease_max'	=> 7200,
     'DHCP_lease_static'	=> 2678400,
@@ -74,12 +74,13 @@ sub post_auth {
 	#&radiusd::radlog(1, "VLAN = $vlan");
 
 	if ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Release' ) {
-	    $dbm->do("UPDATE dhcp_addr SET end_lease=0, agent_info=NULL, port_id=NULL, session=NULL, mac=NULL, vlan=NULL WHERE ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}.
-	    "' and mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and static_ip<1");
+	    $dbm->do("UPDATE dhcp_addr SET end_lease=0, agent_info=NULL, port_id=NULL, session=NULL, hw_mac=NULL, vlan_id=NULL WHERE ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}.
+	    "' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and static_ip<1");
 	    $res = RLM_MODULE_OK;
 	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
+	    ## 
 	    my $Q_check_macport = "SELECT l.port_id, l.inet_shape, h.dhcp_lease, l.head_id, l.static_ip FROM head_link l, heads h WHERE ".
-	    "l.head_id=h.head_id and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and l.mac='".
+	    "l.head_id=h.head_id and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and l.hw_mac='".
 	    $RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan." limit 1";
 	    my $stm_port = $dbm->prepare($Q_check_macport);
 	    $stm_port->execute();
@@ -88,9 +89,10 @@ sub post_auth {
 
 		    my $Q_Discover_start  = "SELECT ip, mask, gw, end_lease, static_ip FROM dhcp_addr WHERE head_id=".$ref_port->{'head_id'}." and real_ip>0";
 
-		    my $Q_Discover_reuse = " and (( static_ip=1 and port_id=".$ref_port->{'port_id'}." and vlan=".$vlan." )".
-		    " or ( ip='".$RAD_REQUEST{'DHCP-Requested-IP-Address'}."' and port_id=".$ref_port->{'port_id'}." and vlan=".$vlan." )".
-		    " or ( end_lease<now() and port_id=".$ref_port->{'port_id'}." and vlan=".$vlan." )".
+		    # Получение такого же IP как и ранее
+		    my $Q_Discover_reuse = " and (( static_ip=1 and port_id=".$ref_port->{'port_id'}." and vlan_id=".$vlan." )".
+		    " or ( ip='".$RAD_REQUEST{'DHCP-Requested-IP-Address'}."' and port_id=".$ref_port->{'port_id'}." and vlan_id=".$vlan." )".
+		    " or ( end_lease<now() and port_id=".$ref_port->{'port_id'}." and vlan_id=".$vlan." )".
 		    ") order by end_lease desc limit 1";
 
 		    my $Q_Discover_new = " and end_lease<now() order by end_lease limit 1";
@@ -110,7 +112,7 @@ sub post_auth {
 			$RAD_REPLY{'DHCP-Subnet-Mask'}		 = $ref_disc->{'mask'};
 			$RAD_REPLY{'DHCP-Router-Address'}	 = $ref_disc->{'gw'};
 			my $Q_Disc_up = "UPDATE dhcp_addr SET agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
-			", port_id=".$ref_port->{'port_id'}.", vlan=".$vlan.", mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
+			", port_id=".$ref_port->{'port_id'}.", vlan_id=".$vlan.", hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
 			", session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."', static_ip=".$ref_port->{'static_ip'}.", end_lease=ADDDATE(now(), INTERVAL ".
 			$ref_port->{'dhcp_lease'}." SECOND) WHERE ip='".$ref_disc->{'ip'}."'";
 
@@ -136,7 +138,7 @@ sub post_auth {
 		#&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'");
 		my $Q_Request = "SELECT  d.ip, d.mask, d.gw, d.static_ip, h.dhcp_lease FROM dhcp_addr d, heads h WHERE ".
 		" d.head_id=h.head_id and d.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}.
-		"' and d.vlan=".$vlan." and d.mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and d.ip='".$cli_addr."'".
+		"' and d.vlan_id=".$vlan." and d.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and d.ip='".$cli_addr."'".
 		" and d.session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'";
 
 		my $stm_req = $dbm->prepare($Q_Request);
@@ -153,7 +155,7 @@ sub post_auth {
 
 			my $Q_Request_up =  "UPDATE dhcp_addr SET end_lease=ADDDATE(now(), INTERVAL ".
 			( $ref_req->{'static_ip'} > 0 ? $conf{'DHCP_lease_max'} : $ref_req->{'dhcp_lease'} )." SECOND )".
-			" WHERE agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
+			" WHERE agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
 			" and ip='".$cli_addr."' and session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'";
 
 			if ($ref_req->{'static_ip'} < 1) {

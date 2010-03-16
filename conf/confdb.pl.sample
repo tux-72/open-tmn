@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+our %dbconf = (
+    'MYSQL_host',	'localhost',
+    'MYSQL_base',	'dbname',
+    'MYSQL_user',	'user',
+    'MYSQL_pass',	'password',
+
+#    'MSSQL_host',	'StatServer',
+#    'MSSQL_base',	'inet',
+#    'MSSQL_user',	'cisco',
+#    'MSSQL_pass',	'cisco',
+
+#    '',		,
+);
