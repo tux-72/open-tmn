@@ -359,6 +359,7 @@ sub SW_AP_get {
 			    $AP{'update_db'}=1;
 		    	    $Query = "INSERT INTO bundle_jobs SET port_id=".$AP{'id'};
 			    $job_parms  = 'login:'.$fparm->{'login'}.';hw_mac:'.$fparm->{'mac_src'}.';';
+			    $job_parms .= 'inet_rate:'.$fparm->{'inet_rate'}.';'   if defined($fparm->{'inet_rate'});
 			    $job_parms .= 'ds_speed:'.$fparm->{'port_rate_ds'}.';' if defined($fparm->{'port_rate_ds'});
 			    $job_parms .= 'us_speed:'.$fparm->{'port_rate_us'}.';' if defined($fparm->{'port_rate_us'});
 
@@ -401,7 +402,7 @@ sub SW_AP_get {
 				$PreQuery .= "INSERT INTO bundle_jobs SET port_id=".$AP{'id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date_insert=NULL';
 
 				$Query .= ", ltype_id=".$fparm->{'link_type'};
-		    		$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( $fparm->{'vlan_id'} > 1 );
+		    		$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( defined($fparm->{'vlan_id'}) and $fparm->{'vlan_id'} > 1 );
 			    } else {
 				$AP{'update_db'}=0;
 			    }

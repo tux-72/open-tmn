@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 
 use Getopt::Long;
@@ -26,7 +26,7 @@ if ( $script_name eq $cycle_name and $ARGV[0] ) {
 
     my $lockfile="/tmp/".$script_name."_".$ARGV[0];
     open(LOCK,">",$lockfile) or die "Can't open file $!";
-    flock(LOCK,2|4) or die "$lockfile already run";
+    flock(LOCK,2|4) or die;
     
 }
 
@@ -34,7 +34,7 @@ if ( $script_name eq $cycle_name and $ARGV[0] ) {
 my $ver='2.00';
 
 my $cycle_run=1;
-my $cycle_sleep=30;
+my $cycle_sleep=20;
 my $res=0;
  
 my $dbm; $res = DB_mysql_connect(\$dbm);
@@ -158,12 +158,11 @@ if ( not defined($ARGV[0]) ) {
 
 } elsif ( $ARGV[0] eq "checkterm" ) {
   while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
+    #dlog ( SUB => 'checkterm', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30 ) if $debug;
     DB_mysql_check_connect(\$dbm);
     ################################ SYNC LINK STATES
     my $stml = $dbm->prepare("SELECT l.head_id, l.port_id, p.vlan_id, l.status, l.set_status, p.ltype_id, l.ip_subnet, l.login \
     FROM swports p, head_link l WHERE l.set_status>0 and l.port_id=p.port_id ORDER BY l.head_id");
-    #my $stml = $dbm->prepare("SELECT head_id, port_id, vlan_id, status, set_status, ltype_id, ip_subnet, login \
-    #FROM  head_link WHERE set_status>0 ORDER BY head_id");
     $stml->execute();
     if ( $stml->rows ) { dlog ( SUB => 'checkterm', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30 ); }
 
@@ -198,22 +197,29 @@ if ( not defined($ARGV[0]) ) {
 } elsif ( $ARGV[0] eq "checkjobs" ) {
 
   while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
+    #dlog ( SUB => 'checkjobs', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30 ) if $debug;
     DB_mysql_check_connect(\$dbm);
 
     $SW{'change'} = 0;
     $SW{'sw_id'}=0;
     my $act=''; my $trunking_vlan = 1;
     ############################ CHECK for UPDATES PORTS PARAMETERS CYCLE ########################
-    my $stm2 = $dbm->prepare("SELECT h.hostname, h.clients_vlan, h.model_id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_port, \
+    my $Q_jobs = "SELECT h.hostname, h.clients_vlan, h.model_id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_port, \
     h.parent_portpref, h.zone_id, h.automanage, j.ltype_id as new_ltype, j.job_id, j.parm, \
     p.sw_id, p.port_id, p.port, p.portpref, p.ds_speed, p.us_speed, p.vlan_id, p.tag, p.ltype_id, \
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m, bundle_jobs j \
     WHERE h.model_id=m.model_id and h.sw_id=p.sw_id and j.archiv<2 and p.type>0 and j.port_id=p.port_id \
-    and h.automanage=1  and j.ltype_id in ".
-    "\(".$link_type{'up'}.",".$link_type{'down'}.",".$link_type{'setparms'}.",".$link_type{'free'}.
-    ",".$link_type{'pppoe'}.",".$link_type{'l2link'}.",".$link_type{'l3realnet'}.",".$link_type{'l3net4'}.
-    #",".$link_type{'uplink'}.
-    "\) order by h.model_id, p.sw_id, p.portpref, p.port, j.job_id ");
+    and h.automanage=1  and j.ltype_id in \(";
+    if ($script_name eq 'cycle_check.pl' ) {
+	$Q_jobs .= $link_type{'setparms'}.",".$link_type{'pppoe'};
+	#dlog ( SUB => 'checkjobs', DBUG => 1, MESS => "Checking scheduled jobs automatically" );
+    } else {
+	$Q_jobs .= $link_type{'up'}.",".$link_type{'down'}.",".$link_type{'uplink'}.",".$link_type{'free'}.
+	",".$link_type{'l2link'}.",".$link_type{'l3realnet'}.",".$link_type{'l3net4'};
+	dlog ( SUB => 'checkjobs', DBUG => 1, MESS => "Checking scheduled jobs manual" ) if $debug;
+    }
+    $Q_jobs .= "\) order by h.model_id, p.sw_id, p.portpref, p.port, j.job_id ";
+    my $stm2 = $dbm->prepare($Q_jobs);
     
     $stm2->execute();
     if ( $stm2->rows ) { dlog ( SUB => 'checklink', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30  ); }
@@ -251,14 +257,14 @@ if ( not defined($ARGV[0]) ) {
 	$SW{'ena_pass'}=$ref->{'ena_pass'}      if defined($ref->{'ena_pass'});
 
 	if ($ref->{'new_ltype'}  < $conf->{'STARTPORTCONF'}) {
-	    $Querry_portfix = "UPDATE swports p, bundle_jobs j SET j.archiv=1";
+	    $Querry_portfix = "UPDATE swports p, bundle_jobs j SET j.archiv=1, date_exec=NOW()";
 	} else {
-	    $Querry_portfix = "UPDATE swports p, bundle_jobs j SET j.archiv=1, p.ltype_id=".$ref->{'new_ltype'};
+	    $Querry_portfix = "UPDATE swports p, bundle_jobs j SET j.archiv=1, date_exec=NOW(), p.ltype_id=".$ref->{'new_ltype'};
 	}
 	$Querry_portfix_where = " WHERE j.job_id=".$ref->{'job_id'}." and j.port_id=p.port_id ";
 	dlog ( SUB => 'checklink', DBUG => 0, MESS => "##############################\n Configure <<".$link_types[$ref->{'new_ltype'} ].">> LINK ".$point."\n##############################" );
 
-#### FREE LINK
+###################### FREE LINK
 	if ($ref->{'new_ltype'}  == $link_type{'free'}) {
 
 	    next if $debug>2;
@@ -285,6 +291,7 @@ if ( not defined($ARGV[0]) ) {
 	    if ($trunking_vlan) {
 		## Убираем VLAN c Терминатора, согласно типа подключения.
 		if ( $head->{'TERM_USE'} ) {
+		  if ( $head->{'TERM_USE'} > 1 ) {
 		    $LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$ref->{'ltype_id'} ].'_remove';
 		    $res = &$LIB_action( IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
 		    ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, IFACE => $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'},
@@ -292,7 +299,8 @@ if ( not defined($ARGV[0]) ) {
 		    next if $res < 1;
 		    $res = SAVE_config(LIB => $head->{'TERM_LIB'}, SWID => -1, IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
 		    ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}); next if $res < 1;
-		    $dbm->do("DELETE FROM head_link WHERE port_id=".$ref->{'port_id'}." and vlan_id=".$ref->{'vlan_id'});
+		  }
+		  $dbm->do("DELETE FROM head_link WHERE port_id=".$ref->{'port_id'});
 		} else {
 		    dlog ( SUB => 'check_free', DBUG => 1, MESS => "Head link not USE for this link type, AP '".$point."'" );
 		}
@@ -411,7 +419,7 @@ if ( not defined($ARGV[0]) ) {
 		dlog ( SUB => 'check_uplink', DBUG => 0, MESS => "Trunking vlan uplink in ".$ref->{'hostname'}.", already add in DB ;-\)" );
 	      }
 		############# SET PORT PARAMETERS 
-		$ref->{'zone_id'} = -1 if ( $ref->{'vlan_id'} > 1 and $ref->{'vlan_id'} < $conf->{'FIRST_ZONEVLAN'} );
+		$ref->{'zone_id'} = 1 if ( $ref->{'vlan_id'} > 1 and $ref->{'vlan_id'} < $conf->{'FIRST_ZONEVLAN'} );
 		$head = GET_Terminfo( TYPE => $conf->{'CLI_VLAN_LINKTYPE'}, ZONE => $ref->{'zone_id'});
 		$Querry_portfix .=", p.head_id=".$head->{'HEAD_ID'};
 
@@ -427,7 +435,7 @@ if ( not defined($ARGV[0]) ) {
 
 		## Терминируем VLAN, согласно текущего типа подключения 
 		if ( $ref->{'vlan_id'} >= $head->{'VLAN_MIN'} and $ref->{'vlan_id'} <= $head->{'VLAN_MAX'} ) {
-		    if ( $head->{'TERM_USE'} ) {
+		    if ( $head->{'TERM_USE'} > 1 ) {
 			#IP LOGIN PASS ENA_PASS IFACE VLAN VLANNAME IPGW NETMASK ACLIN ACLOUT
 			my ($ipcli, $ipgw, $netmask) = GET_GW_parms (SUBNET => $ref->{'ip_subnet'}, TYPE => $conf->{'CLI_VLAN_LINKTYPE'});
 			$LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$conf->{'CLI_VLAN_LINKTYPE'}].'_add';
@@ -459,7 +467,7 @@ if ( not defined($ARGV[0]) ) {
             $trunking_vlan = 1;
 	    dlog ( SUB => 'check_'.$link_types[$ref->{'new_ltype'} ] , DBUG => 1, MESS => "Start linking ".$ref->{'new_ltype'}  );
 
-	    if ( $ref->{'new_ltype'}  ==  ($conf->{'CLI_VLAN_LINKTYPE'}||$link_type{'l3realnet'}) and defined($ref->{'clients_vlan'}) ) {
+	    if ( defined($ref->{'clients_vlan'}) and ( $ref->{'new_ltype'}  == $conf->{'CLI_VLAN_LINKTYPE'} ||  $ref->{'new_ltype'}  ==  $link_type{'l3realnet'} ) ) {
                 $trunking_vlan=0;
 		if ( not defined($parm{'vlan_id'}) ) {
             	    $parm{'vlan_id'} = $ref->{'clients_vlan'};
@@ -468,12 +476,12 @@ if ( not defined($ARGV[0]) ) {
 		}
 	    }
 	    
-	    $ref->{'zone_id'} = -1 if ( $parm{'vlan_id'} < -1 || ( $parm{'vlan_id'} > 1 and $parm{'vlan_id'} < $conf->{'FIRST_ZONEVLAN'} ));
+	    $ref->{'zone_id'} = 1 if ( $parm{'vlan_id'} < -1 || ( $parm{'vlan_id'} > 1 and $parm{'vlan_id'} < $conf->{'FIRST_ZONEVLAN'} ));
             $head = GET_Terminfo( TYPE => $ref->{'new_ltype'} , ZONE => $ref->{'zone_id'});
 	    
 	    ### Выясняем необходимость выделения и номер влана для использования
             #if ( ( not defined($parm{'vlan_id'}) || $parm{'vlan_id'} < 1 ) and defined($head->{'ZONE_ID'}) ) {
-            if ( $parm{'vlan_id'} < 1 and defined($head->{'ZONE_ID'}) ) {
+            if ( defined($parm{'vlan_id'}) and $parm{'vlan_id'} < 1 and defined($head->{'ZONE_ID'}) ) {
 		$parm{'vlan_id'} = VLAN_get( PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'new_ltype'} , ZONE => $head->{'ZONE_ID'}, 
 		VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
 	    }
@@ -543,28 +551,35 @@ if ( not defined($ARGV[0]) ) {
 		## Терминируем VLAN, согласно текущего типа подключения 
 		if ( $parm{'vlan_id'} >= $head->{'VLAN_MIN'} and $parm{'vlan_id'} <= $head->{'VLAN_MAX'} ) {
 		    if ( $head->{'TERM_USE'} ) {
-			#IP LOGIN PASS ENA_PASS IFACE VLAN VLANNAME IPGW NETMASK ACLIN ACLOUT
-			my ($ipcli, $ipgw, $netmask) = GET_GW_parms ( SUBNET => $parm{'ip_subnet'}, TYPE => $ref->{'new_ltype'}  );
-			
-			$LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$ref->{'new_ltype'} ].'_add';
-			$res = &$LIB_action( IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
-			ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, IFACE => $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'},
-			VLAN => $parm{'vlan_id'}, VLANNAME => $ref->{'hostname'}.'_port_'.$ref->{'portpref'}.$ref->{'port'}.'_'.$ref->{'login'}, IPCLI => $ipcli,
-			IPGW => $ipgw, NETMASK => $netmask, UP_ACLIN => $head->{'UP_ACLIN'}, UP_ACLOUT => $head->{'UP_ACLOUT'}, DHCP_HELPER => $head->{'DHCP_HELPER'}, LOOP_IF => $head->{'LOOP_IF'});
-			next if $res < 1;
-			# Сохраняем конфиг на терминаторе
-			$res = SAVE_config(LIB => $head->{'TERM_LIB'}, SWID => -1, IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
-			ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}); next if $res < 1;
+			if ( $head->{'TERM_USE'} > 1 ) {
+			    #IP LOGIN PASS ENA_PASS IFACE VLAN VLANNAME IPGW NETMASK ACLIN ACLOUT
+			    my ($ipcli, $ipgw, $netmask) = GET_GW_parms ( SUBNET => $parm{'ip_subnet'}, TYPE => $ref->{'new_ltype'}  );
 
-			my $head_if = ( $head->{'TERM_PORT'} ne '' ? $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'}.".".$parm{'vlan_id'} : "Vlan".$parm{'vlan_id'});
-
-			my $Q_head_link = "INSERT Into head_link SET port_id=".$ref->{'port_id'}.", vlan_id=".$parm{'vlan_id'}.", head_id=".$head->{'HEAD_ID'}.
-			", head_iface='".$head_if."'";
-			my $Q_head_link1 = ( defined($parm{'ip_subnet'}) ? ", ip_subnet='".$parm{'ip_subnet'}."'" : ", ip_subnet=NULL " );
-			$Q_head_link1   .= ( defined($parm{'login'})     ? ", login='".$parm{'login'}."'"         : ", login=NULL "     );
-			$Q_head_link .= $Q_head_link1;
-			$Q_head_link .= " ON DUPLICATE KEY UPDATE vlan_id=".$parm{'vlan_id'}.", head_id=".$head->{'HEAD_ID'}.", head_iface='".$head_if."' ";
-			$Q_head_link .= $Q_head_link1;
+			    $LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$ref->{'new_ltype'} ].'_add';
+			    $res = &$LIB_action( IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
+			    ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, IFACE => $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'},
+			    VLAN => $parm{'vlan_id'}, VLANNAME => $ref->{'hostname'}.'_port_'.$ref->{'portpref'}.$ref->{'port'}.'_'.$ref->{'login'}, IPCLI => $ipcli,
+			    IPGW => $ipgw, NETMASK => $netmask, UP_ACLIN => $head->{'UP_ACLIN'}, UP_ACLOUT => $head->{'UP_ACLOUT'}, DHCP_HELPER => $head->{'DHCP_HELPER'}, LOOP_IF => $head->{'LOOP_IF'});
+			    next if $res < 1;
+			    # Сохраняем конфиг на терминаторе
+			    $res = SAVE_config(LIB => $head->{'TERM_LIB'}, SWID => -1, IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
+			    ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}); next if $res < 1;
+			}
+			my $head_if = 'unknown';
+			if ( $ref->{'new_ltype'} eq $conf->{'CLI_VLAN_LINKTYPE'} ) {
+			    $head_if = $conf->{'CLI_VLAN_LINKTYPE'};
+			} elsif ( $head->{'TERM_PORT'} ne '' ) {
+			    $head_if = $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'}.".".$parm{'vlan_id'};
+			} elsif ( $ref->{'new_ltype'} eq $link_type{'l3realnet'} ) {
+			    $head_if = "Vlan".$parm{'vlan_id'};
+			}
+			$head_if = ( $head->{'TERM_PORT'} ne '' ? $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'}.".".$parm{'vlan_id'} : "Vlan".$parm{'vlan_id'});
+			my $Q_head_link = "INSERT Into head_link SET port_id=".$ref->{'port_id'};
+			my $Q_head_link_upd = " vlan_id=".$parm{'vlan_id'}.", head_id=".$head->{'HEAD_ID'}.", head_iface='".$head_if."', inet_shape=".$parm{'inet_rate'};
+			$Q_head_link_upd .= ( defined($parm{'ip_subnet'}) ? ", ip_subnet='".$parm{'ip_subnet'}."'" : ", ip_subnet=NULL " );
+			$Q_head_link_upd .= ( defined($parm{'login'})     ? ", login='".$parm{'login'}."'"         : ", login=NULL "     );
+			$Q_head_link .= ", ".$Q_head_link_upd;
+			$Q_head_link .= " ON DUPLICATE KEY UPDATE ".$Q_head_link_upd;
 			$dbm->do($Q_head_link);
 		    } else {
 			dlog ( SUB => 'check_'.$link_types[$ref->{'new_ltype'} ] , DBUG => 1, MESS => "LINK '".$link_types[$ref->{'new_ltype'} ]."'".$point." terminate succesfull!!!" );
@@ -577,8 +592,8 @@ if ( not defined($ARGV[0]) ) {
 	    $SW{'change'} += 1;
 	}
 	# Помечаем в BD изменения на порту
-	dlog ( SUB => 'check_'.$link_types[$ref->{'new_ltype'} ] , DBUG => 1, MESS => $Querry_portfix.$Querry_portfix_where );
 	$dbm->do($Querry_portfix.$Querry_portfix_where) if $resport > 0;
+	#dlog ( SUB => 'check_'.$link_types[$ref->{'new_ltype'} ] , DBUG => 1, MESS => $Querry_portfix.$Querry_portfix_where );
     }
     # SAVE LAST SWITCH CONFIG to NVRAM
     SAVE_config( LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'} )
@@ -608,7 +623,7 @@ sub SAVE_config {
     $LIB_action = $argscfg{'LIB'}.'_conf_save';
     $res = &$LIB_action(IP => $argscfg{'IP'}, LOGIN => $argscfg{'LOGIN'}, PASS => $argscfg{'PASS'}, ENA_PASS => $argscfg{'ENA_PASS'}) if ($argscfg{'LIB'} ne '');
 
-    $dbm->do("UPDATE swports p, bundle_jobs j SET j.archiv=j.job_id, date_exec=".time." WHERE j.port_id=p.port_id and j.archiv=1 and p.sw_id=".$argscfg{'SWID'}) if ($res>0 and $argscfg{'SWID'} > 0);
+    $dbm->do("UPDATE swports p, bundle_jobs j SET j.archiv=j.job_id WHERE j.port_id=p.port_id and j.archiv=1 and p.sw_id=".$argscfg{'SWID'}) if ($res>0 and $argscfg{'SWID'} > 0);
     dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Save config in host '".$argscfg{'IP'}."' failed!" ) if $res < 1;
     dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Save config in host '".$argscfg{'IP'}."' complete" ) if $res > 0;
     return $res;
@@ -659,7 +674,7 @@ sub GET_Terminfo {
     $stm31->execute();
     if (not $stm31->rows) {
 	$stm31->finish();
-	$Querry_end = " and zone_id = -1";
+	$Querry_end = " and zone_id = 1";
 	$stm31 = $dbm->prepare($Querry_start.$Querry_end);
 	$stm31->execute();
     }
@@ -816,7 +831,7 @@ sub DB_trunk_update {
             @_,         # список пар аргументов
         );
 	# ACT SWID VLAN PORTPREF PORT
-        dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Save to DB change trunk VLAN => '".$argdb{'VLAN'}."', sw_id => '".$argdb{'SWID'}."' portpref => '".$argdb{'PORTPREF'}."', port => ".$argdb{'PORT'}." (debug)" );
+        dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Save to DB change trunk VLAN => '".$argdb{'VLAN'}."', sw_id => '".$argdb{'SWID'}."' port => ".$argdb{'PORTPREF'}.$argdb{'PORT'}." (debug)" );
 	return 1 if $debug>1;
 	my $Qr_in = "SELECT port_id FROM swports WHERE sw_id=".$argdb{'SWID'}." and port=".$argdb{'PORT'};
 	if ( defined($argdb{'PORTPREF'}) and 'x'.$argdb{'PORTPREF'} ne 'x' ) {
@@ -934,14 +949,14 @@ sub VLAN_get {
 	if ($increment) {
 	    $vlan_id = $arg{'VLAN_MIN'};
 	    while ( $res < 1 and $vlan_id <= $arg{'VLAN_MAX'} ) {
-		dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => "PROBE VLAN N".$vlan_id." VLANDB -> '".$vlanuse{$vlan_id}."'" );
+		dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => "PROBE VLAN N".$vlan_id );
 		$res = $vlan_id if not defined($vlanuse{$vlan_id});
 		$vlan_id += 1;
 	    }
 	} else {
 	    $vlan_id = $arg{'VLAN_MAX'};
 	    while ( $res < 1 and $vlan_id >= $arg{'VLAN_MIN'} ) {
-		dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => "PROBE VLAN N".$vlan_id." VLANDB -> '".$vlanuse{$vlan_id}."'" );
+		dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => "PROBE VLAN N".$vlan_id );
 		$res = $vlan_id if not defined($vlanuse{$vlan_id});
 		$vlan_id -= 1;
 	    }
