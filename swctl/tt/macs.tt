@@ -1,0 +1,30 @@
+[% INCLUDE header.tt %]
+
+<h3><center>Host: [% hostname %]</center>
+
+<table align=center class=data border=1 width=20%>
+<tr class="bbheader3"> <td colspan=3>--MAC's--</td></tr>
+<tr class="bbheader3">
+    <td width=5%>vlan</td>
+    <td width=5%>port</td>
+    <td>macs</td>
+</tr>
+    [% FOREACH vlan IN vlans %]
+        <tr valign=top><td> [% vlan.name %] </td><td></td><td></td></tr>
+        [% FOREACH port IN vlan.ports %]
+            <tr>
+                <td> </td>
+                <td valign=top>[% port.name %]</td>
+
+                <td>
+                [% FOREACH mac IN port.macs %]
+                    [% mac.value %]<br>
+                [% END %]
+                </td>
+            </tr>
+        [% END %]
+    [% END %]
+<tr><td colspan=2>Total</td><td>[%total%]</td></tr>
+</table>
+
+

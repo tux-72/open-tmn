@@ -1,0 +1,211 @@
+[% INCLUDE header.tt %]
+<a href=/swctl target=_blank>Home(in new indow)</a>
+
+
+<table align=center>
+<tr valign=top><td>
+<table border=1 align=center class="data">
+
+<tr><td colspan=2 align=center class="bbheader3">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----Model---- [<a href="/swctl/?mode=model&action=edit&model_id=[%sw.model_id%]" target=_blank>edit</a>]</td></tr>
+
+<tr><td>  model             </td><td> [% sw.model_name           %] </td></tr>
+<tr><td>  extra             </td><td> <img src="[% sw.extra %]">    </td></tr>
+<tr><td>  comment           </td><td> [% sw.comment              %] </td></tr>
+<!-- [% IF sw.image %] <tr><td>  image </td><td> <img src="[% sw.image %]"> </td></tr> [% ELSE %] [% END %] -->
+<tr><td>  lastuserport      </td><td> [% sw.lastuserport         %] </td></tr>
+<tr><td>  def_trunk         </td><td> [% sw.def_trunk            %] </td></tr>
+<tr><td>  manage            </td><td> [% sw.manage               %] </td></tr>
+<tr><td>  lib               </td><td> [% sw.lib                  %] </td></tr>
+<tr><td>  bw_free           </td><td> [% sw.bw_free              %] </td></tr>
+<tr><td>  sysDescr          </td><td> [% sw.sysDescr             %] </td></tr>
+
+</table>
+</td>
+<td>
+<table border=1 align=center class="data">
+
+
+<tr><td colspan=2 align=center class="bbheader3">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----Info---- [<a href="/swctl/?mode=host&action=edit&sw_id=[%sw.sw_id%]">edit</a>]</td></tr>
+
+<tr><td> Hostname           </td><td> [% sw.hostname %] </td></tr>
+<tr><td> mac                </td><td> [% sw.hw_mac %] </td></tr>
+<tr><td> ip                 </td><td> [% sw.ip %] </td></tr>
+[%IF sw.visible %] [% ELSE %]<tr><td> Show </td><td>  <font color="red">hidden</font> </td></tr> [%END%]
+<tr><td> bw_ctl             </td><td> [% sw.bw_ctl           %] </td></tr>
+<tr><td> automanage         </td><td> [% sw.automanage       %] </td></tr>
+<tr><td> uplink_port        </td><td> [% sw.uplink_portpref  %][% sw.uplink_port %] </td></tr>
+<tr><td> house              </td><td> [% sw.street_name %], [% sw.dom %] </td></tr>
+<tr><td> podezd             </td><td> [% sw.podezd           %] </td></tr>
+<tr><td> unit               </td><td> [% sw.unit             %] </td></tr>
+<tr><td> grp                </td><td> [% sw.grp              %] </td></tr>
+<tr><td> stamp              </td><td> [% sw.stamp            %] </td></tr>
+<tr><td> clients_vlan       </td><td> [% sw.clients_vlan     %] </td></tr>
+<tr><td> vlan_zone          </td><td> [% sw.zone_id          %] </td></tr>
+<tr><td> control_vlan       </td><td> [% sw.control_vlan     %] </td></tr>
+<tr><td> info               </td><td> [% sw.info             %] </td></tr>
+<tr><td colspan=2>
+   <table width=100%>
+   <tr><td class=data width=50%>
+    <a href="telnet://[%sw.ip%]">Telnet</a> </td><td class=data> <a href="http://netstat.tech.tmcity.ru/nagios/cgi-bin/statusmap.cgi?host=[% sw.hostname %]&proximity_width=99999&proximity_height=99999" target=_blank>Show on map</a>
+   </td></tr><td class=data width=50%>
+   <a href="/swctl/?mode=mac&action=view&sw_id=[%sw.sw_id%]" target=_blank>MAC-table</a> </td><td class=data> <a href="http://netstat.tech.tmcity.ru/nagios/cgi-bin/status.cgi?host=[% sw.hostname %]" target=_blank>Show snmp info</a>
+   </table>
+</td></tr>
+
+</table>
+
+
+
+</td>
+<td>
+
+<table border=1 align=center class="data">
+    <tr><td colspan=3 align=center class="bbheader3">   -----Uplink----     </td></tr>
+    <tr class="bbheader3">
+        <td>parent</td>
+        <td>parent_port</td>
+        <td>parent_ext</td>
+    </tr>
+    <tr>
+        <td> <a href="/swctl/?mode=host&action=view&sw_id=[% sw.parent %]&hlport=[% sw.parent_portpref %][% sw.parent_port %]">[% sw.parent_desc %]</a> </td>
+        <td> [% sw.parent_portpref %][% sw.parent_port %] </td>
+        <td> [% sw.parent_ext %] </td>
+    </tr>
+</table>
+
+<table border=1 align=left class="data">
+<tr><td align=center class="bbheader3">   -----Downlinks----     </td></tr>
+
+[% FOREACH host IN sw_downlinks %]
+<tr class=data2><td> <a href="/swctl/?mode=host&action=view&sw_id=[% host.sw_id %]&hlport=[% host.uplink_port %]"> [% host.hostname %]</a> [%IF host.visible %] [% ELSE %] <font color="red">hidden</font> [%END%] </td></tr>
+[% END %]
+</table>
+
+</tr>
+
+</table>
+</td>
+<td>
+
+
+
+<br>
+
+
+<table border=1 align=center class="data">
+
+<tr><td colspan=18<29 align=center class="bbheader3">   -----Ports---- [<a href="/swctl/?mode=port&action=add&sw_id=[%sw.sw_id%]">add</a>]    </td></tr>
+
+<tr class="bbheader3">
+<td></td>
+<td> port            </td>
+<td> type            </td>
+<td> phy_type        </td>
+<td> link_type       </td>
+<td> status          </td>
+<td> ds_speed        </td>
+<td> us_speed        </td>
+<td> portvlan        </td>
+<td> tag             </td>
+<td> login           </td>
+<td> autoneg         </td>
+<td> speed           </td>
+<td> duplex          </td>
+<td> maxhwaddr       </td>
+<td> link_head       </td>
+<td> start_date      </td>
+<td> info            </td>
+</tr>
+
+[% FOREACH port IN ports %]
+<tr [% IF port.free %] class="body" [% ELSE %] class="data" [% END %] >
+<td><a href="/swctl/?mode=port&action=edit&port_id=[%port.port_id%]">edit</a> | <a href="javascript:conf_del('Port &quot;[% port.portpref %][% port.port %]&quot;?','/swctl/?mode=port&action=del&do=1&sw_id=[%sw.sw_id%]&port_id=[%port.port_id%]');">del</a></td>
+<td [% IF port.highlight %] class=bbheader3 [% END %] >[% port.portpref %][% port.port %]</td>
+<td>[% port.type           %]</td>
+<td><nobr>[% port.phy_type %]</td>
+<td>[% port.ltype_name     %]</td>
+<td>[% port.status         %]</td>
+<td>[% port.ds_speed       %]</td>
+<td>[% port.us_speed       %]</td>
+<td><a title="[%port.vlan_desc.info%][%IF port.vlan_desc.desc%] [[%port.vlan_desc.desc%]][%END%]">[% port.vlan_id %]</a> [% IF port.vlans %]<a href="javascript:toggleDisplay('[% port.port_id %]_vlan')">s/h</a>[% END %]</td>
+<td>[% port.tag            %]</td>
+<td>[% IF port.tds %]<a href="javascript:toggleDisplay('[% port.port_id %]_td')">s/h</a>[% END %]</td>
+<td>[% port.autoneg        %]</td>
+<td>[% port.speed          %]</td>
+<td>[% port.duplex         %]</td>
+<td>[% port.maxhwaddr      %]</td>
+<td>[% port.link_head      %]</td>
+<td><nobr>[% port.start_date     %]</td>
+<td class=data2>
+    [% IF port.links %]
+        [% port.info %]:<br>
+        [% FOR link IN port.links %]
+            &nbsp;[% IF link.downlink %]D[%ELSE%]U[%END%]
+            <a href="/swctl/?mode=host&action=view&sw_id=[% link.to_id %]&hlport=[% link.to_portpref %][% link.to_port %]">[% link.to_hostname%]</a> [% IF link.visible %][% ELSE %] <font color="red">hidden</font>[% END %]
+            <br>
+        [% END %]
+    [% ELSE %]
+        [% port.info %]
+    [% END %]
+</td>
+</tr>
+
+
+    [% IF port.vlans %]
+    <tr cellpadding=0 cellspacing=0><td colspan=18>
+        <table id="[% port.port_id %]_vlan" style="display:none;" align=center class=data border=1>
+        <tr class="bbheader3"> <td colspan=7>--Vlans-- [<a href="/swctl/?mode=vlan&action=add&vlan_id=[% vlan.vlan_id %]&zone_id=[%vlan.zone_id%]">add</a>]</td></tr>
+        <tr class="bbheader3">
+            <td></td>
+            <td>ZONE      </td>
+            <td>VLAN_ID   </td>
+            <td>tag       </td>
+            <td>info      </td>
+            <td>Comments  </td>
+            <td>LINK_TYPE </td>
+        </tr>
+            [% FOREACH vlan IN port.vlans %]
+            <tr>
+                <td><a href="/swctl/?mode=vlan&action=edit&vlan_id=[% vlan.vlan_id %]&zone_id=[%vlan.zone_id%]">edit</a></td>
+                <td>[% vlan.zone_name %]</td>
+                <td> <a title="[%vlan.vlan_desc.info%][%IF vlan.vlan_desc.desc%] [[%vlan.vlan_desc.desc%]][%END%]">[% vlan.vlan_id %]</a> </td>
+                <td>[% vlan.tag       %]</td>
+                <td>[% vlan.info      %]</td>
+                <td>[% vlan.desc      %]</td>
+                <td>[% vlan.link_type_desc %]</td>
+            </tr>
+            [% END %]
+        </table>
+    </tr>
+    [% END %]
+
+    [% IF port.tds %]
+    <tr><td colspan=18>
+        <table id="[% port.port_id %]_td" style="display:none;" align=center class=data border=1>
+        <tr class="bbheader3"> <td colspan=6>--Logins--</td></tr>
+        <tr class="bbheader3">
+            <td>login           </td>
+            <td>mac             </td>
+            <td>start_date      </td>
+            <td>last_date       </td>
+            <td>vlan            </td>
+            <td>trust           </td>
+        </tr>
+            [% FOREACH td IN port.tds %]
+            <tr [% IF td.trust %] class="data" [% ELSE %] class="body" [% END %] >
+                <td>[% td.login      %]</td>
+                <td>[% td.hw_mac     %]</td>
+                <td>[% td.start_date %]</td>
+                <td>[% td.last_date  %]</td>
+                <td>[% td.vlan_id    %]</td>
+                <td>[% td.trust      %]</td>
+            </tr>
+            [% END %]
+        </table>
+    </tr>
+    [% END %]
+
+[% END %]
+
+</table>
+

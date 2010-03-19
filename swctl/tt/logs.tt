@@ -1,0 +1,22 @@
+[% INCLUDE header.tt %]
+
+
+
+<table align=center class=data border=1 width=50%>
+<tr class="bbheader3"> <td colspan=4>--Logs--</td></tr>
+<tr class="bbheader3">
+    <td width=5%>time</td>
+    <td width=5%>table</td>
+    <td width=5%>event</td>
+    <td>changes</td>
+</tr>
+    [% FOREACH line IN logs %]
+    <tr valign=top>
+        <td>[% line.time %]</td>
+        <td>[% line.table  %]</td>
+        <td>[% line.event   %]</td>
+        <td>[% line.changes %]</td>
+    </tr>
+    [% END %]
+</table>
+

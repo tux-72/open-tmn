@@ -1,0 +1,40 @@
+[% INCLUDE header.tt %]
+
+<form method=post>
+[% IF vlan_id %]
+<h1>Vlan: [% vlan_id %]; <br> Zone: [% zone_desc %]; </h1>
+[% END %]
+<table border=1 class=data>
+
+[% IF vlan_id %]
+[% ELSE %]
+<tr><td> Vlan_id </td><td><input name="vlan_id" value="[% vlan.vlan_id %]"></td> </tr>
+[% END %]
+[% IF zone_id %]
+[% ELSE %]
+    <tr><td> zone </td><td>
+        <select name="zone_id">
+            [% FOR vlan_zone IN vlan_zones %]
+                <option [% IF vlan.selected %] selected [% END %] value="[% vlan_zone.zone_id %]"> [% vlan_zone.name %] </option>
+            [% END %]
+        </select>
+    </td> </tr>
+[% END %]
+<tr><td> port </td><td><input name="port_id" value="[% vlan.port_id %]"></td> </tr>
+<tr><td> link_type </td><td>
+    <select name="ltype_id">
+        [% FOR type IN link_types %]
+            <option [% IF type.selected %] selected [% END %] value="[% type.ltype_id %]"> [% type.ltype_name %] [% IF type.desc %] [[%type.desc%]] [% END %]</option>
+        [% END %]
+    </select>
+</td> </tr>
+<tr><td> info </td><td><input name="info" value="[% vlan.info %]"></td></tr>
+<tr><td> desc </td><td><input name="desc" value="[% vlan.desc %]"></td></tr>
+</table>
+<input type=hidden name=mode value=vlan>
+<input type=hidden name=action value="[% action %]">
+<input type=hidden name=do value=1>
+[% IF vlan_id %]<input type=hidden name=vlan_id value=[%vlan_id%]>[% END %]
+[% IF zone_id %]<input type=hidden name=zone_id value=[%zone_id%]>[% END %]
+<input type=submit>
+</form>
