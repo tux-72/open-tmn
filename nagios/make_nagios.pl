@@ -5,7 +5,7 @@ use POSIX qw(strftime);
 use DBI();
 
 my $DB_host='192.168.29.20';
-my $DB_base='switchnet';
+my $DB_base='vlancontrol';
 my $DB_user='swgen';
 my $DB_pass='SWgeneRatE';
 
@@ -31,11 +31,11 @@ open (PINFO, "> $conf_dir/$portinfo");
 my $dbh = DBI->connect("DBI:mysql:database=".$DB_base.";host=".$DB_host,$DB_user,$DB_pass) or die("connect");
 $dbh->do("SET NAMES 'koi8r'");
 
-my $sth = $dbh->prepare("SELECT id, hostname FROM hosts ORDER BY id");
+my $sth = $dbh->prepare("SELECT sw_id, hostname FROM hosts ORDER BY sw_id");
 $sth->execute();
 my %parents = ();
 while (my $ref = $sth->fetchrow_hashref()) {
-    $parents{$ref->{'id'}} = $ref->{'hostname'};
+    $parents{$ref->{'sw_id'}} = $ref->{'hostname'};
 }
 #$sth = $dbh->prepare("SELECT grp FROM hosts where grp <> '10v' GROUP by grp");
 $sth = $dbh->prepare("SELECT grp FROM hosts GROUP by grp");
@@ -48,7 +48,7 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
 	print CNFG "\talias\tTransport Network in " . $grp . "\n";
 	print CNFG "\}\n\n";
     }
-    my $sth2 = $dbh->prepare("SELECT h.id, h.ip, h.hostname, h.parent, h.parent_ext, m.extra, m.comment, m.image FROM hosts h, models m where h.visible>0 and h.model>0 and h.model=m.id and h.grp='".$grp."'");
+    my $sth2 = $dbh->prepare("SELECT h.sw_id, h.ip, h.hostname, h.parent, h.parent_ext, m.extra, m.comment, m.image FROM hosts h, models m where h.visible>0 and h.model_id>0 and h.model_id=m.model_id and h.grp='".$grp."'");
     $sth2->execute();
     while (my $ref = $sth2->fetchrow_hashref()) {
         print INFO "define hostextinfo\{
@@ -89,7 +89,7 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
     
     $sth2->finish();
 
-    my $sth3 = $dbh->prepare("SELECT h.id, h.hostname, p.portpref, p.port, p.info, p.portvlan, p.snmp_portindex, p.login FROM hosts h, swports p where h.visible>0 and h.model>0 and h.grp='".$grp."' and h.id=p.sw_id and p.link_type not in (0,20,19) and p.type>0 order by h.id, p.portpref, p.port");
+    my $sth3 = $dbh->prepare("SELECT h.sw_id, h.hostname, p.port_id, p.port, p.info, p.vlan_id, p.portpref, p.snmp_idx FROM hosts h, swports p where h.visible>0 and h.model_id>0 and h.grp='".$grp."' and h.sw_id=p.sw_id and p.ltype_id not in (0,20,19) and p.type>0 order by h.sw_id, p.portpref, p.port");
     $sth3->execute();
     while (my $ref3 = $sth3->fetchrow_hashref()) {
 
@@ -108,10 +108,13 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
 	}
 	
 	$pinfo .=  " ".koi2tr($ref3->{'info'});
-	$pinfo .=  " vl-".$ref3->{'portvlan'} if $ref3->{'portvlan'};
+	$pinfo .=  " vl-".$ref3->{'vlan_id'} if $ref3->{'vlan_id'};
 
-	if (defined($ref3->{'login'}) and $ref3->{'login'} ne '' and not $ref3->{'info'}) {
-	    $pinfo .=  " LOGIN ".koi2tr($ref3->{'login'});
+	my $login = $dbh->selectall_arrayref( "SELECT login FROM ap_login_info WHERE port_id='$ref3->{'port_id'}' and trust > 0 ORDER BY last_date DESC LIMIT 1" );
+	$login = ( $login->[0] && $login->[0][0] ) || '';
+
+	if ($login and not $ref3->{'info'}) {
+	    $pinfo .=  " LOGIN ".koi2tr($login);
 	}
 	
 	$pinfo =~ tr/\'\"//;
@@ -122,8 +125,8 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
         print PINFO "\thost_name\t\t$ref3->{'hostname'}\n";
         print PINFO "\tservice_description\t$pinfo\n";
 
-	if (defined($ref3->{'snmp_portindex'})) {
-    	    print PINFO "\tcheck_command\t\tSNMP-".$ref3->{'snmp_portindex'}."\n";
+	if (defined($ref3->{'snmp_idx'})) {
+    	    print PINFO "\tcheck_command\t\tSNMP-".$ref3->{'snmp_idx'}."\n";
 	} else {
     	    print PINFO "\tcheck_command\t\tSNMP-".$ref3->{'port'}."\n";
 	}
