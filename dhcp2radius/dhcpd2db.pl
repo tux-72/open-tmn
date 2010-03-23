@@ -65,7 +65,7 @@ sub post_auth {
 	# For debugging purposes only
 	#&log_request_attributes;
 	DB_mysql_check_connect(\$dbm, \%conf);
-	my $res = RLM_MODULE_NOTFOUND; my $rows_up = -1; my $cli_addr = ''; 
+	my $res = RLM_MODULE_NOTFOUND; my $rows_up = -1; my $cli_addr = ''; my $ap_id = '';
 	#my $new_req =0;
 
 
@@ -86,7 +86,9 @@ sub post_auth {
 	    $stm_port->execute();
 	    if  ( $stm_port->rows == 1 ) {
 		while (my $ref_port = $stm_port->fetchrow_hashref()) {
-
+		    # Выяснить точку доступа
+		    $ap_id = 0;
+		    # Выделить IP
 		    my $Q_Discover_start  = "SELECT ip, mask, gw, end_lease, static_ip FROM dhcp_addr WHERE head_id=".$ref_port->{'head_id'}." and real_ip>0";
 
 		    # Получение такого же IP как и ранее
@@ -123,8 +125,8 @@ sub post_auth {
 		    $stm_disc->finish;
 		}
 	    } else {
-		    #$res = RLM_MODULE_REJECT;
-		    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-Nack';
+		    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+		    $res = RLM_MODULE_REJECT;
 	    }
 	    $stm_port->finish;
 	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Request' ) {
@@ -170,7 +172,7 @@ sub post_auth {
 			    &radiusd::radlog(1, "UPDATE ".$rows_up." rows in Request");
 			    #ssh_cmd();
 			} else {
-			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-Nack';
+			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			    $res = RLM_MODULE_REJECT;
 			}
 		}

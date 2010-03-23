@@ -5,10 +5,6 @@ package BPSCtl;
 use strict;
 no strict qw(refs);
 
-#use Net::SNMP;
-#use locale;
-use SWALLCtl;
-
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
 use POSIX qw(strftime);
@@ -48,24 +44,26 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 ############ SUBS ##############
 
 sub BPS_conf_first {
-    my %arg = (
-        @_,
-    );
-    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
+    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub BPS_pass_change {
-    my %arg = (
-        @_,
-    );
-    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
+    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
 
 sub BPS_login {
     my ($swl, $ip, $pass ) = @_;
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (	prompt => $prompt,
                             	Timeout => $timeout,
                         	Errmode => 'return',
@@ -82,20 +80,20 @@ sub BPS_login {
     ${$swl}->waitfor("/.*Use arrow keys to.*/");
     ${$swl}->print("c");
     ${$swl}->waitfor($prompt) || return -1;
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "USE BPS command line interface - Ok" );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "USE BPS command line interface - Ok" );
     return 1;
 }
 
 sub BPS_cmd {
    my ($swl, $cmd_prompt, $cmd ) = @_;
 
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 
@@ -104,7 +102,7 @@ sub BPS_port_set_vlan {
     my ( $swl, $port, $vlan_id, $tag, $trunk ) = @_;
 
     my $sw = ${$swl};
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PARMS - ' $port, $vlan_id '" );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "PARMS - ' $port, $vlan_id '" );
     my %vlan_del = ();
 
     #BPS2000#show vlan interface vids 24
@@ -164,16 +162,17 @@ sub BPS_port_set_vlan {
 
 sub BPS_fix_macport {
     # IP LOGIN PASS MAC VLAN
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if ( &$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."'" );
+    my $sw; return -1  if ( &$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'" );
 
     my $port = -1; my $pref; my $max=3; my $count=0;
     while ($count < $max) {
-    my @ln = $sw->cmd("show mac-address-table vid ".$arg{'VLAN'}." address ".$arg{'MAC'});
+    my @ln = $sw->cmd("show mac-address-table vid ".$arg->{'VLAN'}." address ".$arg->{'MAC'});
         foreach (@ln) {
 	    #   MAC Address      Source          MAC Address      Source
 	    #-----------------  --------      -----------------  --------
@@ -195,12 +194,13 @@ sub BPS_fix_macport {
 
 sub BPS_conf_save {
 #   IP LOGIN PASS ENA_PASS
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in switch '".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in switch '".$arg->{'IP'}."'" );
     return -1  if (&$command(\$sw, $prompt, "copy config nvram" ) < 1 );
     $sw->close();
     return 1;
@@ -210,15 +210,16 @@ sub BPS_conf_save {
 
 sub BPS_port_up {
 #    IP LOGIN PASS ENA_PASS PORT PORTPREF
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in '".$arg{'IP'}."', port ".$arg{'PORT'});
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg->{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no shutdown" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
@@ -228,15 +229,16 @@ sub BPS_port_up {
 
 sub BPS_port_down {
 #    IP LOGIN PASS ENA_PASS PORT PORTPREF
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in '".$arg{'IP'}."', port ".$arg{'PORT'});
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg->{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"shutdown" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
@@ -247,20 +249,21 @@ sub BPS_port_down {
 
 sub BPS_port_defect {
 #    IP LOGIN PASS PORT PORTPREF BLOCK_VLAN
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in '".$arg{'IP'}."', port ".$arg{'PORT'});
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
-    #BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'BLOCK_VLAN'}, 0, 0 );
+    #BPS_port_set_vlan ( \$sw, $arg->{'PORT'}, $arg->{'BLOCK_VLAN'}, 0, 0 );
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'BLOCK_VLAN'}." name Block".$arg{'BLOCK_VLAN'}." type port learning ivl" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'BLOCK_VLAN'}." ".$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg{'PORT'}." tagging disable pvid ".$arg{'BLOCK_VLAN'}.
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg->{'BLOCK_VLAN'}." name Block".$arg->{'BLOCK_VLAN'}." type port learning ivl" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg->{'BLOCK_VLAN'}." ".$arg->{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan ports ".$arg->{'PORT'}." tagging disable pvid ".$arg->{'BLOCK_VLAN'}.
     " filter-tagged-frame disable filter-untagged-frame disable priority 0" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg->{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"shutdown" ) < 1);
@@ -272,25 +275,26 @@ sub BPS_port_defect {
 
 sub BPS_port_free {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN
-    my %arg = (
-        @_,
-    );
-    return -1 if (not $arg{'VLAN'});
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure FREE port in '".$arg{'IP'}."', port ".$arg{'PORT'});
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
+    return -1 if (not $arg->{'VLAN'});
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure FREE port in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
 
-    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, 0, 0 );
+    BPS_port_set_vlan ( \$sw, $arg->{'PORT'}, $arg->{'VLAN'}, 0, 0 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg->{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no shutdown" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg{'PORT'}." learning disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg{'PORT'}." both ".$port_ctl_bcast ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg->{'PORT'}." learning disable" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg->{'PORT'}." both ".$port_ctl_bcast ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
 
@@ -300,16 +304,17 @@ sub BPS_port_free {
 
 sub BPS_speed_char {
 
-    my %arg = (
-        @_,
-    );
-    $arg{'DUPLEX'} += 0;
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
+    $arg->{'DUPLEX'} += 0;
     my @dpl = ''; $dpl[0] = 'half'; $dpl[1] = 'full';
 
     my $spd = 'auto';
-    if ( $arg{'SPEED'} =~ /^1(0|00|000)$/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) {
-    	$spd = $arg{'SPEED'};
-	return ($spd, $dpl[$arg{'DUPLEX'}]);
+    if ( $arg->{'SPEED'} =~ /^1(0|00|000)$/ && $arg->{'DUPLEX'} =~ /(0|1)/ and not $arg->{'AUTONEG'} ) {
+    	$spd = $arg->{'SPEED'};
+	return ($spd, $dpl[$arg->{'DUPLEX'}]);
     } else {
 	return ('auto', 'auto');
     }
@@ -317,22 +322,23 @@ sub BPS_speed_char {
 
 sub BPS_port_trunk {
 #   IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
-    my %arg = (
-        @_,
-    );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure TRUNK port in '".$arg{'IP'}."', port ".$arg{'PORT'});
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure TRUNK port in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
+    my ($speed, $duplex ) = &$speed_char( $arg );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
 
-    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 );
+    BPS_port_set_vlan ( \$sw, $arg->{'PORT'}, $arg->{'VLAN'}, $arg->{'TAG'}, 0 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg{'PORT'}." learning disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg{'PORT'}." both ".$port_ctl_bcast ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg->{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg->{'PORT'}." learning disable" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg->{'PORT'}." both ".$port_ctl_bcast ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed ".$speed ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex ".$duplex ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no shutdown" ) < 1);
@@ -347,23 +353,24 @@ sub BPS_port_trunk {
 sub BPS_port_system {
 
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
 
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure SYSTEM port in '".$arg{'IP'}."', port ".$arg{'PORT'});
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure SYSTEM port in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
+    my ($speed, $duplex ) = &$speed_char( $arg );
 
-    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 );
+    BPS_port_set_vlan ( \$sw, $arg->{'PORT'}, $arg->{'VLAN'}, $arg->{'TAG'}, 0 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg{'PORT'}." learning disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg{'PORT'}." both ".$port_ctl_bcast ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg->{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg->{'PORT'}." learning disable" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg->{'PORT'}." both ".$port_ctl_bcast ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed ".$speed ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex ".$duplex ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no shutdown" ) < 1);
@@ -376,22 +383,23 @@ sub BPS_port_system {
 
 sub BPS_port_setparms {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PORT parameters in '".$arg{'IP'}."', port ".$arg{'PORT'} );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PORT parameters in '".$arg->{'IP'}."', port ".$arg->{'PORT'} );
 
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
+    my ($speed, $duplex ) = &$speed_char( $arg );
 
-    BPS_port_set_vlan ( \$sw, $arg{'PORT'}, $arg{'VLAN'}, $arg{'TAG'}, 0 );
+    BPS_port_set_vlan ( \$sw, $arg->{'PORT'}, $arg->{'VLAN'}, $arg->{'TAG'}, 0 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     #return -1  if (&$command(\$sw, $prompt_conf,	"spanning-tree tagged-bpdu disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg{'PORT'} ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg{'PORT'}." learning disable" ) < 1);
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg{'PORT'}." both ".$port_ctl_bcast ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"interface Fa".$arg->{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree port ".$arg->{'PORT'}." learning disable" ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"rate-limit port ".$arg->{'PORT'}." both ".$port_ctl_bcast ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed ".$speed ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex ".$duplex ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no shutdown" ) < 1);
@@ -404,19 +412,20 @@ sub BPS_port_setparms {
 
 sub BPS_vlan_trunk_add {
 #    IP LOGIN PASS VLAN PORT PORTPREF
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg{'VLAN'}."' in '".$arg{'IP'}."', trunk port ".$arg{'PORT'} );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg->{'VLAN'}."' in '".$arg->{'IP'}."', trunk port ".$arg->{'PORT'} );
 
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    if ($arg{'VLAN'} != 1 ) {
-	return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg{'VLAN'}." name Vlan".$arg{'VLAN'}." type port learning ivl" ) < 1);
+    if ($arg->{'VLAN'} != 1 ) {
+	return -1  if (&$command(\$sw, $prompt_conf,	"vlan create ".$arg->{'VLAN'}." name Vlan".$arg->{'VLAN'}." type port learning ivl" ) < 1);
     }
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members add ".$arg->{'VLAN'}." ".$arg->{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
 
     $sw->close();
@@ -425,15 +434,16 @@ sub BPS_vlan_trunk_add {
 
 sub BPS_vlan_trunk_remove  {
 #    IP LOGIN PASS VLAN PORT PORTPREF
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from '".$arg{'IP'}."', trunk port ".$arg{'PORT'} );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from '".$arg->{'IP'}."', trunk port ".$arg->{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members remove ".$arg{'VLAN'}." ".$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan members remove ".$arg->{'VLAN'}." ".$arg->{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
 
     $sw->close();
@@ -442,15 +452,16 @@ sub BPS_vlan_trunk_remove  {
 
 sub BPS_vlan_remove  {
 #    IP LOGIN PASS VLAN
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
+    #my %arg = (
+    #    @_,
+    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from switch '".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from switch '".$arg->{'IP'}."'" );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"vlan delete ".$arg{'VLAN'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt_conf,	"vlan delete ".$arg->{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
     $sw->close();
     return 1;

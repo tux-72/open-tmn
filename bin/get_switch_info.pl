@@ -10,15 +10,16 @@ no strict qw(refs);
 
 use Net::SNMP;
 use POSIX qw(strftime);
-use DBI();
 use locale;
 
 use FindBin '$Bin';
-require $Bin . '/../conf/config.pl';
-require $Bin . '/../conf/lib.pl';
+use lib $Bin . '/../conf';
+use lib $Bin.'/../lib';
+use SWConf;
+use SWFunc;
 
-my $conf = \%main::conf;
-my $checkmac = \%main::checkmac;
+my $conf = \%SWConf::conf;
+my $checkmac = \%SWConf::checkmac;
 
 my $debug=2;
 
@@ -79,6 +80,7 @@ my $res=0;
 my $resport=0;
 my $point='';
 my $Querry_portfix = '';
+my %sw_arg = ();
 
 if (not defined($ARGV[0])) {
     print STDERR  "Usage: $script_name ( chk_model|chk_trunk  <hostname|ip|allhosts> )\n";
@@ -196,10 +198,19 @@ if (not defined($ARGV[0])) {
 
 	if ( $ref->{'lib'} ) {
 	    $fix_rez = "-------- HOST '".$ref->{'hostname'}."' --------\n"; 
-	    $LIB_action = $ref->{'lib'}."_fix_macport";
 	    dlog ( SUB =>'chk_trunk', DBUG => 2, MESS => "Checking MAC = ".$checkmac->{$ref->{'control_vlan'}} );
-	    print $checkmac->{$ref->{'control_vlan'}}."\n";
-	    ( $uplink_portpref, $uplink_port ) = &$LIB_action( IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, MAC => $checkmac->{$ref->{'control_vlan'}}, VLAN => $ref->{'control_vlan'} );
+	    #print $checkmac->{$ref->{'control_vlan'}}."\n";
+	    #$LIB_action = $ref->{'lib'}."_fix_macport";
+#	    %sw_arg = (
+#		LIB => $ref->{'lib'}, 
+#		ACT => 'fix_macport',
+#		PARM => " IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, MAC => $checkmac->{$ref->{'control_vlan'}}, VLAN => $ref->{'control_vlan'} ",
+#	    );
+	    %sw_arg = (
+		LIB => $ref->{'lib'}, ACT => 'fix_macport', IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, 
+		MAC => $checkmac->{$ref->{'control_vlan'}}, VLAN => $ref->{'control_vlan'},
+	    );
+	    ( $uplink_portpref, $uplink_port ) = SW_ctl(\%sw_arg);
 	    if ( $uplink_port > 0 ) {
 		$fix_rez .= "FIX uplink port = ".lspaced($uplink_portpref.$uplink_port,6).", \t";
 		$Q_update .= ", uplink_portpref='".$uplink_portpref."'"	if ( "x".$uplink_portpref ne "x".$ref->{'uplink_portpref'} );
@@ -213,9 +224,17 @@ if (not defined($ARGV[0])) {
 	my $stm22 = $dbm->prepare("SELECT h.hostname, h.model_id, h.ip, h.sw_id, m.lib, m.mon_login, m.mon_pass FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id and h.sw_id=".$ref->{'parent'} );
 	$stm22->execute();
 	while (my $ref2 = $stm22->fetchrow_hashref()) {
-	    $LIB_action = $ref2->{'lib'}."_fix_macport";
 	    if ( $ref2->{'lib'} ) {
-		( $parent_portpref, $parent_port ) = &$LIB_action( IP => $ref2->{'ip'}, LOGIN => $ref2->{'mon_login'}, PASS => $ref2->{'mon_pass'}, MAC => $ref->{'hw_mac'}, VLAN => $ref->{'control_vlan'});
+#		%sw_arg = ( 
+#		    LIB => $ref2->{'lib'}, 
+#		    ACT => 'fix_macport',
+#		    PARM => "  IP => $ref2->{'ip'}, LOGIN => $ref2->{'mon_login'}, PASS => $ref2->{'mon_pass'}, MAC => $ref->{'hw_mac'}, VLAN => $ref->{'control_vlan'} ",
+#		);
+		%sw_arg = ( 
+		    LIB => $ref2->{'lib'}, ACT => 'fix_macport', IP => $ref2->{'ip'}, LOGIN => $ref2->{'mon_login'}, PASS => $ref2->{'mon_pass'},
+		    MAC => $ref->{'hw_mac'}, VLAN => $ref->{'control_vlan'},
+		);
+		( $parent_portpref, $parent_port ) = SW_ctl(\%sw_arg);
 		if ( $parent_port > 0 ) {
 		    $fix_rez .= "FIX parent '".$ref2->{'hostname'}."' downlink = ".$parent_portpref.$parent_port;
 		    $Q_update .= ", parent_portpref='".$parent_portpref."'"	if ( "x".$parent_portpref ne "x".$ref->{'parent_portpref'} );

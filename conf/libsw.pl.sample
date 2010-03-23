@@ -1,6 +1,0 @@
-#!/usr/bin/perl
-
-use lib '/usr/local/switch-control/lib';
-use SWALLCtl;
-
-1;

@@ -3,9 +3,14 @@
 use strict;
 no strict qw(refs);
 
-use Authen::Radius;
+
 use FindBin '$Bin';
-require $Bin . '/../conf/libap.pl';
+use lib $Bin . '/../conf';
+use lib $Bin.'/../lib';
+use SWConf;
+use SWFunc;
+
+use Authen::Radius;
 
 Authen::Radius->load_dictionary();
 

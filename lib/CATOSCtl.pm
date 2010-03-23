@@ -5,10 +5,6 @@ package CATOSCtl;
 use strict;
 no strict qw(refs);
 
-#use Net::SNMP;
-#use locale;
-use SWALLCtl;
-
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
 use POSIX qw(strftime);
@@ -46,46 +42,37 @@ my $port_ctl_mcast      = 1;    my $port_ctl_bcast      = 2;
 ############ SUBS ##############
 
 sub CATOS_conf_first {
-    my %arg = (
-        @_,         # список пар аргументов
-    );
-    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' first configured MANUALLY!!!" );
+    my $arg = shift;
+    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub CATOS_pass_change {
-    my %arg = (
-        @_,         # список пар аргументов
-    );
-    dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg{'IP'}."' changed password MANUALLY!!!" );
+    my $arg = shift;
+    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
 
 sub CATOS_conf_save {
-    my %arg = (
-        @_,         # список пар аргументов
-    );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "CATOS autosave config ;-)" );
+    my $arg = shift;
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "CATOS autosave config ;-)" );
     return 1;
 }
 
 sub CATOS_speed_char {
-
-    my %arg = (
-        @_,         # список пар аргументов
-    );
+    my $arg = shift;
     my @dpl = ''; $dpl[0] = 'half'; $dpl[1] = 'full';
 
     my $spd = 'auto';
-    if ( $arg{'SPEED'} =~ /^1(0|00|000)$/ && $arg{'DUPLEX'} =~ /(0|1)/ and not $arg{'AUTONEG'} ) { 
-	$spd = $arg{'SPEED'};
+    if ( $arg->{'SPEED'} =~ /^1(0|00|000)$/ && $arg->{'DUPLEX'} =~ /(0|1)/ and not $arg->{'AUTONEG'} ) { 
+	$spd = $arg->{'SPEED'};
     }
-    return ($spd, $dpl[$arg{'DUPLEX'}]);
+    return ($spd, $dpl[$arg->{'DUPLEX'}]);
 }
 
 sub CATOS_login {
     my ($swl, $ip, $pass, $ena_pass) = @_;
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass.", ENA_PASS =".$ena_pass );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass.", ENA_PASS =".$ena_pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
@@ -98,13 +85,13 @@ sub CATOS_login {
     ${$swl}->waitfor("/Enter password.*/");
     ${$swl}->print($ena_pass);
     ${$swl}->waitfor($prompt) || return -1;
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect superuser - Ok" );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect superuser - Ok" );
     return 1;
 }
 
 sub CATOS_login_nopriv {
     my ($swl, $ip, $pass) = @_;
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS =>  "IP - ".$ip.", PASS ".$pass );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS =>  "IP - ".$ip.", PASS ".$pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt_nopriv,
                                 Timeout => $timeout,
                                 Errmode => 'return',
@@ -113,35 +100,33 @@ sub CATOS_login_nopriv {
     ${$swl}->waitfor("/Enter password.*/");
     ${$swl}->print($pass);
     ${$swl}->waitfor($prompt_nopriv) || return -1;
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect non privilege user - Ok" );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect non privilege user - Ok" );
     return 1;
 }
 
 sub CATOS_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
 
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
     my @lines = ${$swl}->cmd(   String  => $cmd,
                                 Prompt  => $cmd_prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
                             );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => \@lines );
     return 1;
 }
 
 sub CATOS_fix_vlan {
     # IP LOGIN PASS MAC VLAN
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw;  return -1  if (&$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."'");
+    my $sw;  return -1  if (&$login_nopriv(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."'");
 
     my $vlan = 0;
-    $arg{'MAC'} =~ s/\:/\-/g;
-    my @ln = $sw->cmd('show cam dynamic | inc '.$arg{'MAC'});
+    $arg->{'MAC'} =~ s/\:/\-/g;
+    my @ln = $sw->cmd('show cam dynamic | inc '.$arg->{'MAC'});
     foreach (@ln) {
 	#	print STDERR "lines - $lnv\n";
 	#VLAN  Dest MAC/Route Des    [CoS]  Destination Ports
@@ -157,22 +142,20 @@ sub CATOS_fix_vlan {
 
 sub CATOS_fix_macport {
     # IP LOGIN PASS MAC VLAN
-    my %arg = (
-        @_,
-    );
-    my $sw;  return -1  if (&$login_nopriv(\$sw, $arg{'IP'}, $arg{'PASS'}) < 1 );
-    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg{'IP'}."', MAC '".$arg{'MAC'}."', VLAN '".$arg{'VLAN'}."'");
+    my $arg = shift;
+    my $sw;  return -1  if (&$login_nopriv(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'");
 
-    $arg{'MAC'} =~ s/\:/\-/g;
+    $arg->{'MAC'} =~ s/\:/\-/g;
     my $port = -1; my $pref; my $max=3; my $count=0; my @p = '';
 
     while ($count < $max) {
-    my @ln= $sw->cmd('show cam dynamic '.$arg{'VLAN'}.' | inc '.$arg{'MAC'});
+    my @ln= $sw->cmd('show cam dynamic '.$arg->{'VLAN'}.' | inc '.$arg->{'MAC'});
         foreach (@ln) {
 	    #	print STDERR "lines - $lnv\n";
 	    #VLAN  Dest MAC/Route Des    [CoS]  Destination Ports
 	    #1     00-03-42-97-66-a1             3/1 [ALL]
-            if ( /(\d+)\s+(\w\w\-\w\w\-\w\w\-\w\w\-\w\w\-\w\w)\s+(\d+\/)(\d+)\s+/ and $2 eq $arg{'MAC'} and $1 == $arg{'VLAN'} ) {
+            if ( /(\d+)\s+(\w\w\-\w\w\-\w\w\-\w\w\-\w\w\-\w\w)\s+(\d+\/)(\d+)\s+/ and $2 eq $arg->{'MAC'} and $1 == $arg->{'VLAN'} ) {
                 $port = $4;
 		$pref = "$3";
 	    }
@@ -192,28 +175,24 @@ sub CATOS_fix_macport {
 sub CATOS_port_up {
 
 #    IP LOGIN PASS PORT PORTPREF
-    my %arg = (
-        @_,
-    );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg{'PORTPREF'}.$arg{'PORT'}." state UP in switch '".$arg{'IP'}."'" );
+    my $arg = shift;
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg->{'PORTPREF'}.$arg->{'PORT'}." state UP in switch '".$arg->{'IP'}."'" );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
     $sw->close();
     return 1;
 }
 
 sub CATOS_port_down {
 #    IP LOGIN PASS PORT PORTPREF
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
 
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg{'PORTPREF'}.$arg{'PORT'}." state DOWN in switch '".$arg{'IP'}."'" );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg->{'PORTPREF'}.$arg->{'PORT'}." state DOWN in switch '".$arg->{'IP'}."'" );
 
-    $sw->print("set port disable ".$arg{'PORTPREF'}.$arg{'PORT'});
+    $sw->print("set port disable ".$arg->{'PORTPREF'}.$arg->{'PORT'});
     $sw->waitfor("/Do you want to continue.*/") || return -1;
     return -1  if (&$command(\$sw, $prompt,	"y" ) < 1);
     $sw->close();
@@ -223,17 +202,15 @@ sub CATOS_port_down {
 
 sub CATOS_port_defect {
 #    IP LOGIN PASS PORT PORTPREF VLAN
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg{'PORTPREF'}.$arg{'PORT'}." status DEFECT in switch '".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg->{'PORTPREF'}.$arg->{'PORT'}." status DEFECT in switch '".$arg->{'IP'}."'" );
 
-    return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." 1-1005,1025-4094" ) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." off dot1q" ) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
-    $sw->print("set port disable ".$arg{'PORTPREF'}.$arg{'PORT'});
+    return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." 1-1005,1025-4094" ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." off dot1q" ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'BLOCK_VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
+    $sw->print("set port disable ".$arg->{'PORTPREF'}.$arg->{'PORT'});
     $sw->waitfor("/Do you want to continue.*/") || return -1;
     return -1  if (&$command(\$sw, $prompt,	"y" ) < 1);
     $sw->close();
@@ -242,47 +219,43 @@ sub CATOS_port_defect {
 
 sub CATOS_port_free {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN
-    my %arg = (
-        @_,
-    );
-    return -1 if (not $arg{'VLAN'});
+    my $arg = shift;
+    return -1 if (not $arg->{'VLAN'});
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg{'PORTPREF'}.$arg{'PORT'}." status FREE in switch '".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port ".$arg->{'PORTPREF'}.$arg->{'PORT'}." status FREE in switch '".$arg->{'IP'}."'" );
 
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg{'PORTPREF'}.$arg{'PORT'}." auto" ) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." 1-1005,1025-4094" ) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." off dot1q" ) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg{'PORTPREF'}.$arg{'PORT'} ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg->{'PORTPREF'}.$arg->{'PORT'}." auto" ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." 1-1005,1025-4094" ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." off dot1q" ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
     $sw->close();
     return 1;
 }
 
 sub CATOS_port_trunk {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "CONFIGURE TRUNK port ".$arg{'PORTPREF'}.$arg{'PORT'}." in switch ".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "CONFIGURE TRUNK port ".$arg->{'PORTPREF'}.$arg->{'PORT'}." in switch ".$arg->{'IP'}."'" );
 
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
+    my ($speed, $duplex ) = &$speed_char( $arg );
 
-    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$speed ) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}) < 1);
-    if (not $arg{'AUTONEG'}) {
-	return -1  if (&$command(\$sw, $prompt,	 "set port duplex ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$duplex) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg->{'PORTPREF'}.$arg->{'PORT'}." ".$speed ) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}) < 1);
+    if (not $arg->{'AUTONEG'}) {
+	return -1  if (&$command(\$sw, $prompt,	 "set port duplex ".$arg->{'PORTPREF'}.$arg->{'PORT'}." ".$duplex) < 1);
     }
-    if ($arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+    if ($arg->{'TAG'}) {
+	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$arg->{'BLOCK_VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
     } else {
-	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$arg{'VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	 "set vlan ".$arg->{'VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
     }
-    return -1  if (&$command(\$sw, $prompt,	 "set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." nonegotiate dot1q ".$arg{'VLAN'}) < 1);
-    return -1  if (&$command(\$sw, $prompt,	 "set port enable ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	 "set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." nonegotiate dot1q ".$arg->{'VLAN'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	 "set port enable ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
     $sw->close();
     return 1;
 }
@@ -290,58 +263,54 @@ sub CATOS_port_trunk {
 
 sub CATOS_port_system {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "CONFIGURE SYSTEM port ".$arg{'PORTPREF'}.$arg{'PORT'}." in switch '".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "CONFIGURE SYSTEM port ".$arg->{'PORTPREF'}.$arg->{'PORT'}." in switch '".$arg->{'IP'}."'" );
 
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
+    my ($speed, $duplex ) = &$speed_char( $arg );
 
-    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$speed ) < 1);
-    if (not $arg{'AUTONEG'}) {
-	return -1  if (&$command(\$sw, $prompt,	 "set port duplex ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$duplex) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg->{'PORTPREF'}.$arg->{'PORT'}." ".$speed ) < 1);
+    if (not $arg->{'AUTONEG'}) {
+	return -1  if (&$command(\$sw, $prompt,	 "set port duplex ".$arg->{'PORTPREF'}.$arg->{'PORT'}." ".$duplex) < 1);
     }
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}) < 1);
-    if (not $arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
-	return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." 1-1005,1025-4094" ) < 1);
-	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." off dot1q") < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}) < 1);
+    if (not $arg->{'TAG'}) {
+	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." 1-1005,1025-4094" ) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." off dot1q") < 1);
     } else {
-	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
-	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." nonegotiate dot1q ".$arg{'VLAN'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'BLOCK_VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." nonegotiate dot1q ".$arg->{'VLAN'}) < 1);
     }
-    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
     $sw->close();
     return 1;
 }
 
 sub CATOS_port_setparms {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PARAMETERS port ".$arg{'PORTPREF'}.$arg{'PORT'}." in switch '".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PARAMETERS port ".$arg->{'PORTPREF'}.$arg->{'PORT'}." in switch '".$arg->{'IP'}."'" );
 
-    my ($speed, $duplex ) = &$speed_char(SPEED => $arg{'SPEED'}, DUPLEX => $arg{'DUPLEX'}, AUTONEG => $arg{'AUTONEG'});
+    my ($speed, $duplex ) = &$speed_char( $arg );
 
-    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$speed ) < 1);
-    if (not $arg{'AUTONEG'}) {
-	return -1  if (&$command(\$sw, $prompt,	 "set port duplex ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$duplex) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set port speed ".$arg->{'PORTPREF'}.$arg->{'PORT'}." ".$speed ) < 1);
+    if (not $arg->{'AUTONEG'}) {
+	return -1  if (&$command(\$sw, $prompt,	 "set port duplex ".$arg->{'PORTPREF'}.$arg->{'PORT'}." ".$duplex) < 1);
     }
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}) < 1);
-    if (not $arg{'TAG'}) {
-	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
-	return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." 1-1005,1025-4094" ) < 1);
-	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." off dot1q") < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}) < 1);
+    if (not $arg->{'TAG'}) {
+	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." 1-1005,1025-4094" ) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." off dot1q") < 1);
     } else {
-	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'BLOCK_VLAN'}." ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
-	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." nonegotiate dot1q ".$arg{'VLAN'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'BLOCK_VLAN'}." ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
+	return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." nonegotiate dot1q ".$arg->{'VLAN'}) < 1);
     }
-    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg{'PORTPREF'}.$arg{'PORT'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set port enable ".$arg->{'PORTPREF'}.$arg->{'PORT'}) < 1);
     $sw->close();
     return 1;
 }
@@ -349,16 +318,14 @@ sub CATOS_port_setparms {
 
 sub CATOS_vlan_trunk_add  {
 #    IP LOGIN PASS VLAN PORT PORTPREF
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg{'VLAN'}."' in '".$arg{'IP'}."', trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg->{'VLAN'}."' in '".$arg->{'IP'}."', trunk port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
-#    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}." name ".$arg{'VLANNAME'}) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg{'VLAN'}) < 1);
-    return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." nonegotiate dot1q ".$arg{'VLAN'}) < 1);
+#    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}." name ".$arg->{'VLANNAME'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set vlan ".$arg->{'VLAN'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"set trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." nonegotiate dot1q ".$arg->{'VLAN'}) < 1);
 
     $sw->close();
     return 1;
@@ -367,14 +334,12 @@ sub CATOS_vlan_trunk_add  {
 
 sub CATOS_vlan_trunk_remove  {
 #    IP LOGIN PASS VLAN PORT PORTPREF
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from '".$arg{'IP'}."', trunk port ".$arg{'PORTPREF'}.$arg{'PORT'} );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from '".$arg->{'IP'}."', trunk port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
-    return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg{'PORTPREF'}.$arg{'PORT'}." ".$arg{'VLAN'}) < 1);
+    return -1  if (&$command(\$sw, $prompt,	"clear trunk ".$arg->{'PORTPREF'}.$arg->{'PORT'}." ".$arg->{'VLAN'}) < 1);
     $sw->close();
     return 1;
 }
@@ -382,14 +347,12 @@ sub CATOS_vlan_trunk_remove  {
 sub CATOS_vlan_remove  {
 
 #    IP LOGIN PASS VLAN
-    my %arg = (
-        @_,
-    );
+    my $arg = shift;
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'PASS'}, $arg{'ENA_PASS'}) < 1 );
-    dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg{'VLAN'}."' from '".$arg{'IP'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from '".$arg->{'IP'}."'" );
 
-    $sw->print("clear vlan ".$arg{'VLAN'});
+    $sw->print("clear vlan ".$arg->{'VLAN'});
     $sw->waitfor("/Do you want to continue.*/") || return -1;
     return -1  if (&$command(\$sw, $prompt,	"y" ) < 1);
     $sw->close();
