@@ -42,6 +42,7 @@ our %conflog = (
 #    'LOGTERM',     '/var/log/swctl/change_term.log',
 #    'LOGLINK',     '/var/log/swctl/change_link.log',
     'LOGDISP',     '/var/log/dispatcher/ap_ctl.log',
+    'LOGAPFIX',     '/var/log/swctl/ap_fix.log',
 );
 
 1;
