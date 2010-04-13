@@ -638,7 +638,7 @@ sub SW_AP_free {
     }
     ############################ Освобождeние AP
 
-    $Q_free = "INSERT INTO bundle_jobs SET port_id=".$fparm->{'ap_id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date=NULL';
+    $Q_free = "INSERT INTO bundle_jobs SET port_id=".$fparm->{'ap_id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date_insert=NULL';
 
     if ( $debug > 1 ) {
         dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "DEBUG mode, Query '".$Q_free."'" );
@@ -695,7 +695,7 @@ sub SW_AP_tune {
     if ( defined($fparm->{'port_rate_us'}) ) { $Q_parm .= 'us_speed:'.$fparm->{'port_rate_us'}.';'; $parmset += 1; }
 
     $Q_tune = "INSERT INTO bundle_jobs SET port_id=".$fparm->{'ap_id'}.", ltype_id=".$link_type{'setparms'}.", parm='".
-    $Q_parm."' ON DUPLICATE KEY UPDATE date=NULL, parm='".$Q_parm."'";
+    $Q_parm."' ON DUPLICATE KEY UPDATE date_insert=NULL, parm='".$Q_parm."'";
 
     if ( $debug > 1 ) {
         dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "DEBUG mode, Query '".$Q_tune."'" );

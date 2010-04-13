@@ -8,9 +8,9 @@ our $debug = 2;
 
 our %dbconf = (
     'MYSQL_host',       'localhost',
-    'MYSQL_base',       'vlancontrol',
-    'MYSQL_user',       'swctl',
-    'MYSQL_pass',       'GlaikMincy',
+    'MYSQL_base',       'dbname',
+    'MYSQL_user',       'dbuser',
+    'MYSQL_pass',       'dbpassword',
 );
 
 our %conf = (

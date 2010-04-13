@@ -353,7 +353,7 @@ sub DES_fix_macport {
     my $arg = shift;
     # login
     use Data::Dumper;
-    print Dumper $arg->{'IP'}, $arg->{'MAC'}, ;
+    #print Dumper $arg->{'IP'}, $arg->{'MAC'} ;
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
 
