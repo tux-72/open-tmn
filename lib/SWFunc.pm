@@ -306,7 +306,7 @@ sub SW_AP_fix {
                                         $AP->{'name'} .= ", порт ".$AP->{'port'};
 					$stm1->finish;
 			}
-			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => 
+			dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => 
 			"CLI_VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 		}
 		$stm0->finish;
@@ -346,7 +346,7 @@ sub SW_AP_fix {
 			    }
 			    $AP->{'id'} = $ref->{'port_id'};
 			    $AP->{'communal'} = $ref->{'communal'};
-			    dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => 
+			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => 
 			    "VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 			}
 			$stm0->finish;
