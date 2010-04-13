@@ -130,10 +130,6 @@ if ( not defined($ARGV[0]) ) {
 		} else {
 		    $SW{'last_port'} = $SW{'uplink'} - 1;
 		}
-		#$LIB_action = $ref1->{'lib'}.'_conf_first';
-		#$res = &$LIB_action( IP => $test_swip, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'},  ENA_PASS => $SW{'ena_pass'}, UPLINKPORT => $SW{'uplink'},
-		#UPLINKPORTPREF => $SW{'uplink_portpref'}, LASTPORT => $SW{'last_port'}, VLAN => $SW{'cli_vlan_num'}, VLANNAME => $SW{'cli_vlan'}, BLOCK_VLAN => $conf->{'BLOCKPORT_VLAN'},
-		#BWFREE => $SW{'bwfree'}, MONLOGIN => $SW{'monlogin'}, MONPASS => $SW{'monpass'}, COM_RO => $SW{'rocomunity'}, COM_RW => $SW{'rwcomunity'}) if $debug < 3;
 		%sw_arg = (
                     LIB => $ref1->{'lib'}, ACT => 'conf_first',  IP => $test_swip, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'},  ENA_PASS => $SW{'ena_pass'}, UPLINKPORT => $SW{'uplink'},
 		    UPLINKPORTPREF => $SW{'uplink_portpref'}, LASTPORT => $SW{'last_port'}, VLAN => $SW{'cli_vlan_num'}, VLANNAME => $SW{'cli_vlan'}, BLOCK_VLAN => $conf->{'BLOCKPORT_VLAN'},
@@ -156,9 +152,6 @@ if ( not defined($ARGV[0]) ) {
 	    next if not defined($ref->{'admin_pass'});
 
 	    dlog ( SUB => 'pass_change', DBUG => 0, MESS => "ADD admin accounts in host '".$ref->{'hostname'}."'..." );
-	    #$LIB_action = $ref->{'lib'}.'_pass_change';
-	    #$res = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'old_admin'}, PASS => $ref->{'old_pass'}, ENA_PASS => $ref->{'ena_pass'},
-	    #ADMINLOGIN => $ref->{'admin_login'}, ADMINPASS => $ref->{'admin_pass'}, MONLOGIN => $ref->{'mon_login'}, MONPASS => $ref->{'mon_pass'});
 	    %sw_arg = (
         	LIB => $ref->{'lib'}, ACT => 'pass_change', IP => $ref->{'ip'}, LOGIN => $ref->{'old_admin'}, PASS => $ref->{'old_pass'}, ENA_PASS => $ref->{'ena_pass'},
 		ADMINLOGIN => $ref->{'admin_login'}, ADMINPASS => $ref->{'admin_pass'}, MONLOGIN => $ref->{'mon_login'}, MONPASS => $ref->{'mon_pass'},
@@ -185,12 +178,6 @@ if ( not defined($ARGV[0]) ) {
 	    dlog ( SUB => 'checkterm', DBUG => 1, MESS => "##############################\n Control <<".$link_types[$ref->{'set_status'}].">> LINK in Terminator ".$point."\n##############################" );
 
     	    $head = GET_Terminfo ( TERM_ID => $ref->{'head_id'} );
-
-            #$LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$ref->{'ltype_id'}].'_'.$link_types[$ref->{'set_status'}];
-            #$res = &$LIB_action( IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
-            #ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, IFACE => $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'},
-            #VLAN => $ref->{'vlan_id'}, LOOP_IF => $head->{'LOOP_IF'}, UP_ACLIN => $head->{'UP_ACLIN'}, UP_ACLOUT => $head->{'UP_ACLOUT'}, 
-	    #DOWN_ACLIN => $head->{'DOWN_ACLIN'}, DOWN_ACLOUT => $head->{'DOWN_ACLOUT'});
             %sw_arg = (
                 LIB => $head->{'TERM_LIB'}, ACT => 'term_'.$link_types[$ref->{'ltype_id'}].'_'.$link_types[$ref->{'set_status'}],
 		IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'}, ENA_LOGIN => $head->{'TERM_LOGIN2'}, 
@@ -312,10 +299,6 @@ if ( not defined($ARGV[0]) ) {
 		## Убираем VLAN c Терминатора, согласно типа подключения.
 		if ( $head->{'TERM_USE'} ) {
 		  if ( $head->{'TERM_USE'} > 1 ) {
-		    #$LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$ref->{'ltype_id'} ].'_remove';
-		    #$res = &$LIB_action( IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
-		    #ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, IFACE => $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'},
-		    #VLAN => $ref->{'vlan_id'}, LOOP_IF => $head->{'LOOP_IF'});
         	    %sw_arg = (
             		LIB => $head->{'TERM_LIB'}, ACT => 'term_'.$link_types[$ref->{'ltype_id'} ].'_remove',
 			IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
@@ -342,9 +325,6 @@ if ( not defined($ARGV[0]) ) {
 		dlog ( SUB => 'check_free', DBUG => 1, MESS => "REMOVE VLAN in UPLINK port" );
 	      if ($ref->{'uplink_port'} > 0 and DB_trunk_vlan(ACT => 'remove', SWID => $ref->{'sw_id'}, VLAN => $ref->{'vlan_id'},
 	      PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'}) < 1) {
-		#$LIB_action = $ref->{'lib'}.'_vlan_trunk_remove';
-    	        #$res = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'},
-		# VLAN => $ref->{'vlan_id'}, PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'});
 	        %sw_arg = (
 		    LIB => $ref->{'lib'}, ACT => 'vlan_trunk_remove',IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, 
 		    ENA_PASS => $ref->{'ena_pass'}, VLAN => $ref->{'vlan_id'}, PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'},
@@ -360,9 +340,6 @@ if ( not defined($ARGV[0]) ) {
 		dlog ( SUB => 'check_free', DBUG => 0, MESS => "Trunking vlan uplink in ".$ref->{'hostname'}.", already remove in DB ;-)" );
 	      }
 	      
-	      #$LIB_action = $ref->{'lib'}.'_vlan_remove';
-	      #$res = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'},
-	      #VLAN => $ref->{'vlan_id'});
 	      %sw_arg = (
         	LIB => $ref->{'lib'}, ACT => 'vlan_remove', IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, 
 		ENA_PASS => $ref->{'ena_pass'}, VLAN => $ref->{'vlan_id'},
@@ -373,10 +350,6 @@ if ( not defined($ARGV[0]) ) {
 	    $ref->{'clients_vlan'} = $conf->{'BLOCKPORT_VLAN'} if not defined($ref->{'clients_vlan'});
 	    $Querry_portfix  .=  ", p.vlan_id=".$ref->{'clients_vlan'} if ( $ref->{'clients_vlan'} > 1 );
 
-	    #$LIB_action = $ref->{'lib'}.'_port_free';
-	    #$resport = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'},
-	    #VLAN => $ref->{'clients_vlan'}, PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}, DS => $ref->{'bw_free'}, US => $ref->{'bw_free'},
-	    # UPLINKPORT => $ref->{'uplink_port'}, BLOCK_VLAN => $conf->{'BLOCKPORT_VLAN'}, UPLINKPORTPREF => $ref->{'uplink_portpref'}) if defined($libs{$ref->{'lib'}});
             %sw_arg = (
                 LIB => $ref->{'lib'}, ACT => 'port_free', IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'},
 		ENA_PASS => $ref->{'ena_pass'}, VLAN => $ref->{'clients_vlan'}, PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}, 
@@ -385,8 +358,6 @@ if ( not defined($ARGV[0]) ) {
             );
             $resport = SW_ctl ( \%sw_arg ) if defined($libs{$ref->{'lib'}});
 	    next if $resport < 1;
-
- 	    #$Querry_portfix  .=  " WHERE j.ltype_id= ".$link_type{'free'};
 	    $SW{'change'} += 1;
 
 	} elsif ( $ref->{'new_ltype'}  < $conf->{'STARTLINKCONF'} and $ref->{'new_ltype'}  != $link_type{'uplink'} ) {
@@ -414,18 +385,6 @@ if ( not defined($ARGV[0]) ) {
 	    	$Querry_portfix .= ", p.status=".$link_type{'up'};
 	    }
 
-	    #$LIB_action = $ref->{'lib'}.'_port_'.$link_types[$ref->{'new_ltype'} ];
-	    #$resport = &$LIB_action( IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'}, PORT => $ref->{'port'}, 
-	    #PORTPREF => $ref->{'portpref'}, 
-	    #DS => ( $parm{'ds_speed'} ? $parm{'ds_speed'} : $ref->{'ds_speed'} ),
-	    #US => ( $parm{'us_speed'} ? $parm{'us_speed'} : $ref->{'us_speed'} ),
-	    #VLAN => ( $parm{'vlan_id'} ? $parm{'vlan_id'} : $ref->{'vlan_id'} ),
-	    #MAXHW => ( $parm{'maxhwaddr'} ? $parm{'maxhwaddr'} : $ref->{'maxhwaddr'} ),
-	    #AUTONEG => ( $parm{'autoneg'} ? $parm{'autoneg'} : $ref->{'autoneg'} ),
-	    #SPEED => ( $parm{'speed'} ? $parm{'speed'} : $ref->{'speed'} ),
-	    #DUPLEX => ( $parm{'duplex'} ? $parm{'duplex'} : $ref->{'duplex'} ),
-	    #TAG => $ref->{'tag'},
-	    #BLOCK_VLAN => $conf->{'BLOCKPORT_VLAN'});
             %sw_arg = (
                 LIB => $ref->{'lib'}, ACT => 'port_'.$link_types[$ref->{'new_ltype'}], IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'},
 		PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'}, PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}, 
@@ -453,11 +412,6 @@ if ( not defined($ARGV[0]) ) {
 	    # Настройка непосредственно параметров порта
 	    dlog ( SUB => 'check_uplink', DBUG => 0, MESS => "Configure  UPLINK port !!!" );
 
-	    #$LIB_action = $ref->{'lib'}.'_port_trunk';
-	    #$res = &$LIB_action( IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'}, PORT => $ref->{'port'},
-            #PORTPREF => $ref->{'portpref'}, 
-	    #DS => -1, US => -1, VLAN => $ref->{'vlan_id'}, MAXHW => -1, AUTONEG => $ref->{'autoneg'}, SPEED =>  $ref->{'speed'}, DUPLEX =>  $ref->{'duplex'},
-	    #TAG => $ref->{'tag'}, BLOCK_VLAN => $conf->{'BLOCKPORT_VLAN'});
             %sw_arg = (
                 LIB => $ref->{'lib'}, ACT => 'port_trunk', IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, 
 		ENA_PASS => $ref->{'ena_pass'}, PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}, DS => -1, US => -1, VLAN => $ref->{'vlan_id'}, MAXHW => -1,
@@ -475,10 +429,6 @@ if ( not defined($ARGV[0]) ) {
 	      ## Добавляем VLAN на UPLINK порту текущего коммутатора
 	      if ($ref->{'port'} > 0 and DB_trunk_vlan(ACT => 'add', SWID => $ref->{'sw_id'}, VLAN => $ref->{'vlan_id'}, PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}) < 1) {
 		dlog ( SUB => 'check_uplink', DBUG => 1, MESS => "ADD VLAN in UPLINK port" );
-    		#$LIB_action = $ref->{'lib'}.'_vlan_trunk_add';
-    		#$resport = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, 
-		#ENA_PASS => $ref->{'ena_pass'},	VLAN => $ref->{'vlan_id'} , PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}, 
-		#UPLINKPORTPREF => $ref->{'portpref'}, UPLINKPORT => $ref->{'port'});
                 %sw_arg = (
                     LIB => $ref->{'lib'}, ACT => 'vlan_trunk_add', IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'},
 		    ENA_PASS => $ref->{'ena_pass'},	VLAN => $ref->{'vlan_id'} , PORT => $ref->{'port'}, PORTPREF => $ref->{'portpref'}, 
@@ -514,11 +464,6 @@ if ( not defined($ARGV[0]) ) {
 		    if ( $head->{'TERM_USE'} > 1 ) {
 			#IP LOGIN PASS ENA_PASS IFACE VLAN VLANNAME IPGW NETMASK ACLIN ACLOUT
 			($ipcli, $ipgw, $netmask) = GET_GW_parms (SUBNET => $ref->{'ip_subnet'}, TYPE => $conf->{'CLI_VLAN_LINKTYPE'});
-			#$LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$conf->{'CLI_VLAN_LINKTYPE'}].'_add';
-			#$res = &$LIB_action( IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
-			#ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, IFACE => $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'},
-			#VLAN => $ref->{'vlan_id'}, VLANNAME => $ref->{'hostname'}.'_port_'.$ref->{'portpref'}.$ref->{'port'}.'_'.$ref->{'login'}, IPCLI => $ipcli,
-			#IPGW => $ipgw, NETMASK => $netmask, UP_ACLIN => $head->{'UP_ACLIN'}, UP_ACLOUT => $head->{'UP_ACLOUT'}, DHCP_HELPER => $head->{'DHCP_HELPER'}, LOOP_IF => $head->{'LOOP_IF'});
 			%sw_arg = (
 			    LIB => $head->{'TERM_LIB'}, ACT => 'term_'.$link_types[$conf->{'CLI_VLAN_LINKTYPE'}].'_add',  IP => $head->{'TERM_IP'}, 
 			    LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'}, ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, 
@@ -540,7 +485,6 @@ if ( not defined($ARGV[0]) ) {
 		    dlog ( SUB => 'check_uplink', DBUG => 0, MESS => "Port VLAN '".$ref->{'vlan_id'}."' not in Terminator '".$link_types[$conf->{'CLI_VLAN_LINKTYPE'}]."' VLAN range '".$head->{'VLAN_MIN'}."' - '".$head->{'VLAN_MAX'}."'" );
 		}
 	    }
-	    #$Querry_portfix  .=  " WHERE j.ltype_id= ".$link_type{'uplink'};
 	    $SW{'change'} += 1;
 
 ######## Остальные типы линков начиная от 21-го и выше
@@ -565,10 +509,8 @@ if ( not defined($ARGV[0]) ) {
             $head = GET_Terminfo( TYPE => $ref->{'new_ltype'} , ZONE => $ref->{'zone_id'});
 	    
 	    ### Выясняем необходимость выделения и номер влана для использования
-            #if ( ( not defined($parm{'vlan_id'}) || $parm{'vlan_id'} < 1 ) and defined($head->{'ZONE_ID'}) ) {
             if ( defined($parm{'vlan_id'}) and $parm{'vlan_id'} < 1 and defined($head->{'ZONE_ID'}) ) {
-		$parm{'vlan_id'} = VLAN_get( PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'new_ltype'} , ZONE => $head->{'ZONE_ID'}, 
-		VLAN_MIN => $head->{'VLAN_MIN'}, VLAN_MAX => $head->{'VLAN_MAX'});
+		( $parm{'vlan_id'}, $head->{'HEAD_ID'} ) = VLAN_get ( PORT_ID => $ref->{'port_id'}, LINK_TYPE => $ref->{'new_ltype'} , ZONE => $head->{'ZONE_ID'} );
 	    }
 
             # Завершаем если нет вменяемого номера влана
@@ -590,18 +532,6 @@ if ( not defined($ARGV[0]) ) {
             ## Прописываем VLAN на клиентском порту текущего коммутатора
 	    dlog ( SUB => 'check_'.$link_types[$ref->{'new_ltype'} ] , DBUG => 1, MESS => "Config CLIENT port parameters and set VLAN ".$parm{'vlan_id'} );
 
-            #$LIB_action = $ref->{'lib'}.'_port_setparms';
-            #$resport = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'}, BLOCK_VLAN => $conf->{'BLOCKPORT_VLAN'}, 
-	    #PORTPREF => $ref->{'portpref'}, PORT => $ref->{'port'}, UPLINKPORTPREF => $ref->{'uplink_portpref'}, 
-	    #UPLINKPORT => $ref->{'uplink_port'}, VLAN => $parm{'vlan_id'}, 
-            #DS => ( $parm{'ds_speed'} ? $parm{'ds_speed'} : $ref->{'ds_speed'} ),
-            #US => ( $parm{'us_speed'} ? $parm{'us_speed'} : $ref->{'us_speed'} ),
-            #MAXHW => ( $parm{'maxhwaddr'} ? $parm{'maxhwaddr'} : $ref->{'maxhwaddr'} ),
-            #AUTONEG => ( $parm{'autoneg'} ? $parm{'autoneg'} : $ref->{'autoneg'} ),
-            #SPEED => ( $parm{'speed'} ? $parm{'speed'} : $ref->{'speed'} ),
-            #DUPLEX => ( $parm{'duplex'} ? $parm{'duplex'} : $ref->{'duplex'} ),
-	    #TAG => $ref->{'tag'}, ) if defined($libs{$ref->{'lib'}}); 
-
             %sw_arg = (
                 LIB => $ref->{'lib'}, ACT => 'port_setparms',IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, 
 		ENA_PASS => $ref->{'ena_pass'}, BLOCK_VLAN => $conf->{'BLOCKPORT_VLAN'}, PORTPREF => $ref->{'portpref'}, PORT => $ref->{'port'}, 
@@ -622,9 +552,6 @@ if ( not defined($ARGV[0]) ) {
                 ## Добавляем VLAN на UPLINK порту текущего коммутатора
 	      if ($ref->{'uplink_port'} > 0 and DB_trunk_vlan(ACT => 'add', SWID => $ref->{'sw_id'}, VLAN => $parm{'vlan_id'}, PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'}) < 1) {
 		dlog ( SUB => 'check_'.$link_types[$ref->{'new_ltype'} ] , DBUG => 1, MESS => "ADD VLAN in UPLINK port" );
-    		#$LIB_action = $ref->{'lib'}.'_vlan_trunk_add';
-    		#$resport = &$LIB_action(IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'}, ENA_PASS => $ref->{'ena_pass'}, VLAN => $parm{'vlan_id'},
-		#PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'}, UPLINKPORTPREF => $ref->{'uplink_portpref'}, UPLINKPORT => $ref->{'uplink_port'});
                 %sw_arg = (
                     LIB => $ref->{'lib'}, ACT => 'vlan_trunk_add', IP => $ref->{'ip'}, LOGIN => $ref->{'admin_login'}, PASS => $ref->{'admin_pass'},
 		    ENA_PASS => $ref->{'ena_pass'}, VLAN => $parm{'vlan_id'}, PORT => $ref->{'uplink_port'}, PORTPREF => $ref->{'uplink_portpref'},
@@ -660,12 +587,6 @@ if ( not defined($ARGV[0]) ) {
 			if ( $head->{'TERM_USE'} > 1 ) {
 			    #IP LOGIN PASS ENA_PASS IFACE VLAN VLANNAME IPGW NETMASK ACLIN ACLOUT
 			    ($ipcli, $ipgw, $netmask) = GET_GW_parms ( SUBNET => $parm{'ip_subnet'}, TYPE => $ref->{'new_ltype'} );
-
-			    #$LIB_action = $head->{'TERM_LIB'}.'_term_'.$link_types[$ref->{'new_ltype'} ].'_add';
-			    #$res = &$LIB_action( IP => $head->{'TERM_IP'}, LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},
-			    #ENA_LOGIN => $head->{'TERM_LOGIN2'}, ENA_PASS => $head->{'TERM_PASS2'}, IFACE => $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'},
-			    #VLAN => $parm{'vlan_id'}, VLANNAME => $ref->{'hostname'}.'_port_'.$ref->{'portpref'}.$ref->{'port'}.'_'.$ref->{'login'}, IPCLI => $ipcli,
-			    #IPGW => $ipgw, NETMASK => $netmask, UP_ACLIN => $head->{'UP_ACLIN'}, UP_ACLOUT => $head->{'UP_ACLOUT'}, DHCP_HELPER => $head->{'DHCP_HELPER'}, LOOP_IF => $head->{'LOOP_IF'});
 			    %sw_arg = (
 			        LIB => $head->{'TERM_LIB'}, ACT => 'term_'.$link_types[$ref->{'new_ltype'} ].'_add', IP => $head->{'TERM_IP'}, 
 				LOGIN => $head->{'TERM_LOGIN1'}, PASS => $head->{'TERM_PASS1'},ENA_LOGIN => $head->{'TERM_LOGIN2'},
@@ -711,7 +632,6 @@ if ( not defined($ARGV[0]) ) {
 	}
 	# Помечаем в BD изменения на порту
 	$dbm->do($Querry_portfix.$Querry_portfix_where) if $resport > 0;
-	#dlog ( SUB => 'check_'.$link_types[$ref->{'new_ltype'} ] , DBUG => 1, MESS => $Querry_portfix.$Querry_portfix_where );
     }
     # SAVE LAST SWITCH CONFIG to NVRAM
     SAVE_config( LIB => $SW{'lib'}, SWID => $SW{'sw_id'}, IP => $SW{'swip'}, LOGIN => $SW{'admin'}, PASS => $SW{'adminpass'}, ENA_PASS => $SW{'ena_pass'} )
