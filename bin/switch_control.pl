@@ -619,7 +619,8 @@ if ( not defined($ARGV[0]) ) {
 		}
 		$head_if = ( $head->{'TERM_PORT'} ne '' ? $head->{'TERM_PORTPREF'}.$head->{'TERM_PORT'}.".".$parm{'vlan_id'} : "Vlan".$parm{'vlan_id'});
 		my $Q_head_link = "INSERT Into head_link SET port_id=".$ref->{'port_id'};
-		my $Q_head_link_upd = " vlan_id=".$parm{'vlan_id'}.", head_id=".$head->{'HEAD_ID'}.", head_iface='".$head_if."'";
+		my $Q_head_link_upd = " vlan_id=".$parm{'vlan_id'}.", head_id=".$head->{'HEAD_ID'}.", hw_mac='".$parm{'hw_mac'}."'";
+		$Q_head_link_upd .= ", head_iface='".$head_if."'" if ( $ref->{'new_ltype'} eq $link_type{'l3realnet'} );
 		$Q_head_link_upd .= ( defined($parm{'inet_rate'}) ? ", inet_shape='".$parm{'inet_rate'}."'" : "" );
 		$Q_head_link_upd .= ( defined($parm{'ip_subnet'}) ? ", ip_subnet='".$parm{'ip_subnet'}."'"  : ", ip_subnet=NULL " );
 		$Q_head_link_upd .= ( defined($parm{'login'})     ? ", login='".$parm{'login'}."'"          : ", login=NULL "     );
