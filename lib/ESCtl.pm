@@ -151,7 +151,7 @@ sub ES_port_set_vlan {
         if ( $ln =~ /^\s+\d+\s+(\d+)\s+Static\s+\S+\s+Untagged\s+\:(.*)/ and $1 > 1 ) {
 	    $current_vid = $1;
 	    $range_ports = $2;
-	} elsif (  /^\s+Tagged\s+\:(\S+)/ and $current_vid > 1 ) {
+	} elsif ( $ln =~ /^\s+Tagged\s+\:(\S+)/ and $current_vid > 1 ) {
 	    $range_ports = $1;
 	} else {
 	    next;
@@ -160,8 +160,8 @@ sub ES_port_set_vlan {
 	$range_ports =~ s/\n//;
 	@range = split /\,/,$range_ports;
 	foreach my $c ( @range ) {
-	    if ( $port == $c ) {
-		$vlan_del{$current_vid} = 1;
+	    if ( $c !~ /-/ ) {
+		$vlan_del{$current_vid} = 1 if $port == $c;
 	    } else {
 		@d = split /-/,$c;
 		for my $e ( $d[0]..$d[1] ) {
