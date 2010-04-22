@@ -5,7 +5,7 @@ use POSIX qw(strftime);
 use DBI();
 
 my $DB_host='192.168.29.20';
-my $DB_base='switchnet';
+my $DB_base='vlancontrol';
 my $DB_user='swgen';
 my $DB_pass='SWgeneRatE';
 
