@@ -14,6 +14,7 @@ use DESCtl;
 use C73Ctl;
 use CATIOSCtl;
 use CAT2950Ctl;
+use CAT3550Ctl;
 use CATOSCtl;
 use ESCtl;
 use GSCtl;
