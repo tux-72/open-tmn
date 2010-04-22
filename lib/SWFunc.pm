@@ -154,7 +154,7 @@ sub dlog {
         if ( $arg{'DBUG'} <= $SWConf::debug and defined($arg{'MESS'}) and $arg{'MESS'}."x" ne "x" ) {
 	    my $stderrout=1;
 	    if ( defined($conflog->{$arg{'LOGTYPE'}}) ) {
-		open( LOGFILE,">> ".$conflog->{$arg{'LOGTYPE'}} );
+		open( LOGFILE,">>",$conflog->{$arg{'LOGTYPE'}} );
 		$stderrout=0;
 	    }
 

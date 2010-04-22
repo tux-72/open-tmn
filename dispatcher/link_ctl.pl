@@ -5,7 +5,7 @@ no strict qw(refs);
 
 
 use FindBin '$Bin';
-use lib $Bin . '/../conf';
+#use lib $Bin . '/../conf';
 use lib $Bin.'/../lib';
 use SWConf;
 use SWFunc;

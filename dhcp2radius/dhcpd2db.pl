@@ -36,7 +36,7 @@ use Data::Dumper;
 
 my $res = 0; 
 my %conf = (
-    'MYSQL_host'	=> 'localhost',
+    'MYSQL_host'	=> '192.168.100.20',
     'MYSQL_base'	=> 'vlancontrol',
     'MYSQL_user'	=> 'swctl',
     'MYSQL_pass'	=> 'GlaikMincy',
@@ -48,23 +48,14 @@ my %conf = (
     'ssh_pass'		=> 'JoalvexFon',
 );
 
-
-my $script_name=$0;
-$script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
-#dlog ( SUB => $script_name, LOGTYPE => 'LOGRADIUS', DBUG => 2, MESS => "Use BIN directory - $Bin" );
-
-my $dbm; $res = DB_mysql_connect(\$dbm, \%conf);
-if ($res < 1) {
-    #dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'LOGRADIUS', MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
-    DB_mysql_check_connect(\$dbm, \%conf);
-}
-
-
 # Function to handle post_auth
+my $dbm;
+
 sub post_auth {
 	# For debugging purposes only
 	#&log_request_attributes;
-	DB_mysql_check_connect(\$dbm, \%conf);
+	#DB_mysql_connect(\$dbm);
+	DB_mysql_connect();
 	my $res = RLM_MODULE_NOTFOUND; my $rows_up = -1; my $cli_addr = ''; my $ap_id = '';
 	#my $new_req =0;
 
@@ -87,6 +78,7 @@ sub post_auth {
 	    if  ( $stm_port->rows == 1 ) {
 		while (my $ref_port = $stm_port->fetchrow_hashref()) {
 		    # Выяснить точку доступа
+		    &radiusd::radlog(1, "port_id = ".$ref_port->{'port_id'}."\n");
 		    $ap_id = 0;
 		    # Выделить IP
 		    my $Q_Discover_start  = "SELECT ip, mask, gw, end_lease, static_ip FROM dhcp_addr WHERE head_id=".$ref_port->{'head_id'}." and real_ip>0";
@@ -126,7 +118,8 @@ sub post_auth {
 		}
 	    } else {
 		    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
-		    $res = RLM_MODULE_REJECT;
+		    #$res = RLM_MODULE_REJECT;
+		    $res = RLM_MODULE_NOTFOUND;
 	    }
 	    $stm_port->finish;
 	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Request' ) {
@@ -194,21 +187,10 @@ sub log_request_attributes {
 }
 
 sub DB_mysql_connect {
+    #my $dbml = shift;
     $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'})
-    or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$conf{'MYSQL_host'}."$DBI::errstr" );
-    $dbm->do("SET NAMES 'koi8r'") or die return -1;
-    return 1;
-}
-
-
-sub DB_mysql_check_connect {
-    my $db_ping = $dbm->ping;
-    #dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "DB PING = $db_ping" );
-    if ( $db_ping != 1 ) {
-        dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "DB PING = $db_ping, MYSQL connect lost! RECONNECT to DB host ".$conf{'MYSQL_host'} );
-        $dbm->disconnect;
-        $dbm = DBI->connect_cached("DBI:mysql:database=".$conf{'MYSQL_base'}.";host=".$conf{'MYSQL_host'},$conf{'MYSQL_user'},$conf{'MYSQL_pass'})
-        or dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$conf{'MYSQL_host'}."$DBI::errstr" );
-        $dbm->do("SET NAMES 'koi8r'");
-    }
+    or die "Unable to connect MYSQL DB host ".$conf{'MYSQL_host'}."$DBI::errstr";
+    #dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$conf{'MYSQL_host'}."$DBI::errstr" );
+    $dbm->do("SET NAMES 'koi8r'");
+#    return 1;
 }
