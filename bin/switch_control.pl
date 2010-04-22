@@ -24,11 +24,13 @@ dlog ( SUB => $script_name, DBUG => 2, MESS => "Use BIN directory - $Bin" );
 my $cycle_name='cycle_check.pl';
 if ( $script_name eq $cycle_name and $ARGV[0] ) {
 
-    my $lockfile="/tmp/".$script_name."_".$ARGV[0];
+    my $lockfile="/var/run/swctl/".$script_name."_".$ARGV[0];
     open(LOCK,">",$lockfile) or die "Can't open file $!";
     flock(LOCK,2|4) or die;
-    
+    select((select(LOCK),$|++)[0]);
+    print LOCK "$$\n";
 }
+
 
 my $ver='2.00';
 

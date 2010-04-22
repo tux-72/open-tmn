@@ -499,8 +499,10 @@ sub SW_AP_get {
 			    $AP{'trust'} = 0; $AP{'set'} = 0
 			}
 			$Query = "INSERT INTO ap_login_info SET trust=".$AP{'trust'}.", login='".$fparm->{'login'}."', start_date='".$date."', last_date='".$date."'";
-			$Query .= ", ip_addr='".$fparm->{'ip_addr'}."', hw_mac='".$fparm->{'mac'}."', vlan_id='".$AP{'VLAN'}."', port_id='".$AP{'id'}."', ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."'";
-			$Query .= " ON DUPLICATE KEY UPDATE trust=".$AP{'trust'}.", ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."', last_date='".$date."', vlan_id='".$AP{'VLAN'}."', ip_addr='".$fparm->{'ip_addr'}."'";
+			$Query .= ", hw_mac='".$fparm->{'mac'}."', vlan_id='".$AP{'VLAN'}."', port_id='".$AP{'id'}."', ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."'";
+			$Query .= ", ip_addr='".$fparm->{'ip_addr'}."'" if ( not $fparm->{'ip_addr'} =~ /^10\.13\.2[45][0-9]\.\d{1,3}$/ );
+			$Query .= " ON DUPLICATE KEY UPDATE trust=".$AP{'trust'}.", ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."', last_date='".$date."', vlan_id='".$AP{'VLAN'}."'";
+			$Query .= ", ip_addr='".$fparm->{'ip_addr'}."'" if ( not $fparm->{'ip_addr'} =~ /^10\.13\.2[45][0-9]\.\d{1,3}$/ );
 			$dbm->do("$Query");
 		######################## SET JOB PARAMETERS
 			if ( $AP{'set'} and $AP{'automanage'} ) {

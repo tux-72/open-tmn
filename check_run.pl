@@ -13,10 +13,21 @@ my @processes = ( 	"checkterm",
 $date = `date +%F.%H:%M:%S`;
 $date =~ s/\n//g;
 
-if ( $ARGV[0] eq "real" ) {
+if ( $ARGV[0] eq "kill" ) {
+
+    foreach $PROC ( @processes ) {
+	    my $PIDFILE = "/var/run/swctl/cycle_check.pl_".$PROC;
+	    if ( -f $PIDFILE ) {
+		my $PID = `/bin/cat $PIDFILE`;
+		print STDERR $PID."\n";
+		if ( $PID+0 > 0 ) { system ( "kill $PID" ); }
+	    }
+    }
+
+} elsif ( $ARGV[0] eq "real" ) {
 
     foreach $PROC ( @processes ) { 
-	    $SH_CMD = '/usr/bin/su '.$run_user.' -c "( '.$Bin.'/bin/'.$exec_file.' '.$PROC.' >> '.$LOGDIR.'/'.$PROC.'-stderr.log 2>&1 ) &"';
+	    my $SH_CMD = '/usr/bin/su '.$run_user.' -c "( '.$Bin.'/bin/'.$exec_file.' '.$PROC.' >> '.$LOGDIR.'/'.$PROC.'-stderr.log 2>&1 ) &"';
 	    system ( $SH_CMD );
     }
 

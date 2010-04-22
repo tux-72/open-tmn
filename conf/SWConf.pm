@@ -4,7 +4,7 @@ use strict;
 
 package SWConf;
 
-our $debug = 2;
+our $debug = 1;
 
 our %dbconf = (
     'MYSQL_host',       'localhost',
