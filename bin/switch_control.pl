@@ -25,9 +25,10 @@ my $cycle_name='cycle_check.pl';
 if ( $script_name eq $cycle_name and $ARGV[0] ) {
 
     my $lockfile="/var/run/swctl/".$script_name."_".$ARGV[0];
-    open(LOCK,">",$lockfile) or die "Can't open file $!";
+    open(LOCK,">>",$lockfile) or die "Can't open file $!";
     flock(LOCK,2|4) or die;
     select((select(LOCK),$|++)[0]);
+    truncate LOCK,0;
     print LOCK "$$\n";
 }
 
