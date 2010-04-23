@@ -1,1 +1,0 @@
-link ../lib/SWConf.pm
