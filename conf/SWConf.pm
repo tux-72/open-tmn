@@ -1,1 +1,1 @@
-../lib/SWConf.pm
+link ../lib/SWConf.pm
