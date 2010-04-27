@@ -42,7 +42,7 @@ my $res=0;
 my $dbm; $res = DB_mysql_connect(\$dbm);
 if ($res < 1) {
     dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
-    DB_mysql_check_connect(\$dbm);
+    DB_mysql_connect(\$dbm);
 }
 
 my %link_type = ();
@@ -102,7 +102,7 @@ if ( not defined($ARGV[0]) ) {
     print STDERR "Usage:  $script_name ( newswitch <hostname old switch> <IP new switch> | [checkterm|checkjobs] )\n"
 
 } elsif ( $ARGV[0] eq "newswitch" ) {
-        DB_mysql_check_connect(\$dbm);
+        DB_mysql_connect(\$dbm);
 	exit if not $ARGV[1] =~ /^\S+$/;
 	exit if not $ARGV[2] =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 	my $src_switch= $ARGV[1];
@@ -145,7 +145,7 @@ if ( not defined($ARGV[0]) ) {
 	}
 	$stm1->finish();
 } elsif ( $ARGV[0] eq "pass_change" ) {
-        DB_mysql_check_connect(\$dbm);
+        DB_mysql_connect(\$dbm);
 	my $stm = $dbm->prepare("SELECT h.hostname, h.ip, m.lib, m.admin_login, m.admin_pass, m.ena_pass, m.old_admin, m.old_pass, m.mon_login, m.mon_pass FROM hosts h, models m \
 	WHERE h.automanage=1 and h.model_id=m.model_id order by h.model_id");
 	$stm->execute();
@@ -167,7 +167,7 @@ if ( not defined($ARGV[0]) ) {
 } elsif ( $ARGV[0] eq "checkterm" ) {
   while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
     #dlog ( SUB => 'checkterm', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30 ) if $debug;
-    DB_mysql_check_connect(\$dbm);
+    DB_mysql_connect(\$dbm);
     ################################ SYNC LINK STATES
     my $stml = $dbm->prepare("SELECT l.head_id, l.port_id, p.vlan_id, l.status, l.set_status, p.ltype_id, l.ip_subnet, l.login \
     FROM swports p, head_link l WHERE l.set_status>0 and l.port_id=p.port_id ORDER BY l.head_id");
@@ -208,7 +208,7 @@ if ( not defined($ARGV[0]) ) {
 
   while ( $cycle_run < 2 or $script_name eq 'cycle_check.pl' ) {
     #dlog ( SUB => 'checkjobs', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30 ) if $debug;
-    DB_mysql_check_connect(\$dbm);
+    DB_mysql_connect(\$dbm);
 
     $SW{'change'} = 0;
     $SW{'sw_id'}=0;

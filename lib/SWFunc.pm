@@ -32,7 +32,7 @@ $VERSION = 1.8;
 %EXPORT_TAGS = ();
 
 @EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl dlog rspaced lspaced
-	    DB_mysql_connect DB_mysql_check_connect 
+	    DB_mysql_connect
 	    SAVE_config VLAN_link DB_trunk_vlan DB_trunk_update GET_Terminfo GET_GW_parms 
 	    VLAN_VPN_get VLAN_get VLAN_remove 
 );
@@ -41,8 +41,7 @@ my $start_conf	= \%SWConf::conf;
 my $conflog	= \%SWConf::conflog;
 my $dbi		= \%SWConf::dbconf;
 
-use Data::Dumper;
-#print STDERR " SWFunc CLI_VLAN_LINKTYPE = " , $start_conf->{'CLI_VLAN_LINKTYPE'}, "\n";
+#use Data::Dumper;
 
 my $w2k = cset_factory 1251, 20866;
 my $k2w = cset_factory 20866, 1251;
@@ -54,12 +53,7 @@ my $Querry_end = '';
 my $res; 
 my $dbm; 
 
-$res = DB_mysql_connect(\$dbm);
-
-if ($res < 1) {
-    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
-    DB_mysql_check_connect(\$dbm);
-}
+DB_mysql_connect(\$dbm);
 
 my $LIB_ACT ='';
 
@@ -94,8 +88,6 @@ sub SW_ctl {
 	my $arg = shift;
 	my $swfunc = $arg->{'LIB'}.'_'.$arg->{'ACT'};
 	if ( defined &$swfunc ) {
-#	    print Dumper $swfunc;
-#	    my $res = &$swfunc( $arg->{'PARM'} );
 	    return &$swfunc( $arg );
 	} else {
 	    return 0;
@@ -103,36 +95,14 @@ sub SW_ctl {
 }
 
 sub DB_mysql_connect {
-    my $sqlconnect = shift;
-    ${$sqlconnect} = DBI->connect_cached("DBI:mysql:database=".$dbi->{'MYSQL_base'}.";host=".$dbi->{'MYSQL_host'},$dbi->{'MYSQL_user'},$dbi->{'MYSQL_pass'})
-    or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr" );
-    ${$sqlconnect}->do("SET NAMES 'koi8r'") or die return -1;
-    return 1;
+	my $sqlconnect = shift;
+	${$sqlconnect} = DBI->connect_cached("DBI:mysql:database=".$dbi->{'MYSQL_base'}.";host=".$dbi->{'MYSQL_host'},$dbi->{'MYSQL_user'},$dbi->{'MYSQL_pass'})
+	or die "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr";
+	#or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr" );
+	${$sqlconnect}->do("SET NAMES 'koi8r'") or die return -1;
+	dlog ( DBUG => 1, SUB => (caller(0))[3],  MESS => "Mysql connect ID = ".${$sqlconnect}->{'mysql_thread_id'} );
+	return 1;
 }
-
-
-sub DB_mysql_check_connect {
-    my $sqlconnect = shift;
-    my $db_ping = ${$sqlconnect}->ping;
-    #dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "DB PING = $db_ping" );
-    if ( $db_ping != 1 ) {
-        dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "DB PING = $db_ping, MYSQL connect lost! RECONNECT to DB host ".$dbi->{'MYSQL_host'} );
-        ${$sqlconnect}->disconnect;
-        ${$sqlconnect} = DBI->connect_cached("DBI:mysql:database=".$dbi->{'MYSQL_base'}.";host=".$dbi->{'MYSQL_host'},$dbi->{'MYSQL_user'},$dbi->{'MYSQL_pass'})
-        or dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr" );
-        ${$sqlconnect}->do("SET NAMES 'koi8r'");
-    }
-}
-
-#sub DB_mssql_connect {
-#    my $sqlconnect = shift;
-#    ${$sqlconnect} = DBI->connect("dbi:Sybase:server=".$dbi->{'MSSQL_host'}.";language=russian", $dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'}) 
-#    or die dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => "Unable to connect MSSQL DB host ".$dbi->{'MSSQL_host'}."$DBI::errstr" );
-
-#    ${$sqlconnect}->do("set dateformat ymd set language russian set ansi_null_dflt_on on") or die return -1;
-#    ${$sqlconnect}->func("ISO","_date_fmt") or die return -1;
-#    return 1;
-#}
 
 sub rspaced {
     my $str = shift;
@@ -152,9 +122,9 @@ sub dlog {
             @_,
         );
         if ( $arg{'DBUG'} <= $SWConf::debug and defined($arg{'MESS'}) and $arg{'MESS'}."x" ne "x" ) {
-	    my $stderrout=1;
+	    my $stderrout=1; my $LOGFILE;
 	    if ( defined($conflog->{$arg{'LOGTYPE'}}) ) {
-		open( LOGFILE,">>",$conflog->{$arg{'LOGTYPE'}} );
+		open( $LOGFILE,">>",$conflog->{$arg{'LOGTYPE'}} ) or die "Can't open '".$conflog->{$arg{'LOGTYPE'}}."' $!";
 		$stderrout=0;
 	    }
 
@@ -176,10 +146,10 @@ sub dlog {
 		if ($stderrout) {
             	    print STDERR $logline;
 		} else {
-            	    print LOGFILE $logline;
+            	    print $LOGFILE $logline;
 		}
             }
-	    if (not $stderrout) { close LOGFILE; }
+	    if (not $stderrout) { close $LOGFILE; }
 	}
 }
 
@@ -188,7 +158,6 @@ sub dlog {
     my $pid_decr = (($$ & 7) << 1 );
     my $end_port = 20000 - 1024 * $pid_decr;
     my $start_port = $end_port - 1024;
-
     #dlog ( DBUG => 3, SUB => (caller(0))[3], MESS => "PID decr = $pid_decr, start_port = $start_port, end_port = $end_port"  );
     my $src_port = $end_port ;
 
@@ -238,15 +207,15 @@ sub dlog {
 
 sub SW_AP_fix {
 
+	DB_mysql_connect(\$dbm);
 	my $Query10 = ''; my $Query0 = ''; my $Query1 = ''; my %sw_arg = ();
-
 	my %arg = (
 	    @_,         # список пар аргументов
 	);
-	# AP_INFO LOGIN LTYPE VLAN NAS_IP NAS_PORT HW_MAC
+	# AP_INFO LOGIN LTYPE VLAN NAS_IP HW_MAC
 	if ( not defined($headinfo{'ZONE_'.$arg{'NAS_IP'}}) ) {
-	    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "NAS '".$arg{'NAS_IP'}."'ZONE not exist, AP not fixed...");
-	    return -1; 
+	    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "NAS '".$arg{'NAS_IP'}."'ZONE not exist, AP not fixed..." );
+	    return -1;
 	}
 
 	my $AP = $arg{'AP_INFO'};
@@ -355,9 +324,9 @@ sub SW_AP_fix {
 
 sub SW_AP_get {
 
-        dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "--" );
-	DB_mysql_check_connect(\$dbm);
-        my $fparm = shift; my %sw_arg = ();
+	dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGDISP', MESS => "--" );
+	DB_mysql_connect(\$dbm);
+	my $fparm = shift; my %sw_arg = ();
 	my $Fres = 2; my $Fvalue = 'ap_id:-1;';	
 
         #       $fparm->{login} = pppoe
@@ -479,7 +448,8 @@ sub SW_AP_get {
 	} else {
 		dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "User '".$fparm->{'login'}."'".' Access point VLAN = '.$AP{'VLAN'} );
 		########### Start FIX Access Point (AP) ########### 
-		SW_AP_fix( AP_INFO => \%AP, LOGIN => $fparm->{'login'} , VLAN => $AP{'VLAN'}, NAS_IP => $fparm->{'nas_ip'}, NAS_PORT => $fparm->{'nas_port_id'}, HW_MAC => $fparm->{'mac'});
+		#SW_AP_fix( AP_INFO => \%AP, LOGIN => $fparm->{'login'} , VLAN => $AP{'VLAN'}, NAS_IP => $fparm->{'nas_ip'}, NAS_PORT => $fparm->{'nas_port_id'}, HW_MAC => $fparm->{'mac'});
+		SW_AP_fix( AP_INFO => \%AP, LOGIN => $fparm->{'login'} , VLAN => $AP{'VLAN'}, NAS_IP => $fparm->{'nas_ip'}, HW_MAC => $fparm->{'mac'});
 		################### Если выяснили AP_ID ######################
 		if ($AP{'id'}) {
 			$Fres = 1;
@@ -592,13 +562,9 @@ sub SW_AP_get {
 }
 
 
-
-
-
 sub SW_AP_free {
 
-    DB_mysql_check_connect(\$dbm);
-
+    DB_mysql_connect(\$dbm);
     my $Q_free; my $Fres = 0; my $Fvalue = '';
 
     my $fparm = shift;
@@ -630,8 +596,7 @@ sub SW_AP_free {
 
 sub SW_AP_tune {
 
-    DB_mysql_check_connect(\$dbm);
-
+    DB_mysql_connect(\$dbm);
     my $Q_tune; my $Q_parm = ''; my $Fres = 0; my $Fvalue = ''; my $parmset = 0;
 
     my $fparm = shift;
@@ -669,8 +634,6 @@ sub SW_AP_tune {
 
     if ( $debug > 1 ) {
         dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "DEBUG mode, Query '".$Q_tune."'" );
-	#$Fres = 2;
-	#$Fvalue = "error: ap_free info in debug mode not update;";
     } elsif (not $parmset) {
 	$Fres = 2;
 	$Fvalue = "error: not found change parameters;";
@@ -687,7 +650,7 @@ sub SW_AP_tune {
 }
 
 sub SW_AP_linkstate {
-    DB_mysql_check_connect(\$dbm);
+    DB_mysql_connect(\$dbm);
     my $Fres = 2; my $Fvalue = 'error:unknown error...;';
     my %state = (   'lock' 	=> 2,
 		    'unlock'	=> 1,
@@ -719,7 +682,9 @@ sub SW_AP_linkstate {
     return ( $Fres+0, $Fvalue );
 }
 
+
 sub SAVE_config {
+    DB_mysql_connect(\$dbm);
     # сохраняем конфиг на коммутаторе
     my %argscfg = (
 	    @_,		# список пар аргументов
@@ -765,6 +730,8 @@ sub GET_GW_parms {
 }
 
 sub GET_Terminfo {
+
+    DB_mysql_connect(\$dbm);
     dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => 'GET Terminator info (debug)' );
 
     my %arg = (
@@ -827,6 +794,7 @@ sub GET_Terminfo {
 
 
 sub VLAN_link {
+	DB_mysql_connect(\$dbm);
 	my %sw_arg = ();
 	dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "LINKING VLAN to HEAD (debug)" );
 	return -1 if $debug>2;
@@ -951,6 +919,7 @@ sub VLAN_link {
 
 sub DB_trunk_update {
 	# Делаем запись об изменении влана в текущем транковом порту
+	DB_mysql_connect(\$dbm);
         my %argdb = (
             @_,         # список пар аргументов
         );
@@ -979,6 +948,7 @@ sub DB_trunk_update {
 
 sub DB_trunk_vlan {
 	# Делаем запись об изменении влана в текущем транковом порту
+	DB_mysql_connect(\$dbm);
         my %argdb = (
             @_,         # список пар аргументов
         );
@@ -1017,6 +987,7 @@ sub DB_trunk_vlan {
 
 sub VLAN_remove {
 
+	DB_mysql_connect(\$dbm);
         my %arg = (
             @_,         # список пар аргументов
         );
@@ -1050,11 +1021,9 @@ sub VLAN_remove {
 }
 
 
-
 sub VLAN_get {
 
-	DB_mysql_check_connect(\$dbm);
-
+	DB_mysql_connect(\$dbm);
         my %arg = (
             @_,         # список пар аргументов
         );

@@ -28,12 +28,12 @@ $script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
 dlog ( SUB => $script_name, DBUG => 2, MESS => "Use BIN directory - $Bin" );
 
 
-my $dbm; my $res = DB_mysql_connect(\$dbm);
+my $dbm; 
+my $res = DB_mysql_connect(\$dbm);
 if ($res < 1) {
     dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
-    DB_mysql_check_connect(\$dbm);
+    DB_mysql_connect(\$dbm);
 }
-
 
 my %link_type = ();
 my @link_types = '';
@@ -87,7 +87,7 @@ if (not defined($ARGV[0])) {
 
 ############################################## CHECK SWITCH MODEL & MAC ##############################################
 } elsif ( $ARGV[0] eq "chk_model" and defined($ARGV[1]) ) {
-    DB_mysql_check_connect(\$dbm);
+    DB_mysql_connect(\$dbm);
     my $Q_end = " order by h.hostname" ;
     if ( $ARGV[1] ne "allhosts" ) {
 	if ( $ARGV[1] =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) {
@@ -166,7 +166,7 @@ if (not defined($ARGV[0])) {
 
 ############################################## CHECK & UPDATE TRUNK PORTS ##############################################
 } elsif ( $ARGV[0] eq "chk_trunk" and defined($ARGV[1])) {
-    DB_mysql_check_connect(\$dbm);
+    DB_mysql_connect(\$dbm);
 
     #my $Q_end = " order by h.hostname" ;
     my $Q_end = " and h.model_id=19 order by h.hostname" ;
@@ -306,7 +306,7 @@ if (not defined($ARGV[0])) {
 
 
 sub CHECK_port_exists {
-        DB_mysql_check_connect(\$dbm);
+        DB_mysql_connect(\$dbm);
         my %arg = (
             @_,
         );
