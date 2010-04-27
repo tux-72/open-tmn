@@ -100,7 +100,7 @@ sub DB_mysql_connect {
 	or die "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr";
 	#or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr" );
 	${$sqlconnect}->do("SET NAMES 'koi8r'") or die return -1;
-	dlog ( DBUG => 1, SUB => (caller(0))[3],  MESS => "Mysql connect ID = ".${$sqlconnect}->{'mysql_thread_id'} );
+	#dlog ( DBUG => 2, SUB => (caller(0))[3],  MESS => "Mysql connect ID = ".${$sqlconnect}->{'mysql_thread_id'} );
 	return 1;
 }
 

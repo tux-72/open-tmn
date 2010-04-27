@@ -66,7 +66,6 @@ sub post_auth {
 	my $res = RLM_MODULE_NOTFOUND; my $rows_up = -1; my $cli_addr = ''; my $ap_id = '';
 
 	DB_mysql_connect(\$dbm);
-	DB_mysql_connect(\$dbm);
 	#&radiusd::radlog(1, "Mysql connect ID = ".$dbm->{'mysql_thread_id'}."\n") if $debug;
 
 	#DHCP-Relay-Agent-Information = 0x0106000405dc0303020b010931302e33322e302e31
