@@ -402,7 +402,7 @@ sub SW_AP_get {
 	}
 
 	####################### GET ACCESS POINT ####################
-	my $Query = ''; my $PreQuery = '';
+	my $Query = ''; my $Q_upd = ''; my $PreQuery = '';
         my $date = strftime "%Y%m%d%H%M%S", localtime(time);
 	my $job_parms = '';
 
@@ -475,6 +475,16 @@ sub SW_AP_get {
 			$Query .= " ON DUPLICATE KEY UPDATE trust=".$AP{'trust'}.", ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."', last_date='".$date."', vlan_id='".$AP{'VLAN'}."'";
 			$Query .= ", ip_addr='".$fparm->{'ip_addr'}."'" if ( not $fparm->{'ip_addr'} =~ /^10\.13\.2[45][0-9]\.\d{1,3}$/ );
 			$dbm->do("$Query");
+
+			## HEAD_LINK
+			## Temporary inserting data
+			if ( $AP{'trust'} and ( not $AP{'communal'}) and $fparm->{'link_type'} == $link_type{'pppoe'} ) {
+			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
+			    $Q_upd = " head_id=3, vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."'".
+			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$fparm->{'inet_priority'};
+			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
+			$dbm->do("$Query");
+			}
 		######################## SET JOB PARAMETERS
 			if ( $AP{'set'} and $AP{'automanage'} ) {
 			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Access Point parm change" );
