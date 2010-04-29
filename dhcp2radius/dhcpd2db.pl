@@ -73,9 +73,10 @@ sub post_auth {
 	&radiusd::radlog(1, "New ".$RAD_REQUEST{'DHCP-Message-Type'}." VLAN = $vlan, MAC = ".$RAD_REQUEST{'DHCP-Client-Hardware-Address'} );
 
 	my %AP = (
-		'VLAN',     $vlan,
-		'MAC',      $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
-		'id',       0,
+		'VLAN'		=> $vlan,
+		'MAC'		=> $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
+		'id'		=> 0,
+		'new_lease'	=> 0,
 	);
 
 	if ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Release' ) {
@@ -94,30 +95,30 @@ sub post_auth {
 	    if  ( $stm_port->rows == 1 ) {
 		while (my $ref_port = $stm_port->fetchrow_hashref()) {
 		  ######  Выясняем точку доступа ######
-		  SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_port->{'term_ip'}, LOGIN => $ref_port->{'login'} , VLAN => $AP{'VLAN'}, HW_MAC => $AP{'MAC'} );
+		  SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_port->{'term_ip'}, LOGIN => $ref_port->{'login'}, VLAN => $AP{'VLAN'}, HW_MAC => $AP{'MAC'} );
 		  if ( $AP{'id'} == $ref_port->{'port_id'} ) {
 		    &radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug;
 		    # Выделить IP
-		    my $Q_Discover_start  = "SELECT a.ip, a.end_lease, p.mask, p.gw, p.static_ip, p.dhcp_lease FROM dhcp_addr a, dhcp_pools p ".
+		    my $Q_Discover_start  = "SELECT a.login, a.ip, a.start_lease, a.end_lease, p.mask, p.gw, p.static_ip, p.dhcp_lease FROM dhcp_addr a, dhcp_pools p ".
 		    " WHERE p.head_id=".$ref_port->{'head_id'}." and p.pool_id=a.pool_id";
 
 		    my $Q_Discover_reuse = ""; my $Q_Discover_new ='' ; my $Q_Discover_grey ='' ;
 		    ### Поиск назначенного статического белого IP
 		    if ( $ref_port->{'static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
-			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.port_id=".$ref_port->{'port_id'}." and a.vlan_id=".$vlan;
+			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.port_id=".$ref_port->{'port_id'}." and a.login='".$ref_port->{'login'}."'";
 			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}.
 			" order by a.end_lease limit 1";
 		    ### Поиск ранее выдаваемого динамического белого IP
 		    } elsif ( $ref_port->{'static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
-			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.port_id=".$ref_port->{'port_id'}." and a.vlan_id=".$vlan.
+			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.port_id=".$ref_port->{'port_id'}." and a.login='".$ref_port->{'login'}."'".
 			" and a.inet_shape=".$ref_port->{'inet_shape'}." order by a.end_lease limit 1";
 			$Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}.
 			" order by a.end_lease limit 1";
-			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}.
+			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>1 and ( a.login='".$ref_port->{'login'}."' or ( a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}." ))".
 			" order by a.end_lease limit 1";
 		    ### Поиск ранее выдаваемого серого IP ( линк заблокирован в билинге )
 		    } elsif ( $ref_port->{'status'} == 2 ) {
-			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.port_id=".$ref_port->{'port_id'}." and a.vlan_id=".$vlan.
+			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.port_id=".$ref_port->{'port_id'}.
 			" order by a.end_lease limit 1";
 			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() order by a.end_lease limit 1";
 		    } else {
@@ -128,7 +129,8 @@ sub post_auth {
 
 		    my $stm_disc = $dbm->prepare($Q_Discover_start.$Q_Discover_reuse);
 		    $stm_disc->execute();
-		    if  (not $stm_disc->rows ) {
+		    if  ( not $stm_disc->rows ) {
+			$AP{'new_lease'}=1;
 			#&radiusd::radlog(1, "Discover_new   = ".$Q_Discover_start.$Q_Discover_new."\n") if $debug;
 			$stm_disc->finish;
 			$stm_disc = $dbm->prepare($Q_Discover_start.$Q_Discover_new);
@@ -139,19 +141,28 @@ sub post_auth {
 			    $stm_disc->execute();
 			}
 			if  (not $stm_disc->rows ) {
+			    &radiusd::radlog(1, 'All IP used in available DHCP scopes... :-('); 
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			    return RLM_MODULE_NOTFOUND;
 			}
 		    }
 
 		    while (my $ref_disc = $stm_disc->fetchrow_hashref()) {
+			if  ( $AP{'new_lease'} and $ref_port->{'status'} == 1 and $ref_disc->{'login'} ) {
+			    $Q_Discover_new = "INSERT INTO dhcp_addr_arch ( ip, login, hw_mac, start_lease, end_lease, inet_shape, port_id, agent_info )".
+			    " SELECT ip, login, hw_mac, start_lease, end_lease, inet_shape, port_id, agent_info FROM dhcp_addr WHERE ip='".$ref_disc->{'ip'}."'";
+			    &radiusd::radlog(1, " Archive prev login = ".$Q_Discover_new) if $debug;
+			    $dbm->do($Q_Discover_new);
+			    #$dbm->do( "INSERT into dhcp_addr_arch set ip=".$stm_disc->{'ip'}.", login=".$stm_disc->{'login'}.
+			    #", start_lease=".$stm_disc->{'start_lease'}.", end_lease=".$stm_disc->{'end_lease'} );
+			}
 			$RAD_REPLY{'DHCP-IP-Address-Lease-Time'} = $ref_disc->{'dhcp_lease'};
 			$RAD_REPLY{'DHCP-Your-IP-Address'}	 = $ref_disc->{'ip'};
 			$RAD_REPLY{'DHCP-Subnet-Mask'}		 = $ref_disc->{'mask'};
 			$RAD_REPLY{'DHCP-Router-Address'}	 = $ref_disc->{'gw'};
-			my $Q_Disc_up = "UPDATE dhcp_addr SET agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
+			my $Q_Disc_up = "UPDATE dhcp_addr SET agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."', login='".$ref_port->{'login'}."'".
 			", port_id=".$ref_port->{'port_id'}.", vlan_id=".$vlan.", hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
-			", session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."', end_lease=ADDDATE(now(), INTERVAL ".$ref_disc->{'dhcp_lease'}." SECOND)".
+			", session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'".( $AP{'new_lease'} ? ", start_lease=NULL" : "" ).", end_lease=ADDDATE(now(), INTERVAL ".$ref_disc->{'dhcp_lease'}." SECOND)".
 			" WHERE ip='".$ref_disc->{'ip'}."'";
 			$rows_up = $dbm->do($Q_Disc_up);
 			$res = RLM_MODULE_OK if $rows_up == 1;
@@ -177,9 +188,9 @@ sub post_auth {
 		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, h.term_ip ".
 		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h ".
 		" WHERE l.head_id=h.head_id and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and a.port_id=l.port_id and a.pool_id=p.pool_id ".
-		" and a.ip='".$cli_addr."' and l.hw_mac=a.hw_mac and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
+		" and a.ip='".$cli_addr."' and l.login=a.login and l.hw_mac=a.hw_mac and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
 		" and l.status=1 and l.inet_priority=1 and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and a.inet_shape=l.inet_shape	";
-		&radiusd::radlog(1, $Q_Request) if $debug;
+		#&radiusd::radlog(1, $Q_Request) if $debug;
 
 		my $stm_req = $dbm->prepare($Q_Request);
 		$stm_req->execute();
