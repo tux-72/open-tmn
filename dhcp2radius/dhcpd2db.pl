@@ -2,22 +2,16 @@
 
 
 use strict;
-use DBI;
-use Net::Telnet();
-use IO::Pty ();
 
 # use ...
 # This is very important ! Without this script will not get the filled hashesh from main.
 use vars qw(%RAD_REQUEST %RAD_REPLY %RAD_CHECK);
-use Data::Dumper;
+#use Data::Dumper;
 
 use FindBin '$Bin';
-#use lib $Bin . '/../conf';
 use lib $Bin.'/../lib';
 use SWConf;
 use SWFunc;
-
-#my $dbconf = \%SWConf::dbconf;
 
 # This is hash wich hold original request from radius
 #my %RAD_REQUEST;
@@ -39,20 +33,6 @@ use SWFunc;
 	use constant	RLM_MODULE_NOOP=>      7;#  /* module succeeded without doing anything */
 	use constant	RLM_MODULE_UPDATED=>   8;#  /* OK (pairs modified) */
 	use constant	RLM_MODULE_NUMCODES=>  9;#  /* How many return codes there are */
-
-
-#my %conf = (
-#    'MYSQL_host'	=> '192.168.100.20',
-#    'MYSQL_base'	=> 'vlancontrol',
-#    'MYSQL_user'	=> 'swctl',
-#    'MYSQL_pass'	=> 'GlaikMincy',
-#    'STARTLINKCONF'	=> 20,
-#    'DHCP_lease_max'	=> 7200,
-#    'DHCP_lease_static'	=> 2678400,
-#    'ssh_host'		=> '77.239.208.17',
-#    'ssh_user'		=> 'datasync',
-#    'ssh_pass'		=> 'JoalvexFon',
-#);
 
 
 # Function to handle post_auth
@@ -88,8 +68,8 @@ sub post_auth {
 	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
 	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information
 	    my $Q_check_macport = "SELECT l.port_id, l.inet_shape, l.head_id, l.static_ip, l.status, l.login, h.term_ip ".
-	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}.
-	    "' and l.status=1 and l.inet_priority=1 and l.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
+	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.pppoe_up=0 and l.inet_priority=1 and h.dhcp_relay_ip='".
+	    $RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and l.status=1 and l.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
 	    my $stm_port = $dbm->prepare($Q_check_macport);
 	    $stm_port->execute();
 	    if  ( $stm_port->rows == 1 ) {
@@ -187,9 +167,10 @@ sub post_auth {
 
 		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, h.term_ip ".
 		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h ".
-		" WHERE l.head_id=h.head_id and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and a.port_id=l.port_id and a.pool_id=p.pool_id ".
-		" and a.ip='".$cli_addr."' and l.login=a.login and l.hw_mac=a.hw_mac and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
-		" and l.status=1 and l.inet_priority=1 and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and a.inet_shape=l.inet_shape	";
+		" WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac and a.port_id=l.port_id and a.pool_id=p.pool_id and a.inet_shape=l.inet_shape ".
+		" and l.status=1 and l.pppoe_up=0 and l.inet_priority=1 and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' ".
+		" and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' ".
+		" and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
 
 		my $stm_req = $dbm->prepare($Q_Request);
