@@ -90,20 +90,21 @@ sub post_auth {
 		    ### Поиск ранее выдаваемого динамического белого IP
 		    } elsif ( $ref_port->{'static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
 			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'".
-			" and a.inet_shape=".$ref_port->{'inet_shape'}." order by a.end_lease limit 1";
-			$Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}.
-			" order by a.end_lease limit 1";
-			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>1 and ( a.login='".$ref_port->{'login'}."' or ( a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}." ))".
-			" order by a.end_lease limit 1";
+			" and a.inet_shape=".$ref_port->{'inet_shape'};
+			$Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'};
+			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>1 and ( a.login='".$ref_port->{'login'}."' or ( a.end_lease<now()".
+			" and a.inet_shape=".$ref_port->{'inet_shape'}." ))";
 		    ### Поиск ранее выдаваемого серого IP ( линк заблокирован в билинге )
 		    } elsif ( $ref_port->{'status'} == 2 ) {
-			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'".
-			" order by a.end_lease limit 1";
-			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() order by a.end_lease limit 1";
+			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
+			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()";
 		    } else {
 			$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			return RLM_MODULE_NOTFOUND;
 		    }
+		    $Q_Discover_reuse	.= " order by a.end_lease desc limit 1";
+		    $Q_Discover_new	.= " order by a.end_lease limit 1";
+		    $Q_Discover_grey	.= " order by a.end_lease limit 1";
 		    #&radiusd::radlog(1, "Discover_start = ".$Q_Discover_start.$Q_Discover_reuse."\n") if $debug;
 
 		    my $stm_disc = $dbm->prepare($Q_Discover_start.$Q_Discover_reuse);
