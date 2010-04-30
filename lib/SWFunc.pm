@@ -479,7 +479,7 @@ sub SW_AP_get {
 			## HEAD_LINK
 			## Temporary inserting data
 			if ( $AP{'trust'} and ( not $AP{'communal'}) and $fparm->{'link_type'} == $link_type{'pppoe'} and $fparm->{'ip_addr'} =~ /^10\./ ) {
-			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
+			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=2, static_ip=0, ";
 			    $Q_upd = " head_id=3, vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."'".
 			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$fparm->{'inet_priority'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'";
 			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
