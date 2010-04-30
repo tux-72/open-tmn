@@ -1,6 +1,5 @@
 #!/usr/bin/perl -w
 
-
 use strict;
 
 # use ...
@@ -85,12 +84,12 @@ sub post_auth {
 		    my $Q_Discover_reuse = ""; my $Q_Discover_new ='' ; my $Q_Discover_grey ='' ;
 		    ### Поиск назначенного статического белого IP
 		    if ( $ref_port->{'static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
-			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.port_id=".$ref_port->{'port_id'}." and a.login='".$ref_port->{'login'}."'";
+			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
 			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}.
 			" order by a.end_lease limit 1";
 		    ### Поиск ранее выдаваемого динамического белого IP
 		    } elsif ( $ref_port->{'static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
-			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.port_id=".$ref_port->{'port_id'}." and a.login='".$ref_port->{'login'}."'".
+			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'".
 			" and a.inet_shape=".$ref_port->{'inet_shape'}." order by a.end_lease limit 1";
 			$Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}.
 			" order by a.end_lease limit 1";
@@ -98,7 +97,7 @@ sub post_auth {
 			" order by a.end_lease limit 1";
 		    ### Поиск ранее выдаваемого серого IP ( линк заблокирован в билинге )
 		    } elsif ( $ref_port->{'status'} == 2 ) {
-			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.port_id=".$ref_port->{'port_id'}.
+			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'".
 			" order by a.end_lease limit 1";
 			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() order by a.end_lease limit 1";
 		    } else {
