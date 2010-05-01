@@ -85,8 +85,7 @@ sub post_auth {
 		    ### Поиск назначенного статического белого IP
 		    if ( $ref_port->{'static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
 			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
-			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'}.
-			" order by a.end_lease limit 1";
+			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'};
 		    ### Поиск ранее выдаваемого динамического белого IP
 		    } elsif ( $ref_port->{'static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
 			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'".
@@ -99,7 +98,8 @@ sub post_auth {
 			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
 			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()";
 		    } else {
-			$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+			#$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+			$RAD_REPLY{'DHCP-Message-Type'} = 0;
 			return RLM_MODULE_NOTFOUND;
 		    }
 		    $Q_Discover_reuse	.= " order by a.end_lease desc limit 1";
@@ -122,7 +122,8 @@ sub post_auth {
 			}
 			if  (not $stm_disc->rows ) {
 			    &radiusd::radlog(1, 'All IP used in available DHCP scopes... :-('); 
-			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+			    #$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+			    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 			    return RLM_MODULE_NOTFOUND;
 			}
 		    }
@@ -133,8 +134,6 @@ sub post_auth {
 			    " SELECT ip, login, hw_mac, start_lease, end_lease, inet_shape, port_id, agent_info FROM dhcp_addr WHERE ip='".$ref_disc->{'ip'}."'";
 			    &radiusd::radlog(1, " Archive prev login = ".$Q_Discover_new) if $debug;
 			    $dbm->do($Q_Discover_new);
-			    #$dbm->do( "INSERT into dhcp_addr_arch set ip=".$stm_disc->{'ip'}.", login=".$stm_disc->{'login'}.
-			    #", start_lease=".$stm_disc->{'start_lease'}.", end_lease=".$stm_disc->{'end_lease'} );
 			}
 			$RAD_REPLY{'DHCP-IP-Address-Lease-Time'} = $ref_disc->{'dhcp_lease'};
 			$RAD_REPLY{'DHCP-Your-IP-Address'}	 = $ref_disc->{'ip'};
@@ -151,12 +150,14 @@ sub post_auth {
 		    $stm_disc->finish;
 		  } else {
 		    &radiusd::radlog(1, "AP for MAC = ".$AP{'MAC'}." and VLAN = ".$AP{'VLAN'}." not fixed :-( ...\n") if $debug;
-		    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+		    #$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+		    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 		    $res = RLM_MODULE_NOTFOUND;
 		  }
 		}
 	    } else {
-		    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+		    #$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+		    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 		    $res = RLM_MODULE_NOTFOUND;
 	    }
 	    $stm_port->finish;
@@ -212,7 +213,7 @@ sub post_auth {
 			    #ssh_cmd();
 			} else {
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
-			    $res = RLM_MODULE_REJECT;
+			    $res = RLM_MODULE_NOTFOUND;
 			}
 		    }
 		} else {
