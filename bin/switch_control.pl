@@ -219,16 +219,16 @@ if ( not defined($ARGV[0]) ) {
     p.sw_id, p.port_id, p.port, p.portpref, p.ds_speed, p.us_speed, p.vlan_id, p.tag, p.ltype_id, \
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m, bundle_jobs j \
     WHERE h.model_id=m.model_id and h.sw_id=p.sw_id and j.archiv<2 and p.type>0 and j.port_id=p.port_id \
-    and h.automanage=1  and j.ltype_id in \(";
+    and h.automanage=1  and (( j.ltype_id=".$link_type{'setparms'}." and date_insert < DATE_SUB(now(), INTERVAL 60 SECOND) ) OR j.ltype_id in (";
     if ($script_name eq 'cycle_check.pl' ) {
-	$Q_jobs .= $link_type{'setparms'}.",".$link_type{'pppoe'};
+	$Q_jobs .= $link_type{'pppoe'};
 	#dlog ( SUB => 'checkjobs', DBUG => 1, MESS => "Checking scheduled jobs automatically" );
     } else {
 	$Q_jobs .= $link_type{'up'}.",".$link_type{'down'}.",".$link_type{'uplink'}.",".$link_type{'free'}.
 	",".$link_type{'l2link'}.",".$link_type{'l3realnet'}.",".$link_type{'l3net4'};
 	dlog ( SUB => 'checkjobs', DBUG => 1, MESS => "Checking scheduled jobs manual" ) if $debug;
     }
-    $Q_jobs .= "\) order by h.model_id, p.sw_id, p.portpref, p.port, j.job_id ";
+    $Q_jobs .= ")) ORDER BY h.model_id, p.sw_id, p.portpref, p.port, j.job_id ";
     my $stm2 = $dbm->prepare($Q_jobs);
     
     $stm2->execute();
