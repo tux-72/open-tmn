@@ -235,6 +235,7 @@ if ( not defined($ARGV[0]) ) {
     if ( $stm2->rows ) { dlog ( SUB => 'checklink', DBUG => 1, MESS => "#" x 30 . " Checking cycle N $cycle_run " . "#" x 30  ); }
 
     while ( my $ref = $stm2->fetchrow_hashref() ) {
+	#$ref->{$_}||='' for keys %$ref;
 	############ SAVE PREVIOUS SWITCH CONFIG
 	if ( $SW{'change'} and $SW{'sw_id'} != $ref->{'sw_id'} and defined($libs{$SW{'lib'}}) and 
 	( $ref->{'new_ltype'}  == $link_type{'uplink'} || $ref->{'new_ltype'}  >= $conf->{'STARTLINKCONF'} )) {

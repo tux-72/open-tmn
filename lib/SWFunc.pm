@@ -819,13 +819,15 @@ sub VLAN_link {
 	$PAR{'low_port'} = $arglnk{'PARENTPORT'};
 	$PAR{'low_portpref'} = $arglnk{'PARENTPORTPREF'}; 
 	## Выбираем коммутаторы по цепочке вплоть до head_id или головного по зоне, центрального.
-	while ( $PAR{'sw_id'}>0 and $count < $start_conf->{'MAXPARENTS'} ) {
+	while ( defined($PAR{'sw_id'}) and $count < $start_conf->{'MAXPARENTS'} ) {
+	    $PAR{'low_portpref'}  ||= "";
 	    $PAR{'change'} = 0; 
 	    $count +=1;
 	    my $stm21 = $dbm->prepare("SELECT h.hostname, h.model_id, h.sw_id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_port, h.parent_portpref, ".
 	    "m.lib, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, models m WHERE h.model_id=m.model_id and h.sw_id=".$PAR{'sw_id'}." order by h.sw_id");
 	    $stm21->execute();
 	    while (my $ref21 = $stm21->fetchrow_hashref()) {
+		#$ref21->{'parent_portpref'} ||= "";
 		if ( 'x'.$ref21->{'lib'} eq 'x' ) {
 		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "LIB not defined for switch ".$ref21->{'hostname'}.", Vlan link break :-( !!!" );
 		    $stm21->finish;
@@ -933,11 +935,12 @@ sub DB_trunk_update {
         my %argdb = (
             @_,         # список пар аргументов
         );
+        $argdb{'PORTPREF'} ||= "";
 	# ACT SWID VLAN PORTPREF PORT
         dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Save to DB change trunk VLAN => '".$argdb{'VLAN'}."', sw_id => '".$argdb{'SWID'}."' port => ".$argdb{'PORTPREF'}.$argdb{'PORT'}." (debug)" );
 	return 1 if $debug>1;
 	my $Qr_in = "SELECT port_id FROM swports WHERE sw_id=".$argdb{'SWID'}." and port=".$argdb{'PORT'};
-	if ( defined($argdb{'PORTPREF'}) and 'x'.$argdb{'PORTPREF'} ne 'x' ) {
+	if ( 'x'.$argdb{'PORTPREF'} ne 'x' ) {
 	    $Qr_in .= " and portpref='".$argdb{'PORTPREF'}."'";
 	} else {
 	    $Qr_in .= " and portpref is NULL";
@@ -962,6 +965,7 @@ sub DB_trunk_vlan {
         my %argdb = (
             @_,         # список пар аргументов
         );
+        $argdb{'PORTPREF'} ||= "";
 	# ACT SWID VLAN PORTPREF PORT
 	my $res = 0;
 	# Умолчания для результата процедуры поиска
@@ -971,7 +975,7 @@ sub DB_trunk_vlan {
 
 	return 1 if $debug>1;
 	my $Qr_in = "SELECT port_id FROM swports WHERE sw_id=".$argdb{'SWID'}." and port=".$argdb{'PORT'};
-	if ( defined($argdb{'PORTPREF'}) and 'x'.$argdb{'PORTPREF'} ne 'x' ) {
+	if ( 'x'.$argdb{'PORTPREF'} ne 'x' ) {
 	    $Qr_in .= " and portpref='".$argdb{'PORTPREF'}."'";
 	} else {
 	    $Qr_in .= " and portpref is NULL";

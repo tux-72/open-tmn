@@ -189,7 +189,7 @@ sub DES_speed_char {
     my $arg = shift;
     my @duplex = ''; $duplex[0] = 'half'; $duplex[1] = 'full';
     my $spd = 'auto';
-    if ( defined($arg->{'SPEED'}) and  $arg->{'SPEED'} =~ /^1(0|00|000)$/ and $arg->{'DUPLEX'} =~ /(0|1)/ and not $arg->{'AUTONEG'} ) { 
+    if ( $arg->{'SPEED'} && $arg->{'SPEED'} =~ /^1(0|00)$/ && $arg->{'DUPLEX'} && $arg->{'DUPLEX'}=~ /(0|1)/ and not $arg->{'AUTONEG'} ) {
 	$spd = $arg->{'SPEED'}."_".$duplex[$arg->{'DUPLEX'}];
     }
     return $spd;

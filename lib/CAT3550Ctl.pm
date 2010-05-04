@@ -307,8 +307,8 @@ sub CAT3550_speed_char {
     my @dpl = ''; $dpl[0] = 'half'; $dpl[1] = 'full';
 
     my $spd = 'auto';
-    if ( $arg->{'SPEED'} =~ /^1(0|00|000)$/ && $arg->{'DUPLEX'} =~ /(0|1)/ and not $arg->{'AUTONEG'} ) {
-    	$spd = $arg->{'SPEED'};
+    if ( $arg->{'SPEED'} && $arg->{'SPEED'} =~ /^1(0|00)$/ && $arg->{'DUPLEX'} && $arg->{'DUPLEX'}=~ /(0|1)/ and not $arg->{'AUTONEG'} ) {
+	$spd = $arg->{'SPEED'};
 	return ($spd, $dpl[$arg->{'DUPLEX'}]);
     } else {
 	return ('auto', 'auto');
