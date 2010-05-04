@@ -23,7 +23,7 @@ our %conf = (
     'CYCLE_SLEEP'	=>	30,
     'FIRST_ZONEVLAN'	=>	4094,
     'DEF_COMUNITY'	=>	'Comunity123',
-    'CHECK_PPPOE_UP'	=>	0,
+    'CHECK_PPPOE_UP'	=>	1,
 );
 
 our %checkmac = (
