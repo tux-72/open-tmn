@@ -202,12 +202,7 @@ sub post_auth {
 			" WHERE agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}.
 			"' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
 			" and ip='".$cli_addr."'";
-
-			if ($ref_req->{'static_ip'} < 1) {
-			    $rows_up = $dbm->do($Q_Request_up);
-			} else {
-			    $rows_up = 2;
-			}
+			$rows_up = $dbm->do($Q_Request_up);
 
 			if ($rows_up > 0) {
 			    $res = RLM_MODULE_OK;
