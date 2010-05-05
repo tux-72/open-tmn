@@ -66,8 +66,8 @@ sub post_auth {
 
 	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
 	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information
-	    my $Q_check_macport = "SELECT l.port_id, l.inet_shape, l.head_id, l.static_ip, l.status, l.login, h.term_ip ".
-	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.pppoe_up=0 and l.inet_priority=1 and h.dhcp_relay_ip='".
+	    my $Q_check_macport = "SELECT l.port_id, l.inet_shape, l.head_id, l.static_ip, l.status, l.login, h.term_ip, l.pppoe_up ".
+	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority=1 and h.dhcp_relay_ip='".
 	    $RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and l.status=1 and l.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
 	    my $stm_port = $dbm->prepare($Q_check_macport);
 	    $stm_port->execute();
@@ -77,6 +77,10 @@ sub post_auth {
 		  SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_port->{'term_ip'}, LOGIN => $ref_port->{'login'}, VLAN => $AP{'VLAN'}, HW_MAC => $AP{'MAC'} );
 		  if ( $AP{'id'} == $ref_port->{'port_id'} ) {
 		    &radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug;
+		    if ($ref_port->{'pppoe_up'}) { 
+			$RAD_REPLY{'DHCP-Message-Type'} = 0;
+			return RLM_MODULE_NOTFOUND;
+		    }
 		    # Выделить IP
 		    my $Q_Discover_start  = "SELECT a.login, a.ip, a.start_lease, a.end_lease, p.mask, p.gw, p.static_ip, p.dhcp_lease FROM dhcp_addr a, dhcp_pools p ".
 		    " WHERE p.head_id=".$ref_port->{'head_id'}." and p.pool_id=a.pool_id";

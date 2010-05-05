@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 5.1.26-rc, for portbld-freebsd7.0 (amd64)
+-- MySQL dump 10.13  Distrib 5.1.45, for portbld-freebsd7.1 (amd64)
 --
 -- Host: localhost    Database: vlancontrol
 -- ------------------------------------------------------
--- Server version	5.1.26-rc
+-- Server version	5.1.45
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -28,8 +28,8 @@ USE `vlancontrol`;
 --
 
 DROP TABLE IF EXISTS `ap_login_info`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ap_login_info` (
   `login` varchar(30) CHARACTER SET latin1 NOT NULL,
   `hw_mac` varchar(17) CHARACTER SET latin1 NOT NULL,
@@ -40,41 +40,42 @@ CREATE TABLE `ap_login_info` (
   `sw_id` int(11) DEFAULT NULL,
   `vlan_id` int(11) DEFAULT NULL,
   `trust` tinyint(4) DEFAULT '0',
+  `ip_addr` varchar(15) DEFAULT NULL,
   PRIMARY KEY (`login`,`hw_mac`,`port_id`),
   KEY `switch` (`sw_id`),
   KEY `vlan` (`vlan_id`),
   KEY `trusted` (`trust`),
   KEY `ap` (`port_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `bundle_jobs`
 --
 
 DROP TABLE IF EXISTS `bundle_jobs`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `bundle_jobs` (
   `port_id` int(11) NOT NULL,
   `ltype_id` tinyint(4) NOT NULL DEFAULT '0',
   `job_id` int(11) NOT NULL AUTO_INCREMENT,
   `date_insert` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `date_exec` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `parm` varchar(200) NOT NULL DEFAULT ' ',
+  `parm` varchar(200) NOT NULL DEFAULT '',
   `archiv` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`job_id`) USING BTREE,
   UNIQUE KEY `ch_id` (`port_id`,`ltype_id`,`archiv`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=133 DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+) ENGINE=InnoDB AUTO_INCREMENT=188 DEFAULT CHARSET=koi8r CHECKSUM=1;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `client_subnets`
 --
 
 DROP TABLE IF EXISTS `client_subnets`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `client_subnets` (
   `ip1` int(11) NOT NULL DEFAULT '77',
   `ip2` int(11) NOT NULL DEFAULT '239',
@@ -91,7 +92,7 @@ CREATE TABLE `client_subnets` (
   KEY `state` (`status`),
   KEY `net` (`subnet`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -209,34 +210,158 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `dhcp_addr`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `dhcp_addr` (
   `pool_id` int(11) NOT NULL DEFAULT '0',
   `ip` varchar(15) NOT NULL,
+  `login` varchar(30) DEFAULT NULL,
   `hw_mac` varchar(17) DEFAULT NULL,
   `vlan_id` int(11) DEFAULT NULL,
   `session` varchar(50) DEFAULT NULL,
   `port_id` int(11) DEFAULT NULL,
-  `agent_info` varchar(50) DEFAULT NULL,
-  `end_lease` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `inet_speed` int(11) DEFAULT NULL,
+  `agent_info` varchar(70) DEFAULT NULL,
+  `start_lease` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `end_lease` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `inet_shape` int(11) DEFAULT NULL,
   PRIMARY KEY (`ip`),
   KEY `vlan` (`vlan_id`),
   KEY `session` (`session`),
   KEY `port_id` (`port_id`),
   KEY `lease` (`end_lease`),
-  KEY `hw_mac` (`hw_mac`)
+  KEY `hw_mac` (`hw_mac`),
+  KEY `user` (`login`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `dhcp_addr_arch`
+--
+
+DROP TABLE IF EXISTS `dhcp_addr_arch`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `dhcp_addr_arch` (
+  `ip` varchar(15) NOT NULL,
+  `login` varchar(30) NOT NULL,
+  `hw_mac` varchar(17) DEFAULT NULL,
+  `port_id` int(11) DEFAULT NULL,
+  `agent_info` varchar(70) DEFAULT NULL,
+  `start_lease` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `end_lease` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `inet_shape` int(11) DEFAULT NULL,
+  KEY `IP` (`ip`),
+  KEY `USER` (`login`),
+  KEY `MAC` (`hw_mac`),
+  KEY `AP` (`port_id`),
+  KEY `Shape` (`inet_shape`)
+) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = koi8r */ ;
+/*!50003 SET character_set_results = koi8r */ ;
+/*!50003 SET collation_connection  = koi8r_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER dhcp_addr_arch_log_insert AFTER  insert ON dhcp_addr_arch
+                FOR EACH ROW
+                BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('inet_shape="', IFNULL(new.`inet_shape`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('agent_info="', IFNULL(new.`agent_info`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('hw_mac="', IFNULL(new.`hw_mac`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('end_lease="', IFNULL(new.`end_lease`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('ip="', IFNULL(new.`ip`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('port_id="', IFNULL(new.`port_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('start_lease="', IFNULL(new.`start_lease`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('login="', IFNULL(new.`login`,''),'"'));
+                    
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = koi8r */ ;
+/*!50003 SET character_set_results = koi8r */ ;
+/*!50003 SET collation_connection  = koi8r_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER dhcp_addr_arch_log_update AFTER  update ON dhcp_addr_arch
+                FOR EACH ROW
+                BEGIN IF IFNULL(old.`inet_shape`,'') != IFNULL(new.`inet_shape`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('inet_shape: from="', IFNULL(old.`inet_shape`,''), '" to="', IFNULL(new.`inet_shape`,''),'"'));
+                        END IF; IF IFNULL(old.`agent_info`,'') != IFNULL(new.`agent_info`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('agent_info: from="', IFNULL(old.`agent_info`,''), '" to="', IFNULL(new.`agent_info`,''),'"'));
+                        END IF; IF IFNULL(old.`hw_mac`,'') != IFNULL(new.`hw_mac`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('hw_mac: from="', IFNULL(old.`hw_mac`,''), '" to="', IFNULL(new.`hw_mac`,''),'"'));
+                        END IF; IF IFNULL(old.`end_lease`,'') != IFNULL(new.`end_lease`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('end_lease: from="', IFNULL(old.`end_lease`,''), '" to="', IFNULL(new.`end_lease`,''),'"'));
+                        END IF; IF IFNULL(old.`ip`,'') != IFNULL(new.`ip`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('ip: from="', IFNULL(old.`ip`,''), '" to="', IFNULL(new.`ip`,''),'"'));
+                        END IF; IF IFNULL(old.`port_id`,'') != IFNULL(new.`port_id`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('port_id: from="', IFNULL(old.`port_id`,''), '" to="', IFNULL(new.`port_id`,''),'"'));
+                        END IF; IF IFNULL(old.`start_lease`,'') != IFNULL(new.`start_lease`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('start_lease: from="', IFNULL(old.`start_lease`,''), '" to="', IFNULL(new.`start_lease`,''),'"'));
+                        END IF; IF IFNULL(old.`login`,'') != IFNULL(new.`login`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('login: from="', IFNULL(old.`login`,''), '" to="', IFNULL(new.`login`,''),'"'));
+                        END IF;
+                    
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = koi8r */ ;
+/*!50003 SET character_set_results = koi8r */ ;
+/*!50003 SET collation_connection  = koi8r_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER dhcp_addr_arch_log_delete AFTER  delete ON dhcp_addr_arch
+                FOR EACH ROW
+                BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('inet_shape="',IFNULL(old.`inet_shape`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('agent_info="',IFNULL(old.`agent_info`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('hw_mac="',IFNULL(old.`hw_mac`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('end_lease="',IFNULL(old.`end_lease`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('ip="',IFNULL(old.`ip`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('port_id="',IFNULL(old.`port_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('start_lease="',IFNULL(old.`start_lease`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('login="',IFNULL(old.`login`,''),'"') );
+                    
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `dhcp_pools`
 --
 
 DROP TABLE IF EXISTS `dhcp_pools`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `dhcp_pools` (
   `pool_id` int(11) NOT NULL,
   `head_id` int(11) NOT NULL DEFAULT '1',
@@ -246,9 +371,10 @@ CREATE TABLE `dhcp_pools` (
   `gw` varchar(15) NOT NULL,
   `mask` varchar(15) NOT NULL,
   `static_ip` tinyint(1) NOT NULL DEFAULT '0',
+  `dhcp_lease` int(11) NOT NULL DEFAULT '3600',
   PRIMARY KEY (`pool_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -266,6 +392,7 @@ DELIMITER ;;
                         (now(), 'insert', 'dhcp_pools', CONCAT('real_ip="', IFNULL(new.`real_ip`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('head_id="', IFNULL(new.`head_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('pool_id="', IFNULL(new.`pool_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_pools', CONCAT('dhcp_lease="', IFNULL(new.`dhcp_lease`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('subnet="', IFNULL(new.`subnet`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('pool_name="', IFNULL(new.`pool_name`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('mask="', IFNULL(new.`mask`,''),'"'));
@@ -303,6 +430,9 @@ DELIMITER ;;
                         END IF; IF IFNULL(old.`pool_id`,'') != IFNULL(new.`pool_id`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_pools', CONCAT('pool_id: from="', IFNULL(old.`pool_id`,''), '" to="', IFNULL(new.`pool_id`,''),'"'));
+                        END IF; IF IFNULL(old.`dhcp_lease`,'') != IFNULL(new.`dhcp_lease`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_pools', CONCAT('dhcp_lease: from="', IFNULL(old.`dhcp_lease`,''), '" to="', IFNULL(new.`dhcp_lease`,''),'"'));
                         END IF; IF IFNULL(old.`subnet`,'') != IFNULL(new.`subnet`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_pools', CONCAT('subnet: from="', IFNULL(old.`subnet`,''), '" to="', IFNULL(new.`subnet`,''),'"'));
@@ -337,6 +467,7 @@ DELIMITER ;;
                         (now(), 'delete', 'dhcp_pools', CONCAT('real_ip="',IFNULL(old.`real_ip`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('head_id="',IFNULL(old.`head_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('pool_id="',IFNULL(old.`pool_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_pools', CONCAT('dhcp_lease="',IFNULL(old.`dhcp_lease`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('subnet="',IFNULL(old.`subnet`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('pool_name="',IFNULL(old.`pool_name`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('mask="',IFNULL(old.`mask`,''),'"') );
@@ -353,8 +484,8 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `head_link`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `head_link` (
   `head_id` int(11) NOT NULL,
   `port_id` int(11) NOT NULL,
@@ -362,144 +493,29 @@ CREATE TABLE `head_link` (
   `ip_subnet` varchar(18) DEFAULT NULL,
   `login` varchar(20) DEFAULT NULL,
   `head_iface` varchar(30) DEFAULT NULL,
+  `pppoe_up` tinyint(4) NOT NULL DEFAULT '1',
   `status` tinyint(4) NOT NULL DEFAULT '1',
   `set_status` tinyint(4) DEFAULT NULL,
   `hw_mac` varchar(17) DEFAULT NULL,
   `static_ip` tinyint(4) DEFAULT '0',
   `inet_shape` int(11) NOT NULL DEFAULT '1000',
+  `inet_priority` tinyint(4) NOT NULL DEFAULT '0',
+  `stamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `desc` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`port_id`) USING BTREE,
   KEY `IP` (`ip_subnet`),
   KEY `Login` (`login`),
   KEY `status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
-SET character_set_client = @saved_cs_client;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = koi8r */ ;
-/*!50003 SET character_set_results = koi8r */ ;
-/*!50003 SET collation_connection  = koi8r_general_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = '' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER head_link_log_insert AFTER  insert ON head_link
-                FOR EACH ROW
-                BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('inet_shape="', IFNULL(new.`inet_shape`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('static_ip="', IFNULL(new.`static_ip`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('hw_mac="', IFNULL(new.`hw_mac`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('status="', IFNULL(new.`status`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('port_id="', IFNULL(new.`port_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('login="', IFNULL(new.`login`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('vlan_id="', IFNULL(new.`vlan_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('head_iface="', IFNULL(new.`head_iface`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('head_id="', IFNULL(new.`head_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('desc="', IFNULL(new.`desc`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('ip_subnet="', IFNULL(new.`ip_subnet`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'head_link', CONCAT('set_status="', IFNULL(new.`set_status`,''),'"'));
-                    
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = koi8r */ ;
-/*!50003 SET character_set_results = koi8r */ ;
-/*!50003 SET collation_connection  = koi8r_general_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = '' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER head_link_log_update AFTER  update ON head_link
-                FOR EACH ROW
-                BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'update', 'head_link', CONCAT('PK_port_id: from="', IFNULL(old.`port_id`,''), '" to="', IFNULL(new.`port_id`,''),'"')); IF IFNULL(old.`inet_shape`,'') != IFNULL(new.`inet_shape`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('inet_shape: from="', IFNULL(old.`inet_shape`,''), '" to="', IFNULL(new.`inet_shape`,''),'"'));
-                        END IF; IF IFNULL(old.`static_ip`,'') != IFNULL(new.`static_ip`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('static_ip: from="', IFNULL(old.`static_ip`,''), '" to="', IFNULL(new.`static_ip`,''),'"'));
-                        END IF; IF IFNULL(old.`hw_mac`,'') != IFNULL(new.`hw_mac`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('hw_mac: from="', IFNULL(old.`hw_mac`,''), '" to="', IFNULL(new.`hw_mac`,''),'"'));
-                        END IF; IF IFNULL(old.`status`,'') != IFNULL(new.`status`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('status: from="', IFNULL(old.`status`,''), '" to="', IFNULL(new.`status`,''),'"'));
-                        END IF; IF IFNULL(old.`port_id`,'') != IFNULL(new.`port_id`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('port_id: from="', IFNULL(old.`port_id`,''), '" to="', IFNULL(new.`port_id`,''),'"'));
-                        END IF; IF IFNULL(old.`login`,'') != IFNULL(new.`login`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('login: from="', IFNULL(old.`login`,''), '" to="', IFNULL(new.`login`,''),'"'));
-                        END IF; IF IFNULL(old.`vlan_id`,'') != IFNULL(new.`vlan_id`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('vlan_id: from="', IFNULL(old.`vlan_id`,''), '" to="', IFNULL(new.`vlan_id`,''),'"'));
-                        END IF; IF IFNULL(old.`head_iface`,'') != IFNULL(new.`head_iface`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('head_iface: from="', IFNULL(old.`head_iface`,''), '" to="', IFNULL(new.`head_iface`,''),'"'));
-                        END IF; IF IFNULL(old.`head_id`,'') != IFNULL(new.`head_id`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('head_id: from="', IFNULL(old.`head_id`,''), '" to="', IFNULL(new.`head_id`,''),'"'));
-                        END IF; IF IFNULL(old.`desc`,'') != IFNULL(new.`desc`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('desc: from="', IFNULL(old.`desc`,''), '" to="', IFNULL(new.`desc`,''),'"'));
-                        END IF; IF IFNULL(old.`ip_subnet`,'') != IFNULL(new.`ip_subnet`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('ip_subnet: from="', IFNULL(old.`ip_subnet`,''), '" to="', IFNULL(new.`ip_subnet`,''),'"'));
-                        END IF; IF IFNULL(old.`set_status`,'') != IFNULL(new.`set_status`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'head_link', CONCAT('set_status: from="', IFNULL(old.`set_status`,''), '" to="', IFNULL(new.`set_status`,''),'"'));
-                        END IF;
-                    
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = koi8r */ ;
-/*!50003 SET character_set_results = koi8r */ ;
-/*!50003 SET collation_connection  = koi8r_general_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = '' */ ;
-DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER head_link_log_delete AFTER  delete ON head_link
-                FOR EACH ROW
-                BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('inet_shape="',IFNULL(old.`inet_shape`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('static_ip="',IFNULL(old.`static_ip`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('hw_mac="',IFNULL(old.`hw_mac`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('status="',IFNULL(old.`status`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('port_id="',IFNULL(old.`port_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('login="',IFNULL(old.`login`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('vlan_id="',IFNULL(old.`vlan_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('head_iface="',IFNULL(old.`head_iface`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('head_id="',IFNULL(old.`head_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('desc="',IFNULL(old.`desc`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('ip_subnet="',IFNULL(old.`ip_subnet`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'head_link', CONCAT('set_status="',IFNULL(old.`set_status`,''),'"') );
-                    
-END */;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `heads`
 --
 
 DROP TABLE IF EXISTS `heads`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `heads` (
   `head_id` tinyint(4) NOT NULL DEFAULT '0',
   `linked_head` tinyint(4) DEFAULT NULL,
@@ -523,7 +539,6 @@ CREATE TABLE `heads` (
   `loop_if` varchar(12) DEFAULT NULL,
   `dhcp_helper` varchar(15) DEFAULT NULL,
   `dhcp_relay_ip` varchar(15) DEFAULT NULL,
-  `dhcp_lease` int(11) DEFAULT NULL,
   `up_acl-in` varchar(15) DEFAULT NULL,
   `up_acl-out` varchar(15) DEFAULT NULL,
   `down_acl-in` varchar(15) DEFAULT NULL,
@@ -533,7 +548,7 @@ CREATE TABLE `heads` (
   UNIQUE KEY `term_hosts` (`zone_id`,`ltype_id`,`term_ip`) USING BTREE,
   KEY `type` (`ltype_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r COMMENT='Head switches, VLAN terminators';
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -568,7 +583,6 @@ DELIMITER ;;
                         (now(), 'insert', 'heads', CONCAT('ltype_id="', IFNULL(new.`ltype_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('head_id="', IFNULL(new.`head_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('l2sw_id="', IFNULL(new.`l2sw_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'heads', CONCAT('dhcp_lease="', IFNULL(new.`dhcp_lease`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('vlan_max="', IFNULL(new.`vlan_max`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('up_acl-out="', IFNULL(new.`up_acl-out`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('pass2="', IFNULL(new.`pass2`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
@@ -659,9 +673,6 @@ DELIMITER ;;
                         END IF; IF IFNULL(old.`l2sw_id`,'') != IFNULL(new.`l2sw_id`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'heads', CONCAT('l2sw_id: from="', IFNULL(old.`l2sw_id`,''), '" to="', IFNULL(new.`l2sw_id`,''),'"'));
-                        END IF; IF IFNULL(old.`dhcp_lease`,'') != IFNULL(new.`dhcp_lease`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'heads', CONCAT('dhcp_lease: from="', IFNULL(old.`dhcp_lease`,''), '" to="', IFNULL(new.`dhcp_lease`,''),'"'));
                         END IF; IF IFNULL(old.`vlan_max`,'') != IFNULL(new.`vlan_max`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'heads', CONCAT('vlan_max: from="', IFNULL(old.`vlan_max`,''), '" to="', IFNULL(new.`vlan_max`,''),'"'));
@@ -719,7 +730,6 @@ DELIMITER ;;
                         (now(), 'delete', 'heads', CONCAT('ltype_id="',IFNULL(old.`ltype_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('head_id="',IFNULL(old.`head_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('l2sw_id="',IFNULL(old.`l2sw_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'heads', CONCAT('dhcp_lease="',IFNULL(old.`dhcp_lease`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('vlan_max="',IFNULL(old.`vlan_max`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('up_acl-out="',IFNULL(old.`up_acl-out`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('pass2="',IFNULL(old.`pass2`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
@@ -738,8 +748,8 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `hosts`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `hosts` (
   `sw_id` int(11) NOT NULL AUTO_INCREMENT,
   `hw_mac` varchar(17) DEFAULT NULL,
@@ -772,8 +782,8 @@ CREATE TABLE `hosts` (
   UNIQUE KEY `sw_unit` (`street_id`,`dom`,`podezd`,`unit`) USING BTREE,
   KEY `swmodel` (`model_id`),
   KEY `house` (`street_id`,`dom`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=326 DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+) ENGINE=InnoDB AUTO_INCREMENT=340 DEFAULT CHARSET=koi8r CHECKSUM=1;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -953,8 +963,8 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `link_types`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `link_types` (
   `ltype_id` int(11) NOT NULL,
   `ltype_name` varchar(15) NOT NULL,
@@ -962,7 +972,7 @@ CREATE TABLE `link_types` (
   PRIMARY KEY (`ltype_id`),
   KEY `name` (`ltype_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1042,8 +1052,8 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `log`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `log` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `event` varchar(20) NOT NULL,
@@ -1051,16 +1061,16 @@ CREATE TABLE `log` (
   `time` datetime NOT NULL,
   `changes` varchar(4096) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=41321 DEFAULT CHARSET=latin1;
-SET character_set_client = @saved_cs_client;
+) ENGINE=MyISAM AUTO_INCREMENT=48702 DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `models`
 --
 
 DROP TABLE IF EXISTS `models`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `models` (
   `model_id` int(11) NOT NULL,
   `model_name` varchar(255) NOT NULL,
@@ -1087,7 +1097,7 @@ CREATE TABLE `models` (
   UNIQUE KEY `id` (`model_id`),
   UNIQUE KEY `model` (`model_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1257,15 +1267,15 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `phy_types`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `phy_types` (
   `phy_id` int(11) NOT NULL,
   `phy_name` varchar(40) NOT NULL,
   `desc` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`phy_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1345,8 +1355,8 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `port_vlantag`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `port_vlantag` (
   `port_id` int(11) NOT NULL,
   `vlan_id` int(11) NOT NULL DEFAULT '0',
@@ -1357,7 +1367,7 @@ CREATE TABLE `port_vlantag` (
   KEY `port` (`port_id`),
   CONSTRAINT `port_id` FOREIGN KEY (`port_id`) REFERENCES `swports` (`port_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1438,15 +1448,15 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `streets`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `streets` (
   `street_id` int(11) NOT NULL,
   `street_name` varchar(50) NOT NULL,
   PRIMARY KEY (`street_id`),
   KEY `names` (`street_name`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1521,8 +1531,8 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `swports`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `swports` (
   `snmp_idx` int(11) DEFAULT NULL,
   `port_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1553,8 +1563,8 @@ CREATE TABLE `swports` (
   KEY `head` (`head_id`),
   KEY `PHY` (`phy_id`),
   CONSTRAINT `switch` FOREIGN KEY (`sw_id`) REFERENCES `hosts` (`sw_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5241 DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+) ENGINE=InnoDB AUTO_INCREMENT=5278 DEFAULT CHARSET=koi8r CHECKSUM=1;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1729,8 +1739,8 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `vlan_list`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `vlan_list` (
   `vlan_id` int(11) NOT NULL DEFAULT '0',
   `zone_id` int(2) NOT NULL DEFAULT '-1',
@@ -1743,7 +1753,7 @@ CREATE TABLE `vlan_list` (
   KEY `Link_type` (`ltype_id`),
   KEY `AP` (`port_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r CHECKSUM=1;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1839,15 +1849,15 @@ DELIMITER ;
 --
 
 DROP TABLE IF EXISTS `vlan_zones`;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `vlan_zones` (
   `zone_id` tinyint(4) NOT NULL,
   `zone_name` varchar(20) NOT NULL,
   `desc` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`zone_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
-SET character_set_client = @saved_cs_client;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -1931,4 +1941,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2010-04-12 19:05:03
+-- Dump completed on 2010-05-05  1:05:04
