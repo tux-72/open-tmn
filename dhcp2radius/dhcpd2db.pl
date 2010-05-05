@@ -89,14 +89,12 @@ sub post_auth {
 		    ### Поиск назначенного статического белого IP
 		    if ( $ref_port->{'static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
 			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
-			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'};
+			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()";
 		    ### Поиск ранее выдаваемого динамического белого IP
 		    } elsif ( $ref_port->{'static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
-			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'".
-			" and a.inet_shape=".$ref_port->{'inet_shape'};
-			$Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now() and a.inet_shape=".$ref_port->{'inet_shape'};
-			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>1 and ( a.login='".$ref_port->{'login'}."' or ( a.end_lease<now()".
-			" and a.inet_shape=".$ref_port->{'inet_shape'}." ))";
+			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
+			$Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now()";
+			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>1 and ( a.login='".$ref_port->{'login'}."' or a.end_lease<now() )";
 		    ### Поиск ранее выдаваемого серого IP ( линк заблокирован в билинге )
 		    } elsif ( $ref_port->{'status'} == 2 ) {
 			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
@@ -170,9 +168,9 @@ sub post_auth {
 		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug;
 		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'") if $debug;
 
-		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, h.term_ip ".
+		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, l.inet_shape, h.term_ip ".
 		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h ".
-		" WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac and a.port_id=l.port_id and a.pool_id=p.pool_id and a.inet_shape=l.inet_shape ".
+		" WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac and a.port_id=l.port_id and a.pool_id=p.pool_id ".
 		" and l.status=1 and l.pppoe_up=0 and l.inet_priority=1 and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' ".
 		" and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' ".
 		" and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
@@ -200,7 +198,8 @@ sub post_auth {
 			$RAD_REPLY{'DHCP-Router-Address'}	 = $ref_req->{'gw'};
 
 			my $Q_Request_up =  "UPDATE dhcp_addr SET end_lease=ADDDATE(now(), INTERVAL ".$ref_req->{'dhcp_lease'}.
-			" SECOND ), session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."' WHERE agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}.
+			" SECOND ), session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."', inet_shape=".$ref_req->{'inet_shape'}.
+			" WHERE agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}.
 			"' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
 			" and ip='".$cli_addr."'";
 
