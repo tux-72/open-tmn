@@ -70,7 +70,7 @@ while (my $ref01 = $stm01->fetchrow_hashref()) {
 $stm01->finish();
 
 my %headinfo = ();
-my $stm = $dbm->prepare( "SELECT t.term_ip, t.zone_id, t.term_grey_ip2, h.ip, m.lib, m.mon_login, m.mon_pass FROM heads t, hosts h, models m ".
+my $stm = $dbm->prepare( "SELECT t.linked_head, t.term_ip, t.zone_id, t.term_grey_ip2, h.ip, m.lib, m.mon_login, m.mon_pass FROM heads t, hosts h, models m ".
 " WHERE h.model_id=m.model_id and t.l2sw_id=h.sw_id and t.term_ip is not NULL" );
 $stm->execute();
 while (my $ref = $stm->fetchrow_hashref()) {
@@ -79,6 +79,7 @@ while (my $ref = $stm->fetchrow_hashref()) {
     $headinfo{'MONLOGIN_'.$ref->{'term_ip'}} = $ref->{'mon_login'};
     $headinfo{'MONPASS_'. $ref->{'term_ip'}} = $ref->{'mon_pass'};
     $headinfo{'ZONE_'.    $ref->{'term_ip'}} = $ref->{'zone_id'};
+    $headinfo{'LHEAD_'.    $ref->{'term_ip'}} = $ref->{'linked_head'};
 }
 $stm->finish();
 
@@ -478,11 +479,12 @@ sub SW_AP_get {
 			$dbm->do("$Query");
 
 			## HEAD_LINK
-			## Temporary inserting data
+			# y inserting data
 			if ( $AP{'trust'} and $fparm->{'link_type'} == $link_type{'pppoe'} ) {
 			    if ( ! $fparm->{'ip_addr'} =~ /^10\.13\.\d{1,3}\.\d{1.3}$/ ) { $AP{'pri'} = 3; }
 			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
-			    $Q_upd = " head_id=3, vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
+			    $Q_upd = " head_id=".$headinfo{'LHEAD_'.$fparm->{'nas_ip'}}.", vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."'".
+			    ", hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
 			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'";
 			    $Q_upd .= ", pppoe_up=1" if $start_conf->{'CHECK_PPPOE_UP'};
 			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
