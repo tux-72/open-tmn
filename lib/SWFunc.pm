@@ -484,9 +484,9 @@ sub SW_AP_get {
 			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
 			    $Q_upd = " head_id=3, vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
 			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'";
-			    $Q_upd = ", pppoe_up=1" if $start_conf->{'CHECK_PPPOE_UP'};
+			    $Q_upd .= ", pppoe_up=1" if $start_conf->{'CHECK_PPPOE_UP'};
 			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
-			$dbm->do("$Query");
+			    $dbm->do("$Query") or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "$DBI::errstr" );
 			}
 		######################## SET JOB PARAMETERS
 			if ( $AP{'set'} and $AP{'automanage'} ) {
