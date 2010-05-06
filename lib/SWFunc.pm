@@ -768,41 +768,18 @@ sub GET_Terminfo {
 	$stm31->execute();
     }
     if ($stm31->rows == 1) {
-	while (my $ref31 = $stm31->fetchrow_hashref()) {
-    	    $headinfo{'HEAD_ID'} = $ref31->{'head_id'};
-	    $headinfo{'L2SW_ID'} = $ref31->{'l2sw_id'};
-	    $headinfo{'L2SW_PORT'} = $ref31->{'l2sw_port'};
-	    $headinfo{'L2SW_PORTPREF'} = $ref31->{'l2sw_portpref'};
-	    $headinfo{'TERM_USE'} = $ref31->{'term_use'};
-	    $headinfo{'TERM_LIB'} = $ref31->{'term_lib'};
-	    $headinfo{'TERM_ID'} = $ref31->{'term_id'};
-	    $headinfo{'TERM_IP'} = $ref31->{'term_ip'};
-	    $headinfo{'TERM_PORT'} = $ref31->{'term_port'};
-	    $headinfo{'TERM_PORTPREF'} = $ref31->{'term_portpref'};
-	    $headinfo{'TERM_LOGIN1'} = $ref31->{'login1'};
-	    $headinfo{'TERM_LOGIN2'} = $ref31->{'login2'};
-	    $headinfo{'TERM_PASS1'} = $ref31->{'pass1'};
-	    $headinfo{'TERM_PASS2'} = $ref31->{'pass2'};
-	    $headinfo{'VLAN_MIN'} = $ref31->{'vlan_min'};
-	    $headinfo{'VLAN_MAX'} = $ref31->{'vlan_max'};
-	    $headinfo{'UP_ACLIN'} = $ref31->{'up_acl-in'};
-	    $headinfo{'UP_ACLOUT'} = $ref31->{'up_acl-out'};
-	    $headinfo{'DOWN_ACLIN'} = $ref31->{'down_acl-in'};
-	    $headinfo{'DOWN_ACLOUT'} = $ref31->{'down_acl-out'};
-	    $headinfo{'LOOP_IF'} = $ref31->{'loop_if'};
-	    $headinfo{'DHCP_HELPER'} = $ref31->{'dhcp_helper'};
-	    $headinfo{'ZONE_ID'} = $ref31->{'zone_id'};
-	}
-	$res = 1;
-	#$stm31->finish();
-	#return \%headinfo;
+	my $ref31 = $stm31->fetchrow_hashref();
+	my %head = %{$ref31};
+	$stm31->finish();
+	return \%head;
     } elsif ($stm31->rows > 1)  {
 	dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "MULTI TERMINATOR! 8-), count = ".$stm31->rows );
     } else {
 	dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => 'TERMINATOR NOT FOUND :-(' );
     }
     $stm31->finish();
-    return \%headinfo if ($res > 0);
+    return -1;
+    #return \%headinfo if ($res > 0);
 }
 
 
@@ -1049,7 +1026,7 @@ sub VLAN_get {
 	my $increment = 1; my $res = -1;
 
 	my %vlanuse = ();
-	my $Qr_range = "SELECT vlan_id FROM vlan_list WHERE vlan_id>=".$head->{'VLAN_MIN'}." and vlan_id<=".$head->{'VLAN_MAX'}." and zone_id=".$head->{'VLAN_ZONE'};
+	my $Qr_range = "SELECT vlan_id FROM vlan_list WHERE vlan_id>=".$head->{'vlan_min'}." and vlan_id<=".$head->{'vlan_max'}." and zone_id=".$head->{'zone_id'};
         my $stm35 = $dbm->prepare($Qr_range);
         $stm35->execute();
 	while (my $ref35 = $stm35->fetchrow_hashref()) {
@@ -1059,15 +1036,15 @@ sub VLAN_get {
 		
 	my $vlan_id=0; 
 	if ($increment) {
-	    $vlan_id = $head->{'VLAN_MIN'};
-	    while ( $res < 1 and $vlan_id <= $head->{'VLAN_MAX'} ) {
+	    $vlan_id = $head->{'vlan_min'};
+	    while ( $res < 1 and $vlan_id <= $head->{'vlan_max'} ) {
 		dlog ( SUB => (caller(0))[3]||'', DBUG => 2, MESS =>  "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
 		$res = $vlan_id if not defined($vlanuse{$vlan_id});
 		$vlan_id += 1;
 	    }
 	} else {
-	    $vlan_id = $head->{'VLAN_MAX'};
-	    while ( $res < 1 and $vlan_id >= $head->{'VLAN_MIN'} ) {
+	    $vlan_id = $head->{'vlan_max'};
+	    while ( $res < 1 and $vlan_id >= $head->{'vlan_min'} ) {
 		dlog ( SUB => (caller(0))[3]||'', DBUG => 2, MESS => "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
 		$res = $vlan_id if not defined($vlanuse{$vlan_id});
 		$vlan_id -= 1;
@@ -1075,11 +1052,11 @@ sub VLAN_get {
 	}
 
 	if ($res > 0 and $debug < 2) {
-	    $dbm->do("INSERT into vlan_list SET info='AUTO INSERT VLAN record from vlan range', vlan_id=".$res.", zone_id=".$head->{'VLAN_ZONE'}.
+	    $dbm->do("INSERT into vlan_list SET info='AUTO INSERT VLAN record from vlan range', vlan_id=".$res.", zone_id=".$head->{'zone_id'}.
 	    ", port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}." ON DUPLICATE KEY UPDATE info='AUTO UPDATE VLAN record', port_id=".
 	    $arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}); 
 	}
-	return ( $res, $head->{'HEAD_ID'} ) ;
+	return ( $res, $head->{'head_id'} ) ;
 }
 
 1;

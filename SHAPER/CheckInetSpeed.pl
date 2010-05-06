@@ -11,6 +11,7 @@ my $debug = 1;
 my $DIR='';
 my $PROG=$0;
 my $pri=20;
+my $change = 0;
 
 if ( $PROG =~ /(\S+)\/(\S+)$/ ) {
     $DIR=$1.'/data';
@@ -55,22 +56,6 @@ my %pipeid = (
     '10000'	=> 2000,
 );
 
-my %pipespeed = (
-    '1010'	=> 128,
-    '1020'	=> 256,
-    '1050'	=> 512,
-    '1100'	=> 1000,
-    '1200'	=> 2000,
-    '1300'	=> 3000,
-    '1400'	=> 4000,
-    '1500'	=> 5000,
-    '1600'	=> 6000,
-    '1700'	=> 7000,
-    '1800'	=> 8000,
-    '1900'	=> 9000,
-    '2000'	=> 10000,
-);
-
 my $dbm;
 
 DB_mysql_connect(\$dbm);
@@ -85,7 +70,7 @@ while (my $refm = $stm->fetchrow_hashref()) {
 	($refm->{'inet_shape'}, $pri ) = PRI_CALC ( $refm->{'inet_shape'}, $refm->{'inet_priority'});
 	print SHAPER rspaced($refm->{'ip_subnet'},20)." ".$pipeid{$refm->{'inet_shape'}}."\t ".($pipeid{$refm->{'inet_shape'}}+1)."\t".$pri."\t".($refm->{'login'}||'none')."\n";
 	if (( not defined($pipeold{$refm->{'ip_subnet'}}) ) || ( $pipeold{$refm->{'ip_subnet'}}+0 != $pipeid{$refm->{'inet_shape'}}+0 ) ) {
-	    # inet_priority = 1, ip_addr = 10.13.48.114, inet_rate = 2000, login = yuriy
+	    $change +=1;
 	    print SHAPER_DIFF "login:".($refm->{'login'}||'none').";inet_priority:".$refm->{'inet_priority'}.";inet_rate:".$refm->{'inet_shape'}.
 	    ";ip_addr:".$refm->{'ip_subnet'}.";\n";
 	}
@@ -98,10 +83,10 @@ $stm->execute();
 while (my $refd = $stm->fetchrow_hashref()) {
     if ( defined($refd->{'ip'}) ) {
 	($refd->{'inet_shape'}, $pri ) = PRI_CALC ( $refd->{'inet_shape'}, $refd->{'inet_priority'});
-	print SHAPER rspaced($refd->{'ip'},20)." ".$pipeid{$refd->{'inet_shape'}}."\t ".($pipeid{$refd->{'inet_shape'}}+1)."\t".$pri."\tIPUnnum_".($refd->{'login'}||'none')."\n";
+	print SHAPER rspaced($refd->{'ip'},20)." ".$pipeid{$refd->{'inet_shape'}}."\t ".($pipeid{$refd->{'inet_shape'}}+1)."\t".$pri."\tIPU_".($refd->{'login'}||'none')."\n";
 	if ( ( not defined($pipeold{$refd->{'ip'}})) || ( $pipeold{$refd->{'ip'}}+0 !=  $pipeid{$refd->{'inet_shape'}}+0 ) ) {
-	    # inet_priority = 1, ip_addr = 10.13.48.114, inet_rate = 2000, login = yuriy
-	    print SHAPER_DIFF "login:IPUnnum_".($refd->{'login'}||'none').";inet_priority:".$refd->{'inet_priority'}.";inet_rate:".$refd->{'inet_shape'}.
+	    $change +=1;
+	    print SHAPER_DIFF "login:IPU_".($refd->{'login'}||'none').";inet_priority:".$refd->{'inet_priority'}.";inet_rate:".$refd->{'inet_shape'}.
 	    ";ip_addr:".$refd->{'ip'}.";\n";
 	}
     }
@@ -113,8 +98,9 @@ $stm->finish;
 close SHAPER;
 close SHAPER_DIFF;
 
-system('cat '.$shaperdiff.' | /usr/bin/ssh  datasync@77.239.208.17 /opt/dispatcher/check_shape.pl ssh');
-
+if ($change) {
+    system('cat '.$shaperdiff.' | /usr/bin/ssh  datasync@77.239.208.17 /opt/dispatcher/check_shape.pl ssh');
+}
 rename $shaper, $shaper.".old";
 
 sub GET_IP3 {
@@ -152,4 +138,3 @@ sub PRI_CALC {
     $priority   = 80 if ($priority > 80 );
     return ($rate, $priority)
 }
-

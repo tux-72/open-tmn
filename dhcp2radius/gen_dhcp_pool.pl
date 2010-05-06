@@ -24,14 +24,12 @@ my %pool = ();
 #$pool{'pool_id'}=2;
 #$pool{'start_ip'}="77.239.216.2";
 #$pool{'end_ip'}="77.239.223.254";
-#$pool{'shape'}="2000";
 #gen_pool();
 
 ## For blocked users
-$pool{'pool_id'}=101;
-$pool{'start_ip'}="10.32.240.0";
-$pool{'end_ip'}="10.32.255.254";
-$pool{'shape'}="NULL";
+#$pool{'pool_id'}=101;
+#$pool{'start_ip'}="10.32.240.0";
+#$pool{'end_ip'}="10.32.255.254";
 
 gen_pool();
 
@@ -40,7 +38,7 @@ sub gen_pool {
     my $current_ip=$pool{'start_ip'};
     my $end_ip = ip_inc($pool{'end_ip'});
     while ( $current_ip ne $end_ip ) {
-	$Q_addip = "INSERT INTO dhcp_addr SET pool_id=".$pool{'pool_id'}.", ip='".$current_ip."', inet_shape=".$pool{'shape'};
+	$Q_addip = "INSERT INTO dhcp_addr SET pool_id=".$pool{'pool_id'}.", ip='".$current_ip."'";
 	$Q_addip .= " ON DUPLICATE KEY UPDATE pool_id=".$pool{'pool_id'};
 	print $Q_addip."\n" if $debug;
 	$dbm->do($Q_addip) if not $debug;
