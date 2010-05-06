@@ -414,6 +414,7 @@ sub SW_AP_get {
 	    'update_db',	0,
 	    'DB_portinfo',	0,
 	    'MAC',	$fparm->{'mac'},
+	    'pri',	$fparm->{'inet_priority'},
 	    'id',	0,
 	    'name',	'',
 	    'swid',	0,
@@ -478,10 +479,11 @@ sub SW_AP_get {
 
 			## HEAD_LINK
 			## Temporary inserting data
-			if ( $AP{'trust'} and ( not $AP{'communal'}) and $fparm->{'link_type'} == $link_type{'pppoe'} and $fparm->{'ip_addr'} =~ /^10\./ ) {
+			if ( $AP{'trust'} and $fparm->{'link_type'} == $link_type{'pppoe'} ) {
+			    if ( ! $fparm->{'ip_addr'} =~ /^10\.13\.\d{1,3}\.\d{1.3}$/ ) { $AP{'pri'} = 3; }
 			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
-			    $Q_upd = " head_id=3, vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}.
-			    "', inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$fparm->{'inet_priority'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'";
+			    $Q_upd = " head_id=3, vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
+			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'";
 			    $Q_upd = ", pppoe_up=1" if $start_conf->{'CHECK_PPPOE_UP'};
 			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
 			$dbm->do("$Query");

@@ -65,9 +65,9 @@ sub post_auth {
 	    $res = RLM_MODULE_OK;
 
 	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
-	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information
+	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information и типу абонента
 	    my $Q_check_macport = "SELECT l.port_id, l.inet_shape, l.head_id, l.static_ip, l.status, l.login, h.term_ip, l.pppoe_up ".
-	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority=1 and h.dhcp_relay_ip='".
+	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority=1 and l.communal=0 and h.dhcp_relay_ip='".
 	    $RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and l.status=1 and l.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
 	    my $stm_port = $dbm->prepare($Q_check_macport);
 	    $stm_port->execute();
@@ -168,12 +168,11 @@ sub post_auth {
 		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug;
 		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'") if $debug;
 
-		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, l.inet_shape, h.term_ip ".
-		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h ".
-		" WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac and a.port_id=l.port_id and a.pool_id=p.pool_id ".
-		" and l.status=1 and l.pppoe_up=0 and l.inet_priority=1 and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' ".
-		" and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' ".
-		" and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
+		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, l.inet_shape, h.term_ip".
+		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
+		" and a.port_id=l.port_id and a.pool_id=p.pool_id and l.status=1 and l.pppoe_up=0 and l.inet_priority=1 and l.communal=0".
+		" and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and a.ip='".$cli_addr."' and a.agent_info='".
+		$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
 
 		my $stm_req = $dbm->prepare($Q_Request);
