@@ -209,7 +209,7 @@ sub dlog {
 sub SW_AP_fix {
 
 	DB_mysql_connect(\$dbm);
-	my $Query10 = ''; my $Query0 = ''; my $Query1 = ''; my %sw_arg = ();
+	my $Query10 = ''; my $Query0 = ''; my $Query1 = ''; my %sw_arg = (); my $cli_vlan=0;
 	my %arg = (
 	    @_,         # список пар аргументов
 	);
@@ -226,9 +226,10 @@ sub SW_AP_fix {
 	"m.mon_login, m.mon_pass FROM hosts h, streets st, models m WHERE h.model_id=m.model_id and h.street_id=st.street_id and m.lib is not NULL and h.clients_vlan=".
 	$arg{'VLAN'}." and h.zone_id=".$AP->{'vlan_zone'}." and h.visible>0" );
 	$stm0->execute();
-		if ($stm0->rows>1) { dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "More by one switch in VLAN '".$arg{'VLAN'}."'!!!" ); }
+		if ($stm0->rows>1) { dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "More by one switch in Clients VLAN '".$arg{'VLAN'}."'!!!" ); }
 
 		while (my $ref = $stm0->fetchrow_hashref() and not $AP->{'id'}) {
+			$cli_vlan=1;
 			$AP->{'automanage'}=1 if ($ref->{'automanage'} == 1);
 			$AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
 
@@ -280,7 +281,7 @@ sub SW_AP_fix {
 			"CLI_VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 		}
 		$stm0->finish;
-		if (not $AP->{'id'}) {
+		if ( ( not $AP->{'id'}) and ( not $cli_vlan ) ) {
 			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => "FIND PORT VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."', MAC:'".$arg{'HW_MAC'}."'" );
 			$AP->{'DB_portinfo'}=1;
 			$stm0 = $dbm->prepare( "SELECT h.automanage, h.bw_ctl, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit,".
@@ -320,8 +321,10 @@ sub SW_AP_fix {
 			    "VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 			}
 			$stm0->finish;
+		} else {
+		    $AP->{'id'} = '-1';
 		}
-} 
+}
 
 sub SW_AP_get {
 
