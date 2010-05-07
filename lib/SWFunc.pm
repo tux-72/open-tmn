@@ -71,7 +71,7 @@ $stm01->finish();
 
 my %headinfo = ();
 my $stm = $dbm->prepare( "SELECT t.linked_head, t.term_ip, t.zone_id, t.term_grey_ip2, h.ip, m.lib, m.mon_login, m.mon_pass FROM heads t, hosts h, models m ".
-" WHERE t.ltype_id=".$link_type{'pppoe'}." and h.model_id=m.model_id and t.l2sw_id=h.sw_id and t.term_ip is not NULL order by head_id desc" );
+" WHERE t.ltype_id<>".$link_type{'l3net4'}." and h.model_id=m.model_id and t.l2sw_id=h.sw_id and t.term_ip is not NULL order by head_id desc" );
 $stm->execute();
 while (my $ref = $stm->fetchrow_hashref()) {
     $headinfo{'L2LIB_'.   $ref->{'term_ip'}} = $ref->{'lib'};
