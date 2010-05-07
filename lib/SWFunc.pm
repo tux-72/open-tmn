@@ -71,7 +71,7 @@ $stm01->finish();
 
 my %headinfo = ();
 my $stm = $dbm->prepare( "SELECT t.linked_head, t.term_ip, t.zone_id, t.term_grey_ip2, h.ip, m.lib, m.mon_login, m.mon_pass FROM heads t, hosts h, models m ".
-" WHERE h.model_id=m.model_id and t.l2sw_id=h.sw_id and t.term_ip is not NULL" );
+" WHERE t.ltype_id=".$link_type{'pppoe'}." and h.model_id=m.model_id and t.l2sw_id=h.sw_id and t.term_ip is not NULL order by head_id desc" );
 $stm->execute();
 while (my $ref = $stm->fetchrow_hashref()) {
     $headinfo{'L2LIB_'.   $ref->{'term_ip'}} = $ref->{'lib'};
@@ -79,7 +79,7 @@ while (my $ref = $stm->fetchrow_hashref()) {
     $headinfo{'MONLOGIN_'.$ref->{'term_ip'}} = $ref->{'mon_login'};
     $headinfo{'MONPASS_'. $ref->{'term_ip'}} = $ref->{'mon_pass'};
     $headinfo{'ZONE_'.    $ref->{'term_ip'}} = $ref->{'zone_id'};
-    $headinfo{'LHEAD_'.    $ref->{'term_ip'}} = $ref->{'linked_head'};
+    $headinfo{'LHEAD_'.   $ref->{'term_ip'}} = $ref->{'linked_head'} if $ref->{'linked_head'};
 }
 $stm->finish();
 
@@ -483,12 +483,12 @@ sub SW_AP_get {
 			if ( $AP{'trust'} and $fparm->{'link_type'} == $link_type{'pppoe'} ) {
 			    if ( ! $fparm->{'ip_addr'} =~ /^10\.13\.\d{1,3}\.\d{1.3}$/ ) { $AP{'pri'} = 3; }
 			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
-			    $Q_upd = " head_id=".$headinfo{'LHEAD_'.$fparm->{'nas_ip'}}.", vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."'".
-			    ", hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
-			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'";
+			    $Q_upd = " vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
+			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'".
+			    ", head_id=".$headinfo{'LHEAD_'.$fparm->{'nas_ip'}};
 			    $Q_upd .= ", pppoe_up=1" if $start_conf->{'CHECK_PPPOE_UP'};
 			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
-			    $dbm->do("$Query") or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "$DBI::errstr" );
+			    $dbm->do("$Query") or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "$Query \n$DBI::errstr" );
 			}
 		######################## SET JOB PARAMETERS
 			if ( $AP{'set'} and $AP{'automanage'} ) {
@@ -753,7 +753,7 @@ sub GET_Terminfo {
         @_,         # список пар аргументов
     );
     # TYPE ZONE TERM_ID
-    my %headinfo; my $res = 0;
+    my $res = 0;
     $Querry_start = "SELECT * FROM heads WHERE ";
     if ( defined($arg{'TERM_ID'}) and $arg{'TERM_ID'} > 0) {
 	$Querry_start .= " head_id=".$arg{'TERM_ID'};
@@ -781,7 +781,6 @@ sub GET_Terminfo {
     }
     $stm31->finish();
     return -1;
-    #return \%headinfo if ($res > 0);
 }
 
 
