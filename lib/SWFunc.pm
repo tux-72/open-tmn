@@ -321,8 +321,6 @@ sub SW_AP_fix {
 			    "VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 			}
 			$stm0->finish;
-		} else {
-		    $AP->{'id'} = '-1';
 		}
 }
 
