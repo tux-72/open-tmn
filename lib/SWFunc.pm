@@ -277,8 +277,8 @@ sub SW_AP_fix {
                                         $AP->{'name'} .= ", порт ".$AP->{'port'};
 					$stm1->finish;
 			}
-			dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => 
-			"CLI_VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
+			dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
+			"CLI_VLAN  '".$arg{'VLAN'}."' MAC '".$arg{'HW_MAC'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 		}
 		$stm0->finish;
 		if ( ( not $AP->{'id'}) and ( not $cli_vlan ) ) {
@@ -317,8 +317,8 @@ sub SW_AP_fix {
 			    }
 			    $AP->{'id'} = $ref->{'port_id'};
 			    $AP->{'communal'} = $ref->{'communal'};
-			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => 
-			    "VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
+			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
+			    "PORT_VLAN '".$arg{'VLAN'}."' MAC '".$arg{'HW_MAC'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 			}
 			$stm0->finish;
 		}
