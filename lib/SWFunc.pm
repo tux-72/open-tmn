@@ -277,7 +277,7 @@ sub SW_AP_fix {
                                         $AP->{'name'} .= ", порт ".$AP->{'port'};
 					$stm1->finish;
 			}
-			dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
+			dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
 			"CLI_VLAN  '".$arg{'VLAN'}."' MAC '".$arg{'HW_MAC'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 		}
 		$stm0->finish;
@@ -317,7 +317,7 @@ sub SW_AP_fix {
 			    }
 			    $AP->{'id'} = $ref->{'port_id'};
 			    $AP->{'communal'} = $ref->{'communal'};
-			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
+			    dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
 			    "PORT_VLAN '".$arg{'VLAN'}."' MAC '".$arg{'HW_MAC'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
 			}
 			$stm0->finish;
@@ -409,6 +409,7 @@ sub SW_AP_get {
 	my $job_parms = '';
 
 	my %AP = (
+	    'callsub',	'PPPoE2Dispatcher',
 	    'trust',	0,
 	    'set',	0,
 	    'VLAN',	0,

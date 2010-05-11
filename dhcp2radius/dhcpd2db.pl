@@ -52,6 +52,7 @@ sub post_auth {
 	&radiusd::radlog(1, "New ".$RAD_REQUEST{'DHCP-Message-Type'}." VLAN = $vlan, MAC = ".$RAD_REQUEST{'DHCP-Client-Hardware-Address'} );
 
 	my %AP = (
+		'callsub'	=> 'DHCP2RADIUS',
 		'VLAN'		=> $vlan,
 		'MAC'		=> $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
 		'id'		=> 0,
