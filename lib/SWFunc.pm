@@ -32,7 +32,7 @@ $VERSION = 1.8;
 %EXPORT_TAGS = ();
 
 @EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl dlog rspaced lspaced
-	    DB_mysql_connect IOS_rsh
+	    DB_mysql_connect IOS_rsh GET_IP3 GET_pipeid PRI_calc
 	    SAVE_config VLAN_link DB_trunk_vlan DB_trunk_update GET_Terminfo GET_GW_parms 
 	    VLAN_VPN_get VLAN_get VLAN_remove 
 );
@@ -204,7 +204,6 @@ sub dlog {
         return @c;
     }
 }
-
 
 sub SW_AP_fix {
 
@@ -487,8 +486,7 @@ sub SW_AP_get {
 			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
 			    $Q_upd = " vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
 			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'".
-			    ", head_id=".$headinfo{'LHEAD_'.$fparm->{'nas_ip'}};
-			    $Q_upd .= ", pppoe_up=1" if $start_conf->{'CHECK_PPPOE_UP'};
+			    ", head_id=".$headinfo{'LHEAD_'.$fparm->{'nas_ip'}}.", pppoe_up=1";
 			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
 			    $dbm->do("$Query") or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "$Query \n$DBI::errstr" );
 			}
@@ -1061,5 +1059,68 @@ sub VLAN_get {
 	}
 	return ( $res, $head->{'head_id'} ) ;
 }
+
+sub GET_IP3 {
+    my $subip3 = shift;
+    my @ln = `/usr/local/bin/ipcalc $subip3`;
+    foreach (@ln) {
+        if ( /HostMax\:\s+(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\s+/ ) {
+            #dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Change '".$subip3."' to '$1.$2.$3.$4'" );
+            $subip3 = "$1.$2.$3.$4";
+        }
+    }
+    return $subip3;
+}
+
+
+sub GET_pipeid {
+    my $speed = shift;
+    my %pipeid = (
+	'64'	=> 1006,
+	'128'	=> 1010,
+	'256'	=> 1020,
+	'512'	=> 1050,
+	'1000'	=> 1100,
+	'2000'	=> 1200,
+	'3000'	=> 1300,
+	'4000'	=> 1400,
+	'5000'	=> 1500,
+	'6000'	=> 1600,
+	'7000'	=> 1700,
+	'8000'	=> 1800,
+	'9000'	=> 1900,
+	'10000'	=> 2000,
+    );
+    if ( defined($pipeid{$speed}) ) {
+	return $pipeid{$speed};
+    } else {
+	return 1010;
+    }
+}
+
+sub PRI_calc {
+    my $rate = shift;
+    my $pri  = shift;
+    my $priority = 20;
+    # Normalise megabits for rate > 999 Kbits
+    $rate = int($rate/1000)*1000 if ($rate > 999 );
+
+    if ($rate > 3100)      {
+        $priority = $pri*20+int($rate/1000)*5;
+    } elsif ($rate > 1100) {
+        $priority = $pri*20+int($rate/500)*4;
+    } elsif ($rate > 900)  {
+        $priority = $pri*20+int($rate/200)*3;
+    } elsif ($rate > 400)  {
+        $priority = $pri*20+int($rate/100)*2;
+    } elsif ($rate > 200)  {
+        $priority = $pri*20+int($rate/100)*4;
+    } else {
+        $priority = $pri*20+int($rate/100)*3;
+    }
+    $priority   = 80 if ($priority > 80 );
+    return ($rate, $priority)
+}
+
 
 1;
