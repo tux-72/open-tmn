@@ -174,7 +174,7 @@ sub post_auth {
 		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, l.inet_shape, h.term_ip".
 		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
 		" and a.port_id=l.port_id and a.pool_id=p.pool_id and l.status=1 and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0".
-		" and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and a.ip='".$cli_addr."' and a.agent_info='".
+		" and l.dhcp_use=1 and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and a.ip='".$cli_addr."' and a.agent_info='".
 		$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
 

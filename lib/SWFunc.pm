@@ -483,9 +483,9 @@ sub SW_AP_get {
 			$dbm->do("$Query");
 
 			## HEAD_LINK
-			# y inserting data
+			# inserting data
 			if ( $AP{'trust'} and $fparm->{'link_type'} == $link_type{'pppoe'} ) {
-			    if ( ! $fparm->{'ip_addr'} =~ /^10\.13\.\d{1,3}\.\d{1.3}$/ ) { $AP{'pri'} = 3; }
+			    if ( not ( $fparm->{'ip_addr'} =~ /^10\.13\.\d{1,3}\.\d{1.3}$/ ) ) { $AP{'pri'} = 3; }
 			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, ";
 			    $Q_upd = " vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
 			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'".
