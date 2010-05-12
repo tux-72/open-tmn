@@ -163,14 +163,17 @@ sub BPS_port_set_vlan {
 sub BPS_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
-    my $sw; return -1  if ( &$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'" );
-
     my $port = -1; my $pref; my $max=3; my $count=0;
+
+################
+    if ($arg->{'USE_SNMP'}) {
+        ($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+    }
+################
+  if ( $port < 0 ) {
+    my $sw; return -1  if ( &$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     while ($count < $max) {
     my @ln = $sw->cmd("show mac-address-table vid ".$arg->{'VLAN'}." address ".$arg->{'MAC'});
         foreach (@ln) {
@@ -188,7 +191,8 @@ sub BPS_fix_macport {
         }
     }
     $sw->close();
-    return ($pref, $port);
+  }
+  return ($pref, $port);
 }
 
 

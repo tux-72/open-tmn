@@ -9,10 +9,9 @@ use SWConf;
 use SWFunc;
 
 my $onlyfiz = 1;
+$onlyfiz = 0 if ( defined($ARGV[0]) and $ARGV[0] eq 'all' );
 
-$onlyfiz = 0 if ( $ARGV[0] eq 'all' );
 #########################
-
 my %AP = ();
 my $dbm;
 
@@ -27,9 +26,13 @@ foreach my $inet_speed ( @speed ) {
     $stm->finish;
 }
 
+print "\n\n";
+
 my $IPUnnum_vlans = '10,33';
+my $Allow_IPUnnum = '';
 my $prev_vlan = '';
 my $range = 0;
+my $first_str = 1;
 
 my $Query = "SELECT distinct vlan_id FROM head_link WHERE communal=0 and head_id=3";
 $Query .= " and inet_priority=1" if $onlyfiz ;
@@ -56,8 +59,18 @@ while (my $ref1 = $stm1->fetchrow_hashref()) {
 	    }
 	    $range = 0;
 	}
+	if( length($IPUnnum_vlans) > 50 ) {
+	    if ($first_str) {
+		$Allow_IPUnnum .= "switchport trunk allowed vlan ".$IPUnnum_vlans."\n" ;
+	    } else {
+		$Allow_IPUnnum .= "switchport trunk allowed vlan add ".$IPUnnum_vlans."\n";
+	    }
+	    $range = 0;
+	    $first_str = 0;
+	    $IPUnnum_vlans = $prev_vlan;
+	} 
     }
-	 $prev_vlan = $ref1->{'vlan_id'};
+    $prev_vlan = $ref1->{'vlan_id'};
 
 }
 if ( $range > 1 ) {
@@ -67,5 +80,6 @@ if ( $range > 1 ) {
 }
 $stm1->finish;
 
+$Allow_IPUnnum .= "switchport trunk allowed vlan add ".$IPUnnum_vlans."\n\n";
 
-print "IPUnnum_vlans:\n".$IPUnnum_vlans."\n";
+print $Allow_IPUnnum;

@@ -9,6 +9,7 @@ no strict qw(refs);
 use POSIX qw(strftime);
 use cyrillic qw(cset_factory);
 use DBI();
+use Net::SNMP;
 
 use DESCtl;
 use C73Ctl;
@@ -34,7 +35,7 @@ $VERSION = 1.8;
 @EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl dlog rspaced lspaced
 	    DB_mysql_connect IOS_rsh GET_IP3 GET_pipeid PRI_calc
 	    SAVE_config VLAN_link DB_trunk_vlan DB_trunk_update GET_Terminfo GET_GW_parms 
-	    VLAN_VPN_get VLAN_get VLAN_remove 
+	    VLAN_VPN_get VLAN_get VLAN_remove SNMP_fix_macport
 );
 
 my $start_conf	= \%SWConf::conf;
@@ -221,7 +222,7 @@ sub SW_AP_fix {
 	my $AP = $arg{'AP_INFO'};
 	$AP->{'vlan_zone'} = $headinfo{'ZONE_'.$arg{'NAS_IP'}};
 	############# GET Switch IP's
-	my $stm0 = $dbm->prepare("SELECT h.automanage, h.bw_ctl, h.sw_id, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit, m.lib, ".
+	my $stm0 = $dbm->prepare("SELECT h.automanage, h.bw_ctl, h.sw_id, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit, m.lib, m.rocom, m.snmp_ap_fix, ".
 	"m.mon_login, m.mon_pass FROM hosts h, streets st, models m WHERE h.model_id=m.model_id and h.street_id=st.street_id and m.lib is not NULL and h.clients_vlan=".
 	$arg{'VLAN'}." and h.zone_id=".$AP->{'vlan_zone'}." and h.visible>0" );
 	$stm0->execute();
@@ -234,9 +235,11 @@ sub SW_AP_fix {
 
 			%sw_arg = (
 			    LIB => $ref->{'lib'}, ACT => 'fix_macport', IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'},
-			    MAC => $arg{'HW_MAC'}, VLAN => $arg{'VLAN'},
+			    MAC => $arg{'HW_MAC'}, VLAN => $arg{'VLAN'}, ROCOM => $ref->{'rocom'}, USE_SNMP => $ref->{'snmp_ap_fix'},
 			);
+			### Fix locate MAC in switch
 			( $AP->{'portpref'}, $AP->{'port'} ) = SW_ctl ( \%sw_arg );
+
 			if ($AP->{'port'}>0 or $stm0->rows == 1) {
     				$AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
                                 $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
@@ -1122,5 +1125,43 @@ sub PRI_calc {
     return ($rate, $priority)
 }
 
+sub SNMP_fix_macport {
+    # IP MAC VLAN
+    my $arg = shift;
+    # login
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+    my $port = -1; my $pref; my $max=3; my $count=0; 
+
+    my($session, $error) = Net::SNMP->session(
+        -hostname  => $arg->{'IP'},
+        -version   => 2,
+        -community => $arg->{'ROCOM'},
+        -timeout   => 5,
+    );
+
+    if( !defined $session ) {
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => printf("ERROR: %s.\n", $error) );
+        $port = -1;
+    } else {
+	#my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2';
+	#my $OID = '1.3.6.1.2.1.17.4.3.1.2';
+	$arg->{'MAC'} = join".", map{hex} split/:/,$arg->{'MAC'};
+	my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2.'.$arg->{'VLAN'}.".".$arg->{'MAC'};
+	my $result = $session->get_request( -varbindlist => [ $OID ] );
+	if( !defined $result ) {
+	    printf("ERROR: %s..\n", $session->error);
+	    $session->close;
+	    $port = -1;
+	} else {
+	    $port = (values %$result)[0];
+	    if ( $port =~ /nosuch/i ) {
+		$port = -1;
+	    }
+	}
+	$session->close;
+    }
+    #print STDERR $port."\n" if $debug > 1;
+    return ($pref, $port);
+}
 
 1;

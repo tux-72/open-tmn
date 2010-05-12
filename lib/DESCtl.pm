@@ -348,16 +348,24 @@ sub DES_pass_change {
     return 1;
 }
 
+
 sub DES_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
     # login
     use Data::Dumper;
     #print Dumper $arg->{'IP'}, $arg->{'MAC'} ;
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
 
     my $port = -1; my $pref; my $max=3; my $count=0; 
+################
+    if ($arg->{'USE_SNMP'}) {
+        ($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+    }
+################
+  if ( $port < 0 ) {
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     while ($count < $max) {
     my @ln= $sw->cmd("show fdb mac_address ".$arg->{'MAC'}."\n");
         foreach (@ln) {
@@ -373,7 +381,9 @@ sub DES_fix_macport {
         }
     }
     $sw->close();
-    return ($pref,$port);
+  }
+  return ( $pref, $port );
+
 }
 
 
