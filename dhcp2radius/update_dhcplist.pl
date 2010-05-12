@@ -9,6 +9,8 @@ use SWConf;
 use SWFunc;
 
 my $debug = 0;
+my $head_id_ipunnum = 3;
+
 my %AP = ();
 my $dbm;
 
@@ -27,22 +29,25 @@ undef @ln;
 
 ### Sync data to DHCP DB
 DB_mysql_connect(\$dbm);
-my $stm = $dbm->prepare("SELECT login FROM head_link WHERE head_id=3 and pppoe_up=1");
+
+### Clear oblosete RRRoE session Flag
+my $stm = $dbm->prepare("SELECT login FROM head_link WHERE head_id=".$head_id_ipunnum." and pppoe_up=1");
 $stm->execute();
 while (my $refm = $stm->fetchrow_hashref()) {
     if ( not defined($AP{$refm->{'login'}}) ) {
-	my $Q_up = "UPDATE head_link SET pppoe_up=0 WHERE head_id=3 and login='".$refm->{'login'}."'" ;
+	my $Q_up = "UPDATE head_link SET pppoe_up=0 WHERE head_id=".$head_id_ipunnum." and login='".$refm->{'login'}."'" ;
 	print $Q_up."\n" if $debug;
 	$dbm->do($Q_up) if not $debug;
     }
 }
 $stm->finish;
 
-$stm = $dbm->prepare("SELECT login FROM head_link WHERE head_id=3 and pppoe_up=0");
+### SET current RRRoE session Flag
+$stm = $dbm->prepare("SELECT login FROM head_link WHERE head_id=".$head_id_ipunnum." and pppoe_up=0");
 $stm->execute();
 while (my $refm = $stm->fetchrow_hashref()) {
     if ( defined($AP{$refm->{'login'}}) ) {
-	my $Q_up = "UPDATE head_link SET pppoe_up=1 WHERE head_id=3 and login='".$refm->{'login'}."'" ;
+	my $Q_up = "UPDATE head_link SET pppoe_up=1 WHERE head_id=".$head_id_ipunnum." and login='".$refm->{'login'}."'" ;
 	print $Q_up."\n" if $debug;
 	$dbm->do($Q_up) if not $debug;
     }

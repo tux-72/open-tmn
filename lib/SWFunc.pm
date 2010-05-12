@@ -1136,11 +1136,11 @@ sub SNMP_fix_macport {
         -hostname  => $arg->{'IP'},
         -version   => 2,
         -community => $arg->{'ROCOM'},
-        -timeout   => 5,
+        -timeout   => 7,
     );
 
     if( !defined $session ) {
-        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => printf("ERROR: %s.\n", $error) );
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => printf("ERROR: %s.\n", $error) );
         $port = -1;
     } else {
 	#my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2';
@@ -1149,8 +1149,7 @@ sub SNMP_fix_macport {
 	my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2.'.$arg->{'VLAN'}.".".$arg->{'MAC'};
 	my $result = $session->get_request( -varbindlist => [ $OID ] );
 	if( !defined $result ) {
-	    printf("ERROR: %s..\n", $session->error);
-	    $session->close;
+	    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => printf("ERROR: %s..\n", $session->error) );
 	    $port = -1;
 	} else {
 	    $port = (values %$result)[0];
