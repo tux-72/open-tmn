@@ -9,7 +9,7 @@ no strict qw(refs);
 use POSIX qw(strftime);
 use cyrillic qw(cset_factory);
 use DBI();
-use Net::SNMP;
+use NSNMP::Simple;
 
 use DESCtl;
 use C73Ctl;
@@ -485,7 +485,7 @@ sub SW_AP_get {
 			## HEAD_LINK inserting data
 			if ( $AP{'trust'} and $fparm->{'link_type'} == $link_type{'pppoe'} ) {
 			    if ( $fparm->{'ip_addr'} =~ /^10\./ ) { 
-				$AP{'pri'} = $fparm->{'inet_priority'};
+				$AP{'pri'} = $fparm->{'inet_priority'}||1;
 			    } else {
 				$AP{'pri'} = 3;
 			    }
@@ -1133,36 +1133,16 @@ sub SNMP_fix_macport {
     my $arg = shift;
     # login
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
-    my $port = -1; my $pref; my $max=3; my $count=0; 
+    my $pref; my $max=1; my $count=0; 
 
-    my($session, $error) = Net::SNMP->session(
-        -hostname  => $arg->{'IP'},
-        -version   => 2,
-        -community => $arg->{'ROCOM'},
-        -timeout   => 7,
-    );
+    my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2.'.$arg->{'VLAN'}.".". (join".", map{hex} split/:/,$arg->{'MAC'});
+    my $port = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => 3, community => $arg->{'ROCOM'} );
 
-    if( !defined $session ) {
-        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => printf("ERROR: %s.\n", $error) );
-        $port = -1;
-    } else {
-	#my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2';
-	#my $OID = '1.3.6.1.2.1.17.4.3.1.2';
-	$arg->{'MAC'} = join".", map{hex} split/:/,$arg->{'MAC'};
-	my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2.'.$arg->{'VLAN'}.".".$arg->{'MAC'};
-	my $result = $session->get_request( -varbindlist => [ $OID ] );
-	if( !defined $result ) {
-	    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => printf("ERROR: %s..\n", $session->error) );
-	    $port = -1;
-	} else {
-	    $port = (values %$result)[0];
-	    if ( $port =~ /nosuch/i ) {
-		$port = -1;
-	    }
-	}
-	$session->close;
+    if ( not defined($port) ) {
+	SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => $NSNMP::Simple::error );
+	$port = -1;
     }
-    #print STDERR $port."\n" if $debug > 1;
+    print STDERR "NSNMP fix port = ".$port."\n";
     return ($pref, $port);
 }
 
