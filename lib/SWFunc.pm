@@ -1129,7 +1129,8 @@ sub PRI_calc {
 }
 
 sub SNMP_fix_macport {
-    # IP MAC VLAN
+
+    # IP MAC VLAN ROCOM
     my $arg = shift;
     # login
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
@@ -1144,6 +1145,7 @@ sub SNMP_fix_macport {
     }
     print STDERR "NSNMP fix port = ".$port."\n";
     return ($pref, $port);
+
 }
 
 1;
