@@ -398,37 +398,34 @@ sub ES_fix_vlan {
 sub ES_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    # login
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', VLAN '".$arg->{'VLAN'}."', MAC '".$arg->{'MAC'}."' ..." );
     my $port = -1; my $pref; my $max=3; my $count=0;
 
-################
-    if ($arg->{'USE_SNMP'}) {
-        ($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+   if ($arg->{'USE_SNMP'}) {
+	SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+	($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+    ################
+    } else {
+	# login
+	my $sw;  return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+	while ($count < $max) {
+	    my @ln = $sw->cmd("show mac address-table vlan ".$arg->{'VLAN'});
+	    foreach (@ln) {
+		#Port      VLAN ID        MAC Address         Type
+		#26        1              00:03:42:97:66:a1   Dynamic
+		#5         366            00:14:38:19:66:7a   Dynamic
+		if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+Dynamic/ and $3 eq $arg->{'MAC'} ) {
+		    $port = $1+0;
+		}
+	    }
+	    if ($port>0) {
+		last;
+	    } else {
+		$count+=1;
+	    }
+	}
+	$sw->close();
     }
-################
-  if ( $port < 0 ) {
-    my $sw;  return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-    while ($count < $max) {
-	my @ln = $sw->cmd("show mac address-table vlan ".$arg->{'VLAN'});
-        foreach (@ln) {
-	    #Port      VLAN ID        MAC Address         Type
-	    #26        1              00:03:42:97:66:a1   Dynamic
-	    #5         366            00:14:38:19:66:7a   Dynamic
-            if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+Dynamic/ and $3 eq $arg->{'MAC'} ) {
-                $port = $1+0;
-            }
-        }
-        if ($port>0) {
-            last;
-        } else {
-            $count+=1;
-        }
-    }
-    $sw->close();
-  }
-  return ($pref, $port);
-
+    return ($pref, $port);
 }
 
 sub ES_port_up {

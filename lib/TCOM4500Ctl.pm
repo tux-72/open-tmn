@@ -150,37 +150,35 @@ sub TCOM4500_fix_vlan {
 sub TCOM4500_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    # login
-    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'..." );
-    my $mac=TCOM4500_mac_fix($arg->{'MAC'});
     my $port = -1; my $pref; my $max=3; my $count=0; 
-
 ################
     if ($arg->{'USE_SNMP'}) {
-        ($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
-    }
+	SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => " SNMP Fix PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'..." );
+	($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+    } else {
 ################
-  if ( $port < 0 ) {
-    my $sw; return -1  if ( &$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-    while ($count < $max) {
-    my @ln = $sw->cmd("display mac-address ".$mac." vlan ".$arg->{'VLAN'});
-        foreach (@ln) {
-	    #MAC ADDR        VLAN ID    STATE            PORT INDEX             AGING TIME(s)
-	    #0017-315a-9277   344       Learned          GigabitEthernet1/0/49  AGING
-	    if ( /\w\w\w\w\-\w\w\w\w\-\w\w\w\w\s+(\d+)\s+\S+\s+(Gi|Ether)\S+(\d+\/\d+\/)(\d+)\s+\S+/ and $1 == $arg->{'VLAN'} ) {
-                $port = $4+0;
-                $pref = "$2"."$3";
-            }
-        }
-        if ($port>0) {
-            last;
-        } else {
-            $count+=1;
-        }
+	# login
+	my $sw; return -1  if ( &$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+	my $mac=TCOM4500_mac_fix($arg->{'MAC'});
+	while ($count < $max) {
+	my @ln = $sw->cmd("display mac-address ".$mac." vlan ".$arg->{'VLAN'});
+	    foreach (@ln) {
+		#MAC ADDR        VLAN ID    STATE            PORT INDEX             AGING TIME(s)
+		#0017-315a-9277   344       Learned          GigabitEthernet1/0/49  AGING
+		if ( /\w\w\w\w\-\w\w\w\w\-\w\w\w\w\s+(\d+)\s+\S+\s+(Gi|Ether)\S+(\d+\/\d+\/)(\d+)\s+\S+/ and $1 == $arg->{'VLAN'} ) {
+		    $port = $4+0;
+		    $pref = "$2"."$3";
+		}
+	    }
+	    if ($port>0) {
+		last;
+	    } else {
+		$count+=1;
+	    }
+	}
+	$sw->close();
     }
-    $sw->close();
-  }
-  return ($pref, $port);
+    return ($pref, $port);
 }
 
 

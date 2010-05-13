@@ -352,38 +352,33 @@ sub DES_pass_change {
 sub DES_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    # login
-    use Data::Dumper;
-    #print Dumper $arg->{'IP'}, $arg->{'MAC'} ;
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
-
     my $port = -1; my $pref; my $max=3; my $count=0; 
-################
+    ################
     if ($arg->{'USE_SNMP'}) {
-        ($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+	SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+	($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+    ################
+    } else {
+	SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+	# login
+	my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+	while ($count < $max) {
+	    my @ln= $sw->cmd("show fdb mac_address ".$arg->{'MAC'}."\n");
+	    foreach (@ln) {
+		#541   30LetPobedy_146_1_2  00-19-DB-B3-A6-C3   11    DeleteOnTimeout
+		if ( /(\d+)\s+\S+\s+(\w\w\-\w\w\-\w\w\-\w\w\-\w\w\-\w\w)\s+(\d+)\s+\S+/ and $1 == $arg->{'VLAN'} ) {
+		    $port = $3;
+		}
+	    }
+	    if ($port>0) {
+		last;
+	    } else {
+		$count+=1;
+	    }
+	}
+	$sw->close();
     }
-################
-  if ( $port < 0 ) {
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-    while ($count < $max) {
-    my @ln= $sw->cmd("show fdb mac_address ".$arg->{'MAC'}."\n");
-        foreach (@ln) {
-            #541   30LetPobedy_146_1_2  00-19-DB-B3-A6-C3   11    DeleteOnTimeout
-            if ( /(\d+)\s+\S+\s+(\w\w\-\w\w\-\w\w\-\w\w\-\w\w\-\w\w)\s+(\d+)\s+\S+/ and $1 == $arg->{'VLAN'} ) {
-                $port = $3;
-            }
-        }
-        if ($port>0) {
-            last;
-        } else {
-            $count+=1;
-        }
-    }
-    $sw->close();
-  }
-  return ( $pref, $port );
-
+    return ( $pref, $port );
 }
 
 

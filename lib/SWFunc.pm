@@ -1130,20 +1130,21 @@ sub PRI_calc {
 
 sub SNMP_fix_macport {
 
-    # IP MAC VLAN ROCOM
+    #### IP MAC VLAN ROCOM
     my $arg = shift;
-    # login
+    #### login
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
-    my $pref; my $max=1; my $count=0; 
+    my $pref; my $max = 2; my $count = 0; my $timeout = 0.5;
 
     my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2.'.$arg->{'VLAN'}.".". (join".", map{hex} split/:/,$arg->{'MAC'});
-    my $port = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => 3, community => $arg->{'ROCOM'} );
+    my $port = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
 
     if ( not defined($port) ) {
 	SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => $NSNMP::Simple::error );
 	$port = -1;
     }
     print STDERR "NSNMP fix port = ".$port."\n";
+
     return ($pref, $port);
 
 }
