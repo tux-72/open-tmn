@@ -146,7 +146,7 @@ sub post_auth {
 			$RAD_REPLY{'DHCP-Router-Address'}	 = $ref_disc->{'gw'};
 			my $Q_Disc_up = "UPDATE dhcp_addr SET agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."', login='".$ref_port->{'login'}."'".
 			", port_id=".$ref_port->{'port_id'}.", vlan_id=".$vlan.", hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'".
-			", session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'".( $AP{'new_lease'} ? ", start_lease=NULL" : "" ).", end_lease=ADDDATE(now(), INTERVAL ".$ref_disc->{'dhcp_lease'}." SECOND)".
+			( $AP{'new_lease'} ? ", start_lease=NULL" : "" ).", end_lease=ADDDATE(now(), INTERVAL ".$ref_disc->{'dhcp_lease'}." SECOND)".
 			" WHERE ip='".$ref_disc->{'ip'}."'";
 			$rows_up = $dbm->do($Q_Disc_up);
 			$res = RLM_MODULE_OK if $rows_up == 1;

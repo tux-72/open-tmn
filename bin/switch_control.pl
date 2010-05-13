@@ -623,6 +623,7 @@ if ( not defined($ARGV[0]) ) {
 		}
 		$head_if = ( $head->{'term_port'} ne '' ? $head->{'term_portpref'}.$head->{'term_port'}.".".$parm{'vlan_id'} : "Vlan".$parm{'vlan_id'});
 		my $Q_head_link = "INSERT Into head_link SET port_id=".$ref->{'port_id'};
+		my $Q_head_link .= ", dhcp_use=0 " unless $conf->{'DHCP_USE'} ;
 		my $Q_head_link_upd = " vlan_id=".$parm{'vlan_id'}.", head_id=".$head->{'head_id'}.", hw_mac='".$parm{'hw_mac'}."'";
 		$Q_head_link_upd .= ", head_iface='".$head_if."'" if ( $ref->{'new_ltype'} eq $link_type{'l3realnet'} );
 		$Q_head_link_upd .= ( defined($parm{'inet_rate'}) ? ", inet_shape='".$parm{'inet_rate'}."'" : "" );

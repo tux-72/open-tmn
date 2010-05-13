@@ -1134,7 +1134,7 @@ sub SNMP_fix_macport {
     my $arg = shift;
     #### login
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
-    my $pref; my $max = 2; my $count = 0; my $timeout = 0.5;
+    my $pref; my $max = 2; my $count = 0; my $timeout = 1;
 
     my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2.'.$arg->{'VLAN'}.".". (join".", map{hex} split/:/,$arg->{'MAC'});
     my $port = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );

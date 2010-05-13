@@ -24,6 +24,7 @@ our %conf = (
     'FIRST_ZONEVLAN'    => 4094,
     'DEF_COMUNITY'      => 'Comunity123',
     'CHECK_PPPOE_UP'    => 1,
+    'DHCP_USE'          => 1,
     'DHCP_PRI'          => 1,
 );
 
