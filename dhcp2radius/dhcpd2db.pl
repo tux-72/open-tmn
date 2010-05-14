@@ -11,8 +11,15 @@ use FindBin '$Bin';
 use lib $Bin.'/../lib';
 use SWConf;
 use SWFunc;
+ 
+use Authen::Radius;
+Authen::Radius->load_dictionary();
+use Data::Dumper; 
+
+my $debug=1;
 
 my $start_conf  = \%SWConf::conf;
+my $dbm;
 
 # This is hash wich hold original request from radius
 #my %RAD_REQUEST;
@@ -36,15 +43,10 @@ my $start_conf  = \%SWConf::conf;
 	use constant	RLM_MODULE_NUMCODES=>  9;#  /* How many return codes there are */
 
 
-# Function to handle post_auth
-my $debug=1;
-my $res = 0; 
-my $dbm;
-
 sub post_auth {
 	# For debugging purposes only
 	#&log_request_attributes;
-	my $res = RLM_MODULE_NOTFOUND; my $rows_up = -1; my $cli_addr = ''; my $ap_id = '';
+	my $res = RLM_MODULE_NOTFOUND; my $rows_up = -1; my $cli_addr = ''; my $ap_id = ''; my %acc_attr = (); my $new_session = 0;
 
 	DB_mysql_connect(\$dbm);
 	#&radiusd::radlog(1, "Mysql connect ID = ".$dbm->{'mysql_thread_id'}."\n") if $debug;
@@ -61,13 +63,48 @@ sub post_auth {
 		'new_lease'	=> 0,
 	);
 
-	if ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Release' ) {
-	    $dbm->do("UPDATE dhcp_addr SET end_lease=now(), session=NULL WHERE ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}.
-	    "' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
-	    " and a.session='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'" );
-	    $res = RLM_MODULE_OK;
 
-	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
+	if ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Release' ) {
+		my $Q_Request = "SELECT a.session, a.port_id, a.start_lease, l.login  FROM dhcp_addr a, head_link l WHERE l.login=a.login and l.hw_mac=a.hw_mac".
+		" and a.ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}."' and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
+		" and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
+		#&radiusd::radlog(1, $Q_Request) if $debug;
+
+		my $stm_rel = $dbm->prepare($Q_Request);
+		$stm_rel->execute();
+		#&radiusd::radlog(1, "stm_req exec SET Reply data rows - ".$stm_req->rows);
+		if  ( $stm_rel->rows == 1 ) {
+			my $ref_rel = $stm_rel->fetchrow_hashref;
+			################## ACCOUNTING ###################
+			%acc_attr = (
+			    'Acct-Status-Type'              => 'Stop',
+			    'Acct-Delay-Time'               => 0,
+			    'NAS-IP-Address'                => '192.168.100.20',
+			    'Acct-Authentic'                => 'RADIUS',
+			    'NAS-Port-Type'                 => 'Virtual',
+			    'Service-Type'                  => 'Framed-User',
+			    'User-Name'                     => $ref_rel->{'login'},
+			    'NAS-Port'                      => $vlan,
+			    'NAS-Port-Id'                   => $ref_rel->{'port_id'},
+			    'Acct-Session-Id'               => $ref_rel->{'session'},
+			    'DHCP-Hardware-Type'            => $RAD_REQUEST{'DHCP-Hardware-Type'},
+			    'DHCP-Client-Hardware-Address'  => $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
+			    'DHCP-Relay-Agent-Information'  => $RAD_REQUEST{'DHCP-Relay-Agent-Information'},
+			    'Framed-IP-Address'             => $RAD_REQUEST{'DHCP-Client-IP-Address'},
+			    'Acct-Terminate-Cause'          => 'User-Request',
+			    'Acct-Session-Time'             => ( time - $ref_rel->{'start_lease'}),
+			    'Request-Number'                => $RAD_REQUEST{'DHCP-Transaction-Id'},
+			);
+			#################################################
+			$dbm->do("UPDATE dhcp_addr SET end_lease=now() WHERE ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}.
+			"' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
+			" and login=".$ref_rel->{'login'} );
+			$res = RLM_MODULE_OK;
+			send_accounting (\%acc_attr);
+		}
+		$stm_rel->finish;
+
+	} elsif  ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
 	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information и типу абонента
 	    my $Q_check_macport = "SELECT l.port_id, l.inet_shape, l.head_id, l.static_ip, l.status, l.login, l.dhcp_use, h.term_ip, l.pppoe_up ".
 	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0 and h.dhcp_relay_ip='".
@@ -82,7 +119,7 @@ sub post_auth {
 		    &radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug;
 		    if ((not $ref_port->{'dhcp_use'}) || ($ref_port->{'pppoe_up'} and $start_conf->{'CHECK_PPPOE_UP'} )) {
 			$RAD_REPLY{'DHCP-Message-Type'} = 0;
-			return RLM_MODULE_NOTFOUND;
+ 			return RLM_MODULE_NOTFOUND;
 		    }
 		    # Выделить IP
 		    my $Q_Discover_start  = "SELECT a.login, a.ip, a.start_lease, a.end_lease, p.mask, p.gw, p.static_ip, p.dhcp_lease FROM dhcp_addr a, dhcp_pools p ".
@@ -166,12 +203,18 @@ sub post_auth {
 		    $res = RLM_MODULE_NOTFOUND;
 	    }
 	    $stm_port->finish;
+
 	} elsif ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Request' ) {
-		$cli_addr = ( $RAD_REQUEST{'DHCP-Client-IP-Address'} eq '0.0.0.0' ? $RAD_REQUEST{'DHCP-Requested-IP-Address'} : $RAD_REQUEST{'DHCP-Client-IP-Address'} );
+		if ($RAD_REQUEST{'DHCP-Client-IP-Address'} eq '0.0.0.0' ) {
+		    $cli_addr = $RAD_REQUEST{'DHCP-Requested-IP-Address'};
+		    $new_session = 1;
+		} else {
+		    $cli_addr = $RAD_REQUEST{'DHCP-Client-IP-Address'};
+		}
 		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug;
 		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'") if $debug;
 
-		my $Q_Request = "SELECT a.session, a.ip, a.port_id, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, l.inet_shape, h.term_ip".
+		my $Q_Request = "SELECT a.session, a.ip, a.port_id, a.start_lease, p.mask, p.gw, p.static_ip, p.dhcp_lease, l.login, l.inet_shape, h.term_ip".
 		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
 		" and a.port_id=l.port_id and a.pool_id=p.pool_id and l.status=1 and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0".
 		" and l.dhcp_use=1 and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and a.ip='".$cli_addr."' and a.agent_info='".
@@ -210,7 +253,32 @@ sub post_auth {
 			    $res = RLM_MODULE_OK;
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-Ack';
 			    &radiusd::radlog(1, "UPDATE ".$rows_up." rows in Request");
-			    #ssh_cmd();
+			    ################## ACCOUNTING ###################
+				%acc_attr = (
+				    'NAS-IP-Address'                => '192.168.100.20',
+				    'User-Name'                     => $ref_req->{'login'},
+				    'DHCP-Client-Hardware-Address'  => $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
+				    'Framed-IP-Address'             => $cli_addr,
+				    'NAS-Port'                      => $vlan,
+				    'NAS-Port-Id'                   => $ref_req->{'port_id'},
+				    'Acct-Delay-Time'               => 0,
+				    'Acct-Authentic'                => 'RADIUS',
+				    'NAS-Port-Type'                 => 'Virtual',
+				    'Service-Type'                  => 'Framed-User',
+				    'Acct-Session-Id'               => $ref_req->{'session'},
+				    'DHCP-Hardware-Type'            => $RAD_REQUEST{'DHCP-Hardware-Type'},
+				    'DHCP-Relay-Agent-Information'  => $RAD_REQUEST{'DHCP-Relay-Agent-Information'},
+				);
+				if ($new_session) { 
+				    $acc_attr{'Acct-Status-Type'} = 'Start';
+				} else {
+				    $acc_attr{'Acct-Status-Type'} = 'Interim-Update';
+				    $acc_attr{'Acct-Session-Time'} = ( time - $ref_req->{'start_lease'});
+				    $acc_attr{'Request-Number'} = $RAD_REQUEST{'DHCP-Transaction-Id'};
+				}	
+				#print Dumper %acc_attr;
+				send_accounting (\%acc_attr);
+			    #################################################
 			} else {
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			    $res = RLM_MODULE_NOTFOUND;
@@ -226,7 +294,6 @@ sub post_auth {
 	    $res = RLM_MODULE_OK;
 	}
 	return $res;
-#	return RLM_MODULE_OK;
 }
 
 sub log_request_attributes {
@@ -236,4 +303,14 @@ sub log_request_attributes {
 	for (keys %RAD_REQUEST) {
 		&radiusd::radlog(1, "RAD_REQUEST: $_ = $RAD_REQUEST{$_}");
 	}
+}
+
+
+sub send_accounting  {
+    my $attr = shift;
+    my ( $res, $err, $strerr );
+    my $r = new Authen::Radius(Host => $start_conf->{'DHCP_ACC_NAS'}.":".$start_conf->{'DHCP_ACC_PORT'}, Secret => $start_conf->{'DHCP_ACC_SECRET'}, Debug => 0);
+    #print Dumper $attr;
+    $r->add_attributes ( map {  { Name => $_,  Value =>  $attr->{$_} } } keys %$attr );
+    $r->send_packet(ACCOUNTING_REQUEST);
 }
