@@ -26,6 +26,11 @@ our %conf = (
     'CHECK_PPPOE_UP'    => 1,
     'DHCP_USE'          => 1,
     'DHCP_PRI'          => 1,
+    'DHCP_DYN_GREYIP'   => 1,
+    'DHCP_ACC_NAS'      => '192.168.100.100',
+    'DHCP_ACC_PORT'     => 1813,
+    'DHCP_ACC_SECRET'   => 'secret2account',
+
 );
 
 our %checkmac = (
