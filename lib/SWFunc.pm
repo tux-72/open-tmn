@@ -210,56 +210,59 @@ sub SW_AP_fix {
 
 	DB_mysql_connect(\$dbm);
 	my $Query10 = ''; my $Query0 = ''; my $Query1 = ''; my %sw_arg = (); my $cli_vlan=0;
-	my %arg = (
-	    @_,         # список пар аргументов
-	);
+	my $AP = shift;
+	#my %arg = (
+	#    @_,         # список пар аргументов
+	#);
 	# AP_INFO LOGIN LTYPE VLAN NAS_IP HW_MAC
-	if ( not defined($headinfo{'ZONE_'.$arg{'NAS_IP'}}) ) {
-	    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "NAS '".$arg{'NAS_IP'}."'ZONE not exist, AP not fixed..." );
+	if ( not defined($headinfo{'ZONE_'.$AP->{'nas_ip'}}) ) {
+	    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "NAS '".$AP->{'nas_ip'}."'ZONE not exist, AP not fixed..." );
 	    return -1;
 	}
 
-	my $AP = $arg{'AP_INFO'};
-	$AP->{'vlan_zone'} = $headinfo{'ZONE_'.$arg{'NAS_IP'}};
+	#my $AP = $arg{'AP_INFO'};
+	$AP->{'vlan_zone'} = $headinfo{'ZONE_'.$AP->{'nas_ip'}};
+	$AP->{'fix_vlan_type'} = " UNKNOWN ";
+
 	############# GET Switch IP's
 	my $stm0 = $dbm->prepare("SELECT h.automanage, h.bw_ctl, h.sw_id, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit, m.lib, m.rocom, m.snmp_ap_fix, ".
 	"m.mon_login, m.mon_pass FROM hosts h, streets st, models m WHERE h.model_id=m.model_id and h.street_id=st.street_id and m.lib is not NULL and h.clients_vlan=".
-	$arg{'VLAN'}." and h.zone_id=".$AP->{'vlan_zone'}." and h.visible>0" );
+	$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'}." and h.visible>0" );
 	$stm0->execute();
-		if ($stm0->rows>1) { dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "More by one switch in Clients VLAN '".$arg{'VLAN'}."'!!!" ); }
+		if ($stm0->rows>1) { dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "More by one switch in Clients VLAN '".$AP->{'vlan_id'}."'!!!" ); }
 
 		while (my $ref = $stm0->fetchrow_hashref() and not $AP->{'id'}) {
 			$cli_vlan=1;
-			$AP->{'automanage'}=1 if ($ref->{'automanage'} == 1);
-			$AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
+			$AP->{'automanage'}=1 if ($ref->{'automanage'});
+			$AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'});
 
 			%sw_arg = (
 			    LIB => $ref->{'lib'}, ACT => 'fix_macport', IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'},
-			    MAC => $arg{'HW_MAC'}, VLAN => $arg{'VLAN'}, ROCOM => $ref->{'rocom'}, USE_SNMP => $ref->{'snmp_ap_fix'},
+			    MAC => $AP->{'hw_mac'}, VLAN => $AP->{'vlan_id'}, ROCOM => $ref->{'rocom'}, USE_SNMP => $ref->{'snmp_ap_fix'},
 			);
 			### Fix locate MAC in switch
 			( $AP->{'portpref'}, $AP->{'port'} ) = SW_ctl ( \%sw_arg );
 
 			if ($AP->{'port'}>0 or $stm0->rows == 1) {
-    				$AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
+				$AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
                                 $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
 				$AP->{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
 				$AP->{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
 			}
 			if ($AP->{'port'}>0) {
 				if ( defined($AP->{'portpref'}) and 'x'.$AP->{'portpref'} ne 'x' ) {
-			    	    $Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
-			    	    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
-			    	    $Query1 = "INSERT into swports  SET  status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref='".$AP->{'portpref'}."', port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query1 = "INSERT into swports  SET  status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref='".$AP->{'portpref'}."', port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
 				} else {
-			    	    $Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
-			    	    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
-			    	    $Query1 = "INSERT into swports  SET status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref=NULL, port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query1 = "INSERT into swports  SET status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref=NULL, port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
 				}
 				my $stm10 = $dbm->prepare($Query10);
 				$stm10->execute();
 				if (not $stm10->rows) {
-			    		$dbm->do($Query1);
+					$dbm->do($Query1);
 					dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "Insert New PORT record in swports" );
 				}
 				$stm10->finish;
@@ -275,23 +278,22 @@ sub SW_AP_fix {
 					#NEW Parameters    
 					$AP->{'portvlan'} = $refp->{'vlan_id'} if defined($refp->{'vlan_id'});
 
-			    	}
+				}
                                         $AP->{'name'} .= ", порт ".$AP->{'port'};
 					$stm1->finish;
 			}
-			dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
-			"CLI_VLAN  '".$arg{'VLAN'}."' MAC '".$arg{'HW_MAC'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
+			$AP->{'fix_vlan_type'} = " CLI_VLAN";
 		}
 		$stm0->finish;
 		if ( ( not $AP->{'id'}) and ( not $cli_vlan ) ) {
-			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => "FIND PORT VLAN '".$arg{'VLAN'}."' User: '".$arg{'LOGIN'}."', MAC:'".$arg{'HW_MAC'}."'" );
+			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => "FIND PORT VLAN '".$AP->{'vlan_id'}."' User: '".$AP->{'login'}."', MAC:'".$AP->{'hw_mac'}."'" );
 			$AP->{'DB_portinfo'}=1;
 			$stm0 = $dbm->prepare( "SELECT h.automanage, h.bw_ctl, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit,".
 			" p.sw_id, p.port_id, p.ltype_id, p.communal, p.portpref, p.port, p.ds_speed, p.us_speed, ".
 			" p.vlan_id, p.autoneg, p.speed, p.duplex, p.maxhwaddr FROM hosts h, streets st, swports p ".
-			" WHERE h.street_id=st.street_id and p.sw_id=h.sw_id and p.vlan_id=".$arg{'VLAN'}." and h.zone_id=".$AP->{'vlan_zone'} );
-                    	$stm0->execute();
-                    	while (my $ref = $stm0->fetchrow_hashref()) {
+			" WHERE h.street_id=st.street_id and p.sw_id=h.sw_id and p.vlan_id=".$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'} );
+			$stm0->execute();
+			while (my $ref = $stm0->fetchrow_hashref()) {
 			    $AP->{'port'} = $ref->{'port'} if not defined($ref->{'portpref'});
 			    $AP->{'port'} = $ref->{'portpref'}.$ref->{'port'} if defined($ref->{'portpref'});
                             $AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
@@ -319,10 +321,18 @@ sub SW_AP_fix {
 			    }
 			    $AP->{'id'} = $ref->{'port_id'};
 			    $AP->{'communal'} = $ref->{'communal'};
-			    dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => '('. $dbm->{'mysql_thread_id'}.') '.
-			    "PORT_VLAN '".$arg{'VLAN'}."' MAC '".$arg{'HW_MAC'}."' User: '".$arg{'LOGIN'}."' AP -> '".$AP->{'id'}."', '".$AP->{'name'}."'" );
+			    $AP->{'fix_vlan_type'} = "PORT_VLAN";
 			}
 			$stm0->finish;
+		}
+		if ( $AP->{'id'}) {
+		    $AP->{'fix_ap_type'} = ( $AP->{'id'} == $AP->{'trust_id'} ? "trust " : "Left!!!" );
+		    $AP->{'fix_dlog'} = '('. $dbm->{'mysql_thread_id'}.') '.$AP->{'fix_vlan_type'}." '".$AP->{'vlan_id'}."' MAC '".$AP->{'hw_mac'}."' User: '".
+		    rspaced($AP->{'login'}."'",18)." AP ".$AP->{'fix_ap_type'}." '".$AP->{'id'}."' - '".$AP->{'name'}."'";
+		    if ( $AP->{'fix_ap_type'} eq "Left!!!" ) {
+			$AP->{'fix_dlog'} .= " ( trust AP = '".$AP->{'trust_id'}."' )";
+		    }
+		    dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $AP->{'fix_dlog'} );
 		}
 }
 
@@ -337,7 +347,7 @@ sub SW_AP_get {
         #       $fparm->{link_type} = 21
         #       $fparm->{ap_vlan} = 239
         #       $fparm->{nas_ip} = 192.168.100.30
-	#	$fparm->{nas_port_id} = '0/0/1/0'
+        #       $fparm->{nas_port_id} = '0/0/1/0'
         #       $fparm->{mac} = 0017.3156.7fd9
 
         #       $fparm->{ap_id} =
@@ -411,33 +421,20 @@ sub SW_AP_get {
 	my $job_parms = '';
 
 	my %AP = (
-	    'callsub',	'PPPoE2Dispatcher',
+	    'id',	0,
 	    'trust',	0,
 	    'set',	0,
-	    'VLAN',	0,
-	    'vlan_zone',	-1,
-	    'update_db',	0,
+	    'callsub',	'PPPoE2Dispatcher',
+	    'vlan_zone', 1,
+	    'update_db', 0,
 	    'DB_portinfo',	0,
-	    'MAC',	$fparm->{'mac'},
+	    'vlan_id',	0,
+	    'hw_mac',	$fparm->{'mac'},
 	    'pri',	$fparm->{'inet_priority'},
-	    'id',	0,
+	    'trust_id',	$fparm->{'ap_id'},
 	    'name',	'',
 	    'swid',	0,
-	    'house',	0,
-	    'podezd',	0,
-	    'portpref',	'',
-	    'port',	0,
-	    'ds_db',	0,
-	    'us_db',	0,
-	    'autoconf',	0,
 	    'bw_ctl',	0,
-	    #'lastlogin','1',
-	    'portvlan',	0,
-	    'ip_subnet', '',
-	    'autoneg', 1,
-	    'speed', 100,
-	    'duplex', 1,
-	    'maxhwaddr', -1,
 	);
 
 	####### Start FIX VLAN ID) ########### 
@@ -445,17 +442,19 @@ sub SW_AP_get {
 	    LIB => $headinfo{'L2LIB_'.$fparm->{'nas_ip'}}, ACT => 'fix_vlan', IP => $headinfo{'L2IP_'.$fparm->{'nas_ip'}}, 
 	    LOGIN => $headinfo{'MONLOGIN_'.$fparm->{'nas_ip'}},	PASS => $headinfo{'MONPASS_'.$fparm->{'nas_ip'}}, MAC => $fparm->{'mac'},
 	);
-	$AP{'VLAN'} = SW_ctl ( \%sw_arg );
+	$AP{'vlan_id'} = SW_ctl ( \%sw_arg );
 
-	if ( $AP{'VLAN'} < 1) {
+	if ( $AP{'vlan_id'} < 1) {
 	    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "User '".$fparm->{'login'}."'".' Access point VLAN is not FIX!!! Trobles connect to ZONE SWITCH???' );
 	    $Fres = 2;
 	    $Fvalue = 'error:MAC VLAN not fixed... :-(;';
 	} else {
-		dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "User '".$fparm->{'login'}."'".' Access point VLAN = '.$AP{'VLAN'} );
+		dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "User '".$fparm->{'login'}."'".' Access point VLAN = '.$AP{'vlan_id'} );
 		########### Start FIX Access Point (AP) ########### 
-		#SW_AP_fix( AP_INFO => \%AP, LOGIN => $fparm->{'login'} , VLAN => $AP{'VLAN'}, NAS_IP => $fparm->{'nas_ip'}, NAS_PORT => $fparm->{'nas_port_id'}, HW_MAC => $fparm->{'mac'});
-		SW_AP_fix( AP_INFO => \%AP, LOGIN => $fparm->{'login'} , VLAN => $AP{'VLAN'}, NAS_IP => $fparm->{'nas_ip'}, HW_MAC => $fparm->{'mac'});
+		$AP{'trust_id'}	= $fparm->{'ap_id'};
+		$AP{'nas_ip'}	= $fparm->{'nas_ip'};
+		$AP{'login'}	= $fparm->{'login'};
+		SW_AP_fix( \%AP );
 		################### Если выяснили AP_ID ######################
 		if ($AP{'id'}) {
 			$Fres = 1;
@@ -476,9 +475,9 @@ sub SW_AP_get {
 			    $AP{'trust'} = 0; $AP{'set'} = 0
 			}
 			$Query = "INSERT INTO ap_login_info SET trust=".$AP{'trust'}.", login='".$fparm->{'login'}."', start_date='".$date."', last_date='".$date."'";
-			$Query .= ", hw_mac='".$fparm->{'mac'}."', vlan_id='".$AP{'VLAN'}."', port_id='".$AP{'id'}."', ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."'";
+			$Query .= ", hw_mac='".$fparm->{'mac'}."', vlan_id='".$AP{'vlan_id'}."', port_id='".$AP{'id'}."', ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."'";
 			$Query .= ", ip_addr='".$fparm->{'ip_addr'}."'" if ( not $fparm->{'ip_addr'} =~ /^10\.13\.2[45][0-9]\.\d{1,3}$/ );
-			$Query .= " ON DUPLICATE KEY UPDATE trust=".$AP{'trust'}.", ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."', last_date='".$date."', vlan_id='".$AP{'VLAN'}."'";
+			$Query .= " ON DUPLICATE KEY UPDATE trust=".$AP{'trust'}.", ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."', last_date='".$date."', vlan_id='".$AP{'vlan_id'}."'";
 			$Query .= ", ip_addr='".$fparm->{'ip_addr'}."'" if ( not $fparm->{'ip_addr'} =~ /^10\.13\.2[45][0-9]\.\d{1,3}$/ );
 			$dbm->do("$Query");
 
@@ -490,7 +489,7 @@ sub SW_AP_get {
 				$AP{'pri'} = 3;
 			    }
 			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, dhcp_use=".$start_conf->{'DHCP_USE'}.", ";
-			    $Q_upd = " vlan_id=".$AP{'VLAN'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
+			    $Q_upd = " vlan_id=".$AP{'vlan_id'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
 			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'".
 			    ", head_id=".$headinfo{'LHEAD_'.$fparm->{'nas_ip'}}.", pppoe_up=1";
 			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
@@ -531,7 +530,7 @@ sub SW_AP_get {
 			    ## Если порт был свободен и задействуется под PPPoE
 			    if ( $AP{'link_type'} == $link_type{'free'} and $fparm->{'link_type'} == $start_conf->{'CLI_VLAN_LINKTYPE'} ) {
 				$Query .= ", ltype_id=".$fparm->{'link_type'};
-		    		$job_parms .= 'vlan_id:'.$AP{'VLAN'}.';';
+		    		$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
 			    ## Иначе если порт был свободен и задействуется под другие типы подключений  
 			    } elsif ( $AP{'link_type'} == $link_type{'free'} ) {
 				$Query .= ", ltype_id=".$fparm->{'link_type'};
@@ -539,7 +538,7 @@ sub SW_AP_get {
 			    ## Иначе если порт занят под такой же тип подключения
 			    } elsif ( $AP{'link_type'} > $start_conf->{'STARTLINKCONF'} and $fparm->{'link_type'}+0 == $AP{'link_type'}+0 ) {
 				$Query .= ", ltype_id=".$link_type{'setparms'};
-		    		$job_parms .= 'vlan_id:'.$AP{'VLAN'}.';';
+		    		$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
 			    ## Иначе если порт ЗАНЯТ! и задействуется под другой тип подключения
 			    } elsif ( $AP{'link_type'} > $start_conf->{'STARTLINKCONF'} and $fparm->{'link_type'}+0 != $AP{'link_type'}+0  ) {
 				$PreQuery .= "INSERT INTO bundle_jobs SET port_id=".$AP{'id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date_insert=NULL';
@@ -568,15 +567,15 @@ sub SW_AP_get {
 			    $Fvalue = 'ap_id:'.$AP{'id'}.';ap_name:'.&$k2w($AP{'name'}).';bw_ctl:'.$AP{'bw_ctl'}.';ap_swid:'.$AP{'swid'}.';ap_communal:'.$AP{'communal'}.';';
 			}
 
-		} elsif ( $AP{'VLAN'} ) {
-		    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "AP ID '".$fparm->{'login'}."' in VLAN ".$AP{'VLAN'}." not fixed!!!" );
+		} elsif ( $AP{'vlan_id'} ) {
+		    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "AP ID '".$fparm->{'login'}."' in VLAN ".$AP{'vlan_id'}." not fixed!!!" );
 		    $Fres = 2;
-	            $Fvalue = 'error:MAC found in VLAN '.$AP{'VLAN'}.'. Access point not fixed... :-(;';
+	            $Fvalue = 'error:MAC found in VLAN '.$AP{'vlan_id'}.'. Access point not fixed... :-(;';
 		}
 	}
         dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => 
 	"QUERY: Login  = '".$fparm->{'login'}."', MAC = '".$fparm->{'mac'}."', NAS_IP = ".$fparm->{'nas_ip'}."\n".
-	"AP_CHECK: ".$RES[$Fres].'('.$Fres.')'.", Login = '".$fparm->{'login'}."', AP_ID = '".$AP{'id'}."', '".$AP{'name'}.", ZONE = ".$AP{'vlan_zone'}.", VLAN = ".$AP{'VLAN'}."'\n".
+	"AP_CHECK: ".$RES[$Fres].'('.$Fres.')'.", Login = '".$fparm->{'login'}."', AP_ID = '".$AP{'id'}."', '".$AP{'name'}.", ZONE = ".$AP{'vlan_zone'}.", VLAN = ".$AP{'vlan_id'}."'\n".
 	"REPLY: ".$Fres.", '".&$w2k($Fvalue)."'" );
 
 	return ($Fres+0, $Fvalue);

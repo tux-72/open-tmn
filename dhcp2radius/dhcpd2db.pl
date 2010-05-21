@@ -57,8 +57,8 @@ sub post_auth {
 
 	my %AP = (
 		'callsub'	=> 'DHCP2RADIUS',
-		'VLAN'		=> $vlan,
-		'MAC'		=> $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
+		'vlan_id'	=> $vlan,
+		'hw_mac'	=> $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
 		'id'		=> 0,
 		'new_lease'	=> 0,
 	);
@@ -107,14 +107,19 @@ sub post_auth {
 	} elsif  ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
 	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information и типу абонента
 	    my $Q_check_macport = "SELECT l.port_id, l.head_id, l.static_ip, l.status, l.login, l.dhcp_use, h.term_ip, l.pppoe_up ".
-	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0 and h.dhcp_relay_ip='".
-	    $RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and l.status=1 and l.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
+	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0 ".
+	    " and ( h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' or h.dhcp_relay_ip2='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' )".
+	    " and l.status=1 and l.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
 	    my $stm_port = $dbm->prepare($Q_check_macport);
 	    $stm_port->execute();
 	    if  ( $stm_port->rows == 1 ) {
 		while (my $ref_port = $stm_port->fetchrow_hashref()) {
 		  ######  Выясняем точку доступа ######
-		  SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_port->{'term_ip'}, LOGIN => $ref_port->{'login'}, VLAN => $AP{'VLAN'}, HW_MAC => $AP{'MAC'} );
+		  $AP{'trust_id'}	= $ref_port->{'port_id'};
+		  $AP{'nas_ip'}		= $ref_port->{'term_ip'};
+		  $AP{'login'}		= $ref_port->{'login'};
+		  #SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_port->{'term_ip'}, LOGIN => $ref_port->{'login'}, VLAN => $AP{'vlan'}, HW_MAC => $AP{'hw_mac'} );
+		  SW_AP_fix( \%AP );
 		  if ( $AP{'id'} == $ref_port->{'port_id'} ) {
 		    &radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug;
 		    if ((not $ref_port->{'dhcp_use'}) || ($ref_port->{'pppoe_up'} and $start_conf->{'CHECK_PPPOE_UP'} )) {
@@ -198,7 +203,7 @@ sub post_auth {
 		    if  (not $stm_disc->rows ) { &radiusd::radlog(1, 'All IP used in available DHCP scopes... :-('); }
 		    $stm_disc->finish;
 		  } else {
-		    &radiusd::radlog(1, "AP for MAC = ".$AP{'MAC'}." and VLAN = ".$AP{'VLAN'}." not fixed :-( ...\n") if $debug;
+		    &radiusd::radlog(1, "AP for MAC = ".$AP{'hw_mac'}." and VLAN = ".$AP{'vlan'}." not fixed :-( ...\n") if $debug;
 		    #$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 		    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 		    $res = RLM_MODULE_NOTFOUND;
@@ -224,8 +229,9 @@ sub post_auth {
 		my $Q_Request = "SELECT a.session, a.ip, a.port_id, a.start_lease, p.mask, p.gw, l.static_ip, p.dhcp_lease, l.login, h.term_ip".
 		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
 		" and a.port_id=l.port_id and a.pool_id=p.pool_id and l.status=1 and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0".
-		" and l.dhcp_use=1 and h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' and a.ip='".$cli_addr."' and a.agent_info='".
-		$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."' and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
+		" and ( h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' or h.dhcp_relay_ip2='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' )".
+		" and l.dhcp_use=1 and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
+		" and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
 
 		my $stm_req = $dbm->prepare($Q_Request);
@@ -235,7 +241,11 @@ sub post_auth {
 		    while (my $ref_req = $stm_req->fetchrow_hashref()) {
 
 			if ( ( not defined ($ref_req->{'session'}) ) || ($ref_req->{'session'} ne $RAD_REQUEST{'DHCP-Transaction-Id'}) ) {
-			    SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_req->{'term_ip'}, LOGIN => $ref_req->{'login'} , VLAN => $AP{'VLAN'}, HW_MAC => $AP{'MAC'} );
+			    $AP{'trust_id'}	= $ref_req->{'port_id'};
+			    $AP{'nas_ip'}	= $ref_req->{'term_ip'};
+			    $AP{'login'}	= $ref_req->{'login'};
+			    #SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_req->{'term_ip'}, LOGIN => $ref_req->{'login'} , VLAN => $AP{'vlan'}, HW_MAC => $AP{'hw_mac'} );
+			    SW_AP_fix( \%AP );
 			    if ( $AP{'id'} != $ref_req->{'port_id'} ) {
 				$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 				return RLM_MODULE_NOTFOUND;
