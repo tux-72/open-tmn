@@ -66,7 +66,7 @@ CREATE TABLE `bundle_jobs` (
   `archiv` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`job_id`) USING BTREE,
   UNIQUE KEY `ch_id` (`port_id`,`ltype_id`,`archiv`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=188 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=238 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -218,15 +218,15 @@ CREATE TABLE `dhcp_addr` (
   `login` varchar(30) DEFAULT NULL,
   `hw_mac` varchar(17) DEFAULT NULL,
   `vlan_id` int(11) DEFAULT NULL,
-  `session` varchar(50) DEFAULT NULL,
   `port_id` int(11) DEFAULT NULL,
-  `agent_info` varchar(70) DEFAULT NULL,
-  `start_lease` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `start_use` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `start_lease` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `end_lease` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `inet_shape` int(11) DEFAULT NULL,
+  `session` varchar(50) DEFAULT NULL,
+  `agent_info` varchar(70) DEFAULT NULL,
+  `dhcp_vendor` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`ip`),
   KEY `vlan` (`vlan_id`),
-  KEY `session` (`session`),
   KEY `port_id` (`port_id`),
   KEY `lease` (`end_lease`),
   KEY `hw_mac` (`hw_mac`),
@@ -247,14 +247,12 @@ CREATE TABLE `dhcp_addr_arch` (
   `hw_mac` varchar(17) DEFAULT NULL,
   `port_id` int(11) DEFAULT NULL,
   `agent_info` varchar(70) DEFAULT NULL,
-  `start_lease` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `end_lease` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `inet_shape` int(11) DEFAULT NULL,
+  `start_use` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `end_use` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   KEY `IP` (`ip`),
   KEY `USER` (`login`),
   KEY `MAC` (`hw_mac`),
-  KEY `AP` (`port_id`),
-  KEY `Shape` (`inet_shape`)
+  KEY `AP` (`port_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
@@ -269,13 +267,12 @@ DELIMITER ;;
 /*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER dhcp_addr_arch_log_insert AFTER  insert ON dhcp_addr_arch
                 FOR EACH ROW
                 BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('inet_shape="', IFNULL(new.`inet_shape`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('end_use="', IFNULL(new.`end_use`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_addr_arch', CONCAT('agent_info="', IFNULL(new.`agent_info`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_addr_arch', CONCAT('hw_mac="', IFNULL(new.`hw_mac`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('end_lease="', IFNULL(new.`end_lease`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('start_use="', IFNULL(new.`start_use`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_addr_arch', CONCAT('ip="', IFNULL(new.`ip`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_addr_arch', CONCAT('port_id="', IFNULL(new.`port_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'insert', 'dhcp_addr_arch', CONCAT('start_lease="', IFNULL(new.`start_lease`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_addr_arch', CONCAT('login="', IFNULL(new.`login`,''),'"'));
                     
 END */;;
@@ -295,27 +292,24 @@ DELIMITER ;
 DELIMITER ;;
 /*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER dhcp_addr_arch_log_update AFTER  update ON dhcp_addr_arch
                 FOR EACH ROW
-                BEGIN IF IFNULL(old.`inet_shape`,'') != IFNULL(new.`inet_shape`,'') THEN
+                BEGIN IF IFNULL(old.`end_use`,'') != IFNULL(new.`end_use`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'dhcp_addr_arch', CONCAT('inet_shape: from="', IFNULL(old.`inet_shape`,''), '" to="', IFNULL(new.`inet_shape`,''),'"'));
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('end_use: from="', IFNULL(old.`end_use`,''), '" to="', IFNULL(new.`end_use`,''),'"'));
                         END IF; IF IFNULL(old.`agent_info`,'') != IFNULL(new.`agent_info`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_addr_arch', CONCAT('agent_info: from="', IFNULL(old.`agent_info`,''), '" to="', IFNULL(new.`agent_info`,''),'"'));
                         END IF; IF IFNULL(old.`hw_mac`,'') != IFNULL(new.`hw_mac`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_addr_arch', CONCAT('hw_mac: from="', IFNULL(old.`hw_mac`,''), '" to="', IFNULL(new.`hw_mac`,''),'"'));
-                        END IF; IF IFNULL(old.`end_lease`,'') != IFNULL(new.`end_lease`,'') THEN
+                        END IF; IF IFNULL(old.`start_use`,'') != IFNULL(new.`start_use`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'dhcp_addr_arch', CONCAT('end_lease: from="', IFNULL(old.`end_lease`,''), '" to="', IFNULL(new.`end_lease`,''),'"'));
+                            (now(), 'update', 'dhcp_addr_arch', CONCAT('start_use: from="', IFNULL(old.`start_use`,''), '" to="', IFNULL(new.`start_use`,''),'"'));
                         END IF; IF IFNULL(old.`ip`,'') != IFNULL(new.`ip`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_addr_arch', CONCAT('ip: from="', IFNULL(old.`ip`,''), '" to="', IFNULL(new.`ip`,''),'"'));
                         END IF; IF IFNULL(old.`port_id`,'') != IFNULL(new.`port_id`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_addr_arch', CONCAT('port_id: from="', IFNULL(old.`port_id`,''), '" to="', IFNULL(new.`port_id`,''),'"'));
-                        END IF; IF IFNULL(old.`start_lease`,'') != IFNULL(new.`start_lease`,'') THEN
-                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                            (now(), 'update', 'dhcp_addr_arch', CONCAT('start_lease: from="', IFNULL(old.`start_lease`,''), '" to="', IFNULL(new.`start_lease`,''),'"'));
                         END IF; IF IFNULL(old.`login`,'') != IFNULL(new.`login`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_addr_arch', CONCAT('login: from="', IFNULL(old.`login`,''), '" to="', IFNULL(new.`login`,''),'"'));
@@ -339,13 +333,12 @@ DELIMITER ;;
 /*!50003 CREATE*/ /*!50017 DEFINER=`swweb`@`192.168.29.22`*/ /*!50003 TRIGGER dhcp_addr_arch_log_delete AFTER  delete ON dhcp_addr_arch
                 FOR EACH ROW
                 BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('inet_shape="',IFNULL(old.`inet_shape`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('end_use="',IFNULL(old.`end_use`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_addr_arch', CONCAT('agent_info="',IFNULL(old.`agent_info`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_addr_arch', CONCAT('hw_mac="',IFNULL(old.`hw_mac`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('end_lease="',IFNULL(old.`end_lease`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('start_use="',IFNULL(old.`start_use`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_addr_arch', CONCAT('ip="',IFNULL(old.`ip`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_addr_arch', CONCAT('port_id="',IFNULL(old.`port_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
-                        (now(), 'delete', 'dhcp_addr_arch', CONCAT('start_lease="',IFNULL(old.`start_lease`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_addr_arch', CONCAT('login="',IFNULL(old.`login`,''),'"') );
                     
 END */;;
@@ -494,12 +487,14 @@ CREATE TABLE `head_link` (
   `login` varchar(20) DEFAULT NULL,
   `head_iface` varchar(30) DEFAULT NULL,
   `pppoe_up` tinyint(4) NOT NULL DEFAULT '1',
+  `communal` tinyint(4) NOT NULL DEFAULT '0',
   `status` tinyint(4) NOT NULL DEFAULT '1',
   `set_status` tinyint(4) DEFAULT NULL,
   `hw_mac` varchar(17) DEFAULT NULL,
   `static_ip` tinyint(4) DEFAULT '0',
   `inet_shape` int(11) NOT NULL DEFAULT '1000',
   `inet_priority` tinyint(4) NOT NULL DEFAULT '0',
+  `dhcp_use` tinyint(4) NOT NULL DEFAULT '1',
   `stamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `desc` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`port_id`) USING BTREE,
@@ -539,6 +534,7 @@ CREATE TABLE `heads` (
   `loop_if` varchar(12) DEFAULT NULL,
   `dhcp_helper` varchar(15) DEFAULT NULL,
   `dhcp_relay_ip` varchar(15) DEFAULT NULL,
+  `dhcp_relay_ip2` varchar(15) DEFAULT NULL,
   `up_acl-in` varchar(15) DEFAULT NULL,
   `up_acl-out` varchar(15) DEFAULT NULL,
   `down_acl-in` varchar(15) DEFAULT NULL,
@@ -585,6 +581,7 @@ DELIMITER ;;
                         (now(), 'insert', 'heads', CONCAT('l2sw_id="', IFNULL(new.`l2sw_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('vlan_max="', IFNULL(new.`vlan_max`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('up_acl-out="', IFNULL(new.`up_acl-out`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'heads', CONCAT('dhcp_relay_ip2="', IFNULL(new.`dhcp_relay_ip2`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('pass2="', IFNULL(new.`pass2`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('zone_id="', IFNULL(new.`zone_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'heads', CONCAT('down_acl-in="', IFNULL(new.`down_acl-in`,''),'"'));
@@ -679,6 +676,9 @@ DELIMITER ;;
                         END IF; IF IFNULL(old.`up_acl-out`,'') != IFNULL(new.`up_acl-out`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'heads', CONCAT('up_acl-out: from="', IFNULL(old.`up_acl-out`,''), '" to="', IFNULL(new.`up_acl-out`,''),'"'));
+                        END IF; IF IFNULL(old.`dhcp_relay_ip2`,'') != IFNULL(new.`dhcp_relay_ip2`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'heads', CONCAT('dhcp_relay_ip2: from="', IFNULL(old.`dhcp_relay_ip2`,''), '" to="', IFNULL(new.`dhcp_relay_ip2`,''),'"'));
                         END IF; IF IFNULL(old.`pass2`,'') != IFNULL(new.`pass2`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'heads', CONCAT('pass2: from="', IFNULL(old.`pass2`,''), '" to="', IFNULL(new.`pass2`,''),'"'));
@@ -732,6 +732,7 @@ DELIMITER ;;
                         (now(), 'delete', 'heads', CONCAT('l2sw_id="',IFNULL(old.`l2sw_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('vlan_max="',IFNULL(old.`vlan_max`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('up_acl-out="',IFNULL(old.`up_acl-out`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'heads', CONCAT('dhcp_relay_ip2="',IFNULL(old.`dhcp_relay_ip2`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('pass2="',IFNULL(old.`pass2`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('zone_id="',IFNULL(old.`zone_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'heads', CONCAT('down_acl-in="',IFNULL(old.`down_acl-in`,''),'"') );
@@ -1061,7 +1062,7 @@ CREATE TABLE `log` (
   `time` datetime NOT NULL,
   `changes` varchar(4096) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=48702 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=51035 DEFAULT CHARSET=koi8r;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1090,6 +1091,7 @@ CREATE TABLE `models` (
   `bw_free` int(11) DEFAULT '0',
   `rocom` varchar(30) DEFAULT NULL,
   `rwcom` varchar(30) DEFAULT NULL,
+  `snmp_ap_fix` tinyint(4) DEFAULT '0',
   `old_admin` varchar(15) DEFAULT NULL,
   `old_pass` varchar(12) DEFAULT NULL,
   `sysDescr` varchar(30) DEFAULT NULL,
@@ -1122,6 +1124,7 @@ DELIMITER ;;
                         (now(), 'insert', 'models', CONCAT('admin_login="', IFNULL(new.`admin_login`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'models', CONCAT('mon_login="', IFNULL(new.`mon_login`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'models', CONCAT('template="', IFNULL(new.`template`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'models', CONCAT('snmp_ap_fix="', IFNULL(new.`snmp_ap_fix`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'models', CONCAT('image="', IFNULL(new.`image`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'models', CONCAT('ena_pass="', IFNULL(new.`ena_pass`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'models', CONCAT('def_trunk="', IFNULL(new.`def_trunk`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
@@ -1186,6 +1189,9 @@ DELIMITER ;;
                         END IF; IF IFNULL(old.`template`,'') != IFNULL(new.`template`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'models', CONCAT('template: from="', IFNULL(old.`template`,''), '" to="', IFNULL(new.`template`,''),'"'));
+                        END IF; IF IFNULL(old.`snmp_ap_fix`,'') != IFNULL(new.`snmp_ap_fix`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'models', CONCAT('snmp_ap_fix: from="', IFNULL(old.`snmp_ap_fix`,''), '" to="', IFNULL(new.`snmp_ap_fix`,''),'"'));
                         END IF; IF IFNULL(old.`image`,'') != IFNULL(new.`image`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'models', CONCAT('image: from="', IFNULL(old.`image`,''), '" to="', IFNULL(new.`image`,''),'"'));
@@ -1245,6 +1251,7 @@ DELIMITER ;;
                         (now(), 'delete', 'models', CONCAT('admin_login="',IFNULL(old.`admin_login`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'models', CONCAT('mon_login="',IFNULL(old.`mon_login`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'models', CONCAT('template="',IFNULL(old.`template`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'models', CONCAT('snmp_ap_fix="',IFNULL(old.`snmp_ap_fix`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'models', CONCAT('image="',IFNULL(old.`image`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'models', CONCAT('ena_pass="',IFNULL(old.`ena_pass`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'models', CONCAT('def_trunk="',IFNULL(old.`def_trunk`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
@@ -1563,7 +1570,7 @@ CREATE TABLE `swports` (
   KEY `head` (`head_id`),
   KEY `PHY` (`phy_id`),
   CONSTRAINT `switch` FOREIGN KEY (`sw_id`) REFERENCES `hosts` (`sw_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5278 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=5290 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1941,4 +1948,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2010-05-05  1:05:04
+-- Dump completed on 2010-05-21 18:03:37
