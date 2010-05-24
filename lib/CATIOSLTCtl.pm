@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-package CAT3550Ctl;
+package CATIOSLTCtl;
 
 use strict;
 no strict qw(refs);
@@ -16,24 +16,21 @@ $VERSION = 1.2;
 @EXPORT_OK = qw();
 %EXPORT_TAGS = ();
 
-@EXPORT = qw(	CAT3550_pass_change CAT3550_conf_first	CAT3550_conf_save	CAT3550_fix_macport	CAT3550_fix_vlan
-		CAT3550_port_up	CAT3550_port_down	CAT3550_port_defect	CAT3550_port_free	CAT3550_port_setparms
-		CAT3550_port_trunk	CAT3550_port_system CAT3550_port_add_policy_map
-		CAT3550_vlan_trunk_add	CAT3550_vlan_trunk_remove	CAT3550_vlan_remove CAT3550_port_disable_shape
+@EXPORT = qw(	CATIOSLT_pass_change CATIOSLT_conf_first	CATIOSLT_conf_save	CATIOSLT_fix_macport	CATIOSLT_fix_vlan
+		CATIOSLT_port_up	CATIOSLT_port_down	CATIOSLT_port_defect	CATIOSLT_port_free	CATIOSLT_port_setparms
+		CATIOSLT_port_trunk	CATIOSLT_port_system CATIOSLT_port_add_policy_map
+		CATIOSLT_vlan_trunk_add	CATIOSLT_vlan_trunk_remove	CATIOSLT_vlan_remove CATIOSLT_port_disable_shape
 	    );
 
 my $debug=1;
 
-my $LIB='CAT3550';
+my $LIB='CATIOSLT';
 my $command	= $LIB."_cmd";
 my $login	= $LIB."_login";
-my $login_nopriv= $LIB."_login_nopriv";
 my $speed_char	= $LIB."_speed_char";
-#my $block_vlan=4094;
 
 my $timeout=15;
 my $timeout_login=5;
-#my $prompt='/\r{1,}CAT3550\-.*#$/i';
 my $prompt='/.*#.*/';
 my $prompt_nopriv='/.*[\>#].*/';
 my $prompt_conf ='/.*\(config\)#.*/';
@@ -50,60 +47,34 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 
 ############ SUBS ##############
 
-sub CAT3550_conf_first {
+sub CATIOSLT_conf_first {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
-sub CAT3550_pass_change {
+sub CATIOSLT_pass_change {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
 
-
-sub CAT3550_login {
-    my ($swl, $ip, $pass, $ena_pass) = @_;
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass.", ENA_PASS =".$ena_pass );
-    ${$swl}=new Net::Telnet (	prompt => $prompt,
-                            	Timeout => $timeout_login,
-                        	Errmode => 'return',
-			    );
+sub CATIOSLT_login {
+    my ($swl, $ip, $login, $pass) = @_;
+    SWFunc::dlog ( DBUG => 3, SUB => (caller(0))[3], MESS => " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass );
+    ${$swl}=new Net::Telnet (   prompt => $prompt,
+                                Timeout => $timeout,
+                                Errmode => 'return',
+                            );
     ${$swl}->open($ip);
-    ${$swl}->waitfor("/.*assword.*/");
-    ${$swl}->print($pass);
-    ${$swl}->waitfor($prompt_nopriv);
-    ${$swl}->print("ena");
-    ${$swl}->waitfor("/.*assword.*/");
-    ${$swl}->print($ena_pass);
-    ${$swl}->waitfor($prompt) || return -1;
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect superuser - Ok");
+    ${$swl}->print("");
+    ${$swl}->login($login,$pass) || return -1;
+    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Login - Ok");
     return 1;
 }
 
-sub CAT3550_login_nopriv {
-    my ($swl, $ip, $pass) = @_;
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", PASS = ".$pass );
-    ${$swl}=new Net::Telnet (	prompt => $prompt_nopriv,
-				Timeout => $timeout,
-				Errmode => 'return',
-			    );
-    ${$swl}->open($ip);
-    ${$swl}->waitfor("/.*assword.*/");
-    ${$swl}->print($pass);
-    ${$swl}->waitfor($prompt_nopriv) || return -1;
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Connect non privilege user - Ok");
-    return 1;
-}
 
-sub CAT3550_cmd {
+sub CATIOSLT_cmd {
     my ($swl, $cmd_prompt, $cmd ) = @_;
 
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], PROMPT => ${$swl}->last_prompt(), MESS => $cmd );
@@ -116,16 +87,13 @@ sub CAT3550_cmd {
     return 1;
 }
 
-sub CAT3550_fix_vlan {
+sub CATIOSLT_fix_vlan {
     # IP LOGIN PASS MAC
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."'" );
     my $vlan = 0;
     # login
-    my $sw;  return -1  if (&$login_nopriv(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     my @ln = $sw->cmd("show mac-address-table dynamic address ".$arg->{'MAC'});
     foreach (@ln) {
 	    #Vlan    Mac Address       Type        Ports
@@ -138,20 +106,20 @@ sub CAT3550_fix_vlan {
     return $vlan;
 }
 
-sub CAT3550_fix_macport {
+sub CATIOSLT_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
-    # login
-    my $sw; return -1  if ( &$login_nopriv(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'" );
-
     my $port = -1; my $pref; my $max=3; my $count=0;
-
-    while ($count < $max) {
-    my @ln = $sw->cmd("show mac-address-table dynamic address ".$arg->{'MAC'}." vlan ".$arg->{'VLAN'});
+    ################
+    if ($arg->{'USE_SNMP'}) {
+        SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+        ($pref, $port ) = SWFunc::SNMP_cisco_fix_macport($arg);
+    ################
+    } else {
+      my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+      SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'" );
+      while ($count < $max) {
+      my @ln = $sw->cmd("show mac-address-table dynamic address ".$arg->{'MAC'}." vlan ".$arg->{'VLAN'});
         foreach (@ln) {
             #Vlan    Mac Address       Type        Ports
             # 999    0004.38bb.8061    DYNAMIC     Gi0/2
@@ -165,21 +133,18 @@ sub CAT3550_fix_macport {
         } else {
             $count+=1;
         }
+      }
+      $sw->close();
     }
-    $sw->close();
     return ($pref, $port);
 }
 
-
-sub CAT3550_conf_save {
+sub CATIOSLT_conf_save {
 #   IP LOGIN PASS ENA_PASS
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in switch '".$arg->{'IP'}."'" );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     
     $sw->print("copy running-config startup-config");
     $sw->waitfor("/\[startup-config\]/");
@@ -188,14 +153,11 @@ sub CAT3550_conf_save {
     return 1;
 }
 
-sub CAT3550_port_up {
+sub CATIOSLT_port_up {
 #    IP LOGIN PASS ENA_PASS PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
@@ -207,14 +169,11 @@ sub CAT3550_port_up {
     return 1;
 }
 
-sub CAT3550_port_down {
+sub CATIOSLT_port_down {
 #    IP LOGIN PASS ENA_PASS PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
@@ -227,14 +186,11 @@ sub CAT3550_port_down {
 }
 
 
-sub CAT3550_port_defect {
+sub CATIOSLT_port_defect {
 #    IP LOGIN PASS PORT PORTPREF VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
@@ -254,17 +210,14 @@ sub CAT3550_port_defect {
     return 1;
 }
 
-sub CAT3550_port_free {
+sub CATIOSLT_port_free {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     return -1 if (not $arg->{'VLAN'});
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure FREE port in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg->{'VLAN'} ) < 1 );
@@ -286,10 +239,6 @@ sub CAT3550_port_free {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex auto" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport protected" ) < 1);
 
-    &CAT3550_port_disable_shape( $arg );
-    &CAT3550_port_add_policy_map( { %$arg, SPEED => 64 } );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"service-policy input 64" ) < 1);
-
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no shutdown" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
@@ -297,12 +246,9 @@ sub CAT3550_port_free {
     return 1;
 }
 
-sub CAT3550_speed_char {
+sub CATIOSLT_speed_char {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     $arg->{'DUPLEX'} += 0;
     my @dpl = ''; $dpl[0] = 'half'; $dpl[1] = 'full';
 
@@ -315,17 +261,14 @@ sub CAT3550_speed_char {
     }
 }
 
-sub CAT3550_port_trunk {
+sub CATIOSLT_port_trunk {
 #   IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure TRUNK port in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
     my ($speed, $duplex ) = &$speed_char( $arg );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
@@ -352,17 +295,14 @@ sub CAT3550_port_trunk {
 }
 
 
-sub CAT3550_port_system {
+sub CATIOSLT_port_system {
 
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure SYSTEM port in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
     my ($speed, $duplex ) = &$speed_char( $arg );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg->{'VLAN'} ) < 1 );
@@ -373,7 +313,6 @@ sub CAT3550_port_system {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
     if ($arg->{'TAG'}) {
-	#return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport access vlan ".$arg->{'BLOCK_VLAN'} ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
 	return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan add ".$arg->{'VLAN'} ) < 1);
         return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk native vlan ".$arg->{'BLOCK_VLAN'} ) < 1);
@@ -398,75 +337,14 @@ sub CAT3550_port_system {
 }
 
 
-sub CAT3550_port_add_policy_map {
-#    IP LOGIN PASS PORT PORTPREF
-    my $arg = shift;
-    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD policy-map in '".$arg->{'IP'}."', speed ".$arg->{'SPEED'} );
-
-    my $sw;  return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
-
-    return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_ext_acl,	"ip access-list extended acl_for_bw_limit" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_ext_acl,	"permit ip any any" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
-
-    return -1  if (&$command(\$sw, $prompt_conf_cmap,	"class-map match-all bw_limit_class" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_cmap,	"match access-group name acl_for_bw_limit" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
-
-    return -1  if (&$command(\$sw, $prompt_conf_pmap,	"policy-map ".$arg->{'SPEED'} ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_pmapc,	"class bw_limit_class" ) < 1 );
-    my $pspeed = $arg->{'SPEED'} * 1000;
-    my $pburst = $arg->{'SPEED'} * 1000 / 8 * 0.05 * 2;
-    $pburst = 8000 if $pburst < 8000;
-    return -1  if (&$command(\$sw, $prompt_conf_pmapc,	"police $pspeed $pburst exceed-action drop" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_pmap,	"exit" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
-
-    $sw->close();
-    return 1;
-}
-
-
-sub CAT3550_port_disable_shape {
-#    IP LOGIN PASS PORT PORTPREF
-    my $arg = shift;
-    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Disabe shaping s in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
-
-    my $sw;  return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
-
-    my @ln = $sw->cmd("show run int ".$arg->{'PORTPREF'}.$arg->{'PORT'});
-    my %s;
-    for( grep /^\s*service-policy/, @ln )
-    {
-        my %s1 = /service-policy\s+(input|output)\s+(\S+)/;
-        %s = ( %s, %s1 );
-    }
-
-    return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
-    return -1  if (&$command(\$sw, $prompt_conf_if,	"int ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1 );
-
-    for( keys %s )
-    {
-        return -1  if (&$command(\$sw, $prompt_conf_if, "no service-policy $_ ".$s{$_} ) < 1 );
-    }
-
-    $sw->close();
-    return 1;
-}
-
-
-sub CAT3550_port_setparms {
+sub CATIOSLT_port_setparms {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PORT parameters in '".$arg->{'IP'}."', port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
     my ($speed, $duplex ) = &$speed_char( $arg );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg->{'VLAN'} ) < 1 );
@@ -494,13 +372,6 @@ sub CAT3550_port_setparms {
     return -1  if (&$command(\$sw, $prompt_conf_if,	"speed ".$speed ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"duplex ".$duplex ) < 1);
 
-    if( $arg->{DS} )
-    {
-        &CAT3550_port_disable_shape( $arg );
-        &CAT3550_port_add_policy_map( { %$arg, SPEED => $arg->{DS} } );
-        return -1  if (&$command(\$sw, $prompt_conf_if,	"service-policy input  ". $arg->{DS} ) < 1);
-    }
-
     return -1  if (&$command(\$sw, $prompt_conf_if,	"no shutdown" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
@@ -509,15 +380,12 @@ sub CAT3550_port_setparms {
     return 1;
 }
 
-sub CAT3550_vlan_trunk_add {
+sub CATIOSLT_vlan_trunk_add {
 #    IP LOGIN PASS VLAN PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg->{'VLAN'}."' in '".$arg->{'IP'}."', trunk port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg->{'VLAN'} ) < 1 );
@@ -526,8 +394,6 @@ sub CAT3550_vlan_trunk_add {
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
 
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan add ".$arg->{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
@@ -536,19 +402,15 @@ sub CAT3550_vlan_trunk_add {
     return 1;
 }
 
-sub CAT3550_vlan_trunk_remove  {
+sub CATIOSLT_vlan_trunk_remove  {
 #    IP LOGIN PASS VLAN PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from '".$arg->{'IP'}."', trunk port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,	"interface ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
-    #return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan remove ".$arg->{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,		"exit" ) < 1);
@@ -557,15 +419,12 @@ sub CAT3550_vlan_trunk_remove  {
     return 1;
 }
 
-sub CAT3550_vlan_remove  {
+sub CATIOSLT_vlan_remove  {
 #    IP LOGIN PASS VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from '".$arg->{'IP'}."'" );
     # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf,	"no vlan ".$arg->{'VLAN'} ) < 1);
@@ -574,3 +433,4 @@ sub CAT3550_vlan_remove  {
     return 1;
 }
 
+1;

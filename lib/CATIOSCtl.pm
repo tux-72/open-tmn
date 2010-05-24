@@ -47,9 +47,6 @@ my $port_ctl_mcast      = 1;    my $port_ctl_bcast      = 2;
 
 sub CATIOS_conf_first {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg->{'IP'}' first configured MANUALLY!!!" ) ;
     return -1;
 }
@@ -57,16 +54,13 @@ sub CATIOS_conf_first {
 
 sub CATIOS_pass_change {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "$LIB Switch '$arg->{'IP'}' changed password MANUALLY!!!" );
     return -1;
 }
 
 sub CATIOS_login {
     my ($swl, $ip, $login, $pass) = @_;
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass );
+    SWFunc::dlog ( DBUG => 3, SUB => (caller(0))[3], MESS => " IP = ".$ip.", LOGIN = ".$login.", PASS = ".$pass );
     ${$swl}=new Net::Telnet (   prompt => $prompt,
                                 Timeout => $timeout,
                                 Errmode => 'return',
@@ -102,26 +96,19 @@ sub CATIOS_mac_fix {
 sub CATIOS_fix_vlan {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
-    # IP LOGIN PASS MAC RSH
-    $arg->{'RSH'} = 0;
-     SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."' ..." );
+    # IP LOGIN PASS MAC
+    SWFunc::dlog ( DBUG => 3, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."' ..." );
     my $vlan = 0; my @ln = ''; 	my $sw; 
 
-    if ( $arg->{'RSH'} ) {
-        @ln = IOS_rsh( PID => $$, HOST => $arg->{'IP'}, REMOTE_USER => $arg->{'LOGIN'}, CMD => "show mac-address-table dynamic address ".$arg->{'MAC'} );
-    } else {
-	# login
-	return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-	@ln= $sw->cmd("show mac-address-table dynamic address ".$arg->{'MAC'}) if ( not $arg->{'RSH'} );
-	$sw->close();
-    }
+    # login
+    return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+    @ln= $sw->cmd("show mac-address-table dynamic address ".$arg->{'MAC'}) if ( not $arg->{'RSH'} );
+    $sw->close();
+
     foreach (@ln) {
-	#vlan   mac address     type        protocols               port
-	#-------+---------------+--------+---------------------+--------------------
-	#464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
+        #vlan   mac address     type        protocols               port
+        #-------+---------------+--------+---------------------+--------------------
+        #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
         if ( /(\d+)\s+\w\w\w\w\.\w\w\w\w\.\w\w\w\w\s+dynamic\s+\S+\s+\S+/ and $1 > 99 ) {
             $vlan = $1;
         }
@@ -129,94 +116,25 @@ sub CATIOS_fix_vlan {
     return $vlan;
 }
 
+
 sub CATIOS_fix_macport {
-    # IP LOGIN PASS MAC VLAN RSH
-    my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
-    $arg->{'RSH'} = 0;
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."' ..." );
-
-    my $mac=CATIOS_mac_fix($arg->{'MAC'});
-    my $port = -1; my $pref; my $max=3; my $count=0; my @ln = ''; my $sw;
-
-
-    while ($count < $max) {
-	if ( $arg->{'RSH'} ) {
-	    @ln = IOS_rsh( PID => $$, HOST => $arg->{'IP'}, REMOTE_USER => $arg->{'LOGIN'}, CMD => "show mac-address-table dynamic address ".$mac." vlan ".$arg->{'VLAN'} );
-	    #@ln = rsh( $arg->{'IP'}, "show mac-address-table dynamic address ".$mac." vlan ".$arg->{'VLAN'}.' | inc dynamic'  );
-	} else {
-	    # login
-	    return -1 if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-	    @ln = $sw->cmd("show mac-address-table dynamic address ".$mac." vlan ".$arg->{'VLAN'} );
-	    $sw->close();
-	}
-        foreach (@ln) {
-		    #vlan   mac address     type        protocols               port
-		    #-------+---------------+--------+---------------------+--------------------
-		    #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
-		    #*    1  001b.1105.3d8e   dynamic  Yes          5   Fa4/46
-		    #     1  001e.589f.0c61   dynamic  Yes   Gi3/16
-            if      ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Fa|Gi)(\D+|.*)(\d+\/)(\d+)/ ) {
-		$port = $6+0;
-		$pref = "$3$5";
-		    # *   1  001b.1105.3d8e   dynamic  Yes          5   Po1
-		    #     1  0013.4991.f9a5   dynamic  Yes   Po1
-            } elsif ( /(\d+)\s+(\w\w\w\w\.\w\w\w\w\.\w\w\w\w)\s+dynamic\s+.*\s+(Po|Lo)(\D+|.*)(\d+)/ ) {
-		$port = $5+0;
-		$pref = "$3";
-	    }
-	}
-	if ($port>0) {
-	    last;
-	} else {
-	    $count+=1;
-	}
-    }
-    return ($pref, $port);
-}
-
-sub CATIOS_fix_vlan_old {
-
-    # IP LOGIN PASS MAC
-    my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing VLAN in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."' ..." );
-    my $vlan = 0;
-    # login
-    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-
-    my @ln= $sw->cmd("show mac-address-table dynamic address ".$arg->{'MAC'});
-        foreach (@ln) {
-	    #vlan   mac address     type        protocols               port
-	    #-------+---------------+--------+---------------------+--------------------
-	    #464    001f.c66e.2bf4   dynamic ip                    FastEthernet6/30
-        if ( /(\d+)\s+\w\w\w\w\.\w\w\w\w\.\w\w\w\w\s+dynamic\s+\S+\s+\S+/ and $1 > 1 ) {
-            $vlan = $1;
-        }
-    }
-    $sw->close();
-    return $vlan;
-}
-
-sub CATIOS_fix_macport_old {
-    my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS MAC VLAN
-    # login
-    my $sw; return -1 if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."' ..." );
-
-    my $mac=CATIOS_mac_fix($arg->{'MAC'});
+    my $arg = shift;
     my $port = -1; my $pref; my $max=3; my $count=0;
-
-    while ($count < $max) {
-    my @ln= $sw->cmd("show mac-address-table dynamic address ".$mac." vlan ".$arg->{'VLAN'});
+    ################
+    if ($arg->{'USE_SNMP'}) {
+        SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+        ($pref, $port ) = SWFunc::SNMP_cisco_fix_macport($arg);
+    ################
+    } else {
+      SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."' ..." );
+      my $mac=CATIOS_mac_fix($arg->{'MAC'});
+      my @ln = ''; my $sw;
+      while ($count < $max) {
+        # login
+        return -1 if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+        @ln = $sw->cmd("show mac-address-table dynamic address ".$mac." vlan ".$arg->{'VLAN'} );
+        $sw->close();
         foreach (@ln) {
 		    #vlan   mac address     type        protocols               port
 		    #-------+---------------+--------+---------------------+--------------------
@@ -238,17 +156,14 @@ sub CATIOS_fix_macport_old {
 	} else {
 	    $count+=1;
 	}
+      }
     }
-    $sw->close();
     return ($pref, $port);
 }
 
 
 sub CATIOS_conf_save {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
 #   IP LOGIN PASS
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "SAVING $LIB config in switch ".$arg->{'IP'}." ..." );
     # login
@@ -263,9 +178,6 @@ sub CATIOS_conf_save {
 
 sub CATIOS_port_up {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
 #    IP LOGIN PASS PORT PORTPREF
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -282,9 +194,6 @@ sub CATIOS_port_up {
 
 sub CATIOS_port_down {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
 #    IP LOGIN PASS PORT PORTPREF
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -301,9 +210,6 @@ sub CATIOS_port_down {
 
 sub CATIOS_port_defect {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
 #   IP LOGIN PASS PORT PORTPREF VLAN
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -328,9 +234,6 @@ sub CATIOS_port_defect {
 
 sub CATIOS_port_free {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     #    IP LOGIN PASS PORT PORTPREF DS US VLAN
     return -1 if (not $arg->{'VLAN'});
     # login
@@ -365,9 +268,6 @@ sub CATIOS_port_free {
 sub CATIOS_speed_char {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,         # список пар аргументов
-    #);
     $arg->{'DUPLEX'} += 0;
     my @dpl = ''; $dpl[0] = 'half'; $dpl[1] = 'full';
 
@@ -382,9 +282,6 @@ sub CATIOS_speed_char {
 
 sub CATIOS_port_trunk {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     #   IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -419,9 +316,6 @@ sub CATIOS_port_trunk {
 sub CATIOS_port_system {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "Configure SYSTEM port in ".$arg->{'IP'}.", port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
@@ -462,9 +356,6 @@ sub CATIOS_port_system {
 sub CATIOS_port_setparms {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS =>  "SET PORT parameters in ".$arg->{'IP'}.", port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
@@ -508,9 +399,6 @@ sub CATIOS_port_setparms {
 sub CATIOS_vlan_trunk_add  {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
 #    IP LOGIN PASS VLAN PORT PORTPREF
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg->{'VLAN'}."' in ".$arg->{'IP'}.", trunk port ".$arg->{'PORTPREF'}.$arg->{'PORT'} );
 
@@ -524,9 +412,6 @@ sub CATIOS_vlan_trunk_add  {
     return -1  if (&$command(\$sw, $prompt_conf,        "exit" ) < 1);
 
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport" ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk encapsulation dot1q" ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,     "switchport trunk allowed vlan add ".$arg->{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,        "exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,             "exit" ) < 1);
@@ -536,9 +421,6 @@ sub CATIOS_vlan_trunk_add  {
 
 sub CATIOS_vlan_trunk_remove  {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
 #    IP LOGIN PASS VLAN PORT PORTPREF
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -547,8 +429,6 @@ sub CATIOS_vlan_trunk_remove  {
     return -1  if (&$command(\$sw, $prompt_conf,        "conf t" ) < 1 );
 
     return -1  if (&$command(\$sw, $prompt_conf_if,     "interface ".$arg->{'PORTPREF'}.$arg->{'PORT'} ) < 1);
-    #return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk encapsulation dot1q" ) < 1);
-    #return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan remove ".$arg->{'VLAN'} ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,        "exit" ) < 1);
     return -1  if (&$command(\$sw, $prompt,             "exit" ) < 1);
@@ -559,9 +439,6 @@ sub CATIOS_vlan_trunk_remove  {
 sub CATIOS_vlan_remove  {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
 #    IP LOGIN PASS VLAN
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -574,14 +451,15 @@ sub CATIOS_vlan_remove  {
     return 1;
 }
 
-############################ TERMINATOR FUNCTION
+
+################################################################################
+############################ TERMINATOR FUNCTION ###############################
+################################################################################
+
 ############################ TERMINATE SUBNET IFACES
 
 sub CATIOS_term_l3subnet_add {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN VLANNAME IPGW NETMASK UP_ACLIN UP_ACLOUT
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -607,9 +485,6 @@ sub CATIOS_term_l3subnet_add {
 
 sub CATIOS_term_l3subnet_remove {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -636,9 +511,6 @@ sub CATIOS_term_l3subnet_remove {
 
 sub CATIOS_term_l3subnet_down {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN DOWN_ACLIN DOWN_ACLOUT
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -660,9 +532,6 @@ sub CATIOS_term_l3subnet_down {
 
 sub CATIOS_term_l3subnet_up {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN UP_ACLIN UP_ACLOUT
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -684,9 +553,6 @@ sub CATIOS_term_l3subnet_up {
 
 sub CATIOS_term_l3realnet_add {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN VLANNAME IPCLI UP_ACLIN UP_ACLOUT LOOP_IF DHCP_HELPER
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -731,8 +597,8 @@ sub CATIOS_term_l3realnet_add {
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip proxy-arp" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf_if,   "ip route-cache cef" ) < 1);
     if ( defined($arg->{'DHCP_HELPER'}) and not ( defined($arg->{'STATIC'}) and $arg->{'STATIC'} ) ) {
-	return -1  if (&$command(\$sw, $prompt_conf,  "ip dhcp relay information trusted"  ) < 1);
-	return -1  if (&$command(\$sw, $prompt_conf,  "ip helper-address ".$arg->{'DHCP_HELPER'} ) < 1);
+        return -1  if (&$command(\$sw, $prompt_conf,  "ip dhcp relay information trusted"  ) < 1);
+        return -1  if (&$command(\$sw, $prompt_conf,  "ip helper-address ".$arg->{'DHCP_HELPER'} ) < 1);
     }
     return -1  if (&$command(\$sw, $prompt_conf_if,   "no shutdown" ) < 1);
     return -1  if (&$command(\$sw, $prompt_conf,      "exit" ) < 1);
@@ -747,9 +613,6 @@ sub CATIOS_term_l3realnet_add {
 
 sub CATIOS_term_l3realnet_remove {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN IPCLI
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -779,9 +642,6 @@ sub CATIOS_term_l3realnet_remove {
 
 sub CATIOS_term_l3realnet_down {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN DOWN_ACLIN DOWN_ACLOUT
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -789,8 +649,6 @@ sub CATIOS_term_l3realnet_down {
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg->{'VLAN'} ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,   "no ip access-group in"  ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,   "no ip access-group out" ) < 1);
     if ( defined($arg->{'DOWN_ACLIN'})  ) { return -1  if (&$command(\$sw, $prompt_conf_if,   "ip access-group ".$arg->{'DOWN_ACLIN'}. " in"  ) < 1); }
     if ( defined($arg->{'DOWN_ACLOUT'}) ) { return -1  if (&$command(\$sw, $prompt_conf_if,   "ip access-group ".$arg->{'DOWN_ACLOUT'}." out" ) < 1); }
     return -1  if (&$command(\$sw, $prompt_conf,      "exit" ) < 1);
@@ -802,9 +660,6 @@ sub CATIOS_term_l3realnet_down {
 
 sub CATIOS_term_l3realnet_up {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS VLAN UP_ACLIN UP_ACLOUT
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
@@ -812,8 +667,6 @@ sub CATIOS_term_l3realnet_up {
 
     return -1  if (&$command(\$sw, $prompt_conf,      "conf t" ) < 1 );
     return -1  if (&$command(\$sw, $prompt_conf_if,   "interface Vlan".$arg->{'VLAN'} ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,   "no ip access-group in"  ) < 1);
-#    return -1  if (&$command(\$sw, $prompt_conf_if,   "no ip access-group out" ) < 1);
     if ( defined($arg->{'UP_ACLIN'})  ) { return -1  if (&$command(\$sw, $prompt_conf_if,   "ip access-group ".$arg->{'UP_ACLIN'}. " in"  ) < 1); }
     if ( defined($arg->{'UP_ACLOUT'}) ) { return -1  if (&$command(\$sw, $prompt_conf_if,   "ip access-group ".$arg->{'UP_ACLOUT'}." out" ) < 1); }
     return -1  if (&$command(\$sw, $prompt_conf,      "exit" ) < 1);

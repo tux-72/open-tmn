@@ -14,8 +14,7 @@ use NSNMP::Simple;
 use DESCtl;
 use C73Ctl;
 use CATIOSCtl;
-use CAT2950Ctl;
-use CAT3550Ctl;
+use CATIOSLTCtl;
 use CATOSCtl;
 use ESCtl;
 use GSCtl;
@@ -24,6 +23,8 @@ use TCOM4500Ctl;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
+
+my $debug=0;
 
 $VERSION = 1.8;
 
@@ -46,8 +47,6 @@ my $dbi		= \%SWConf::dbconf;
 
 my $w2k = cset_factory 1251, 20866;
 my $k2w = cset_factory 20866, 1251;
-
-my $debug=1;
 
 my $Querry_start = '';
 my $Querry_end = '';
@@ -251,11 +250,11 @@ sub SW_AP_fix {
 			}
 			if ($AP->{'port'}>0) {
 				if ( defined($AP->{'portpref'}) and 'x'.$AP->{'portpref'} ne 'x' ) {
-				    $Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
 				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
 				    $Query1 = "INSERT into swports  SET  status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref='".$AP->{'portpref'}."', port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
 				} else {
-				    $Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
 				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
 				    $Query1 = "INSERT into swports  SET status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref=NULL, port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
 				}
@@ -1131,6 +1130,8 @@ sub SNMP_fix_macport {
 
     #### IP MAC VLAN ROCOM
     my $arg = shift;
+    my $getname = shift;
+    #$getname = 1;
     #### login
     dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
     my $pref; my $max = 2; my $count = 0; my $timeout = 1;
@@ -1139,13 +1140,89 @@ sub SNMP_fix_macport {
     my $port = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
 
     if ( not defined($port) ) {
-	SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => $NSNMP::Simple::error );
-	$port = -1;
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => $NSNMP::Simple::error );
+        $port = -1;
     }
-    print STDERR "NSNMP fix port = ".$port."\n";
+    print STDERR "NSNMP fix portindex = ".$port."\n" if $debug;
 
+    if ($getname and $port > 0 ) {
+        $OID = '1.3.6.1.2.1.31.1.1.1.1.'.$port;
+        my $portname = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
+        if ( defined($portname) ) {
+            if ( $portname =~ /^(\d+)$/ ) {
+                $port = $1;
+                print STDERR "NSNMP port name fix = '".$port."'\n" if $debug;
+            } elsif ( $portname =~ /^\d+\/(\d+)$/ ) {
+                $port = $1;
+                print STDERR "NSNMP port name fix = '".$port."'\n" if $debug;
+            } elsif ( $portname =~ /^(\S+\/)(\d+)$/ ) {
+                $pref = $1;
+                $port = $2;
+                print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
+            } elsif ( $portname =~ /^(\S+)(\d+)$/ ) {
+                $pref = $1;
+                $port = $2;
+                print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
+            } else {
+                SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
+                print STDERR "Unknown portname type '$portname'\n" if $debug;
+            }
+            print STDERR "NSNMP fix portname = ".$portname."\n" if $debug;
+        } else {
+            SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $NSNMP::Simple::error );
+            $port = -1;
+        }
+    }
     return ($pref, $port);
+}
 
+
+sub SNMP_cisco_fix_macport {
+
+    #### IP MAC VLAN ROCOM
+    my $arg = shift;
+    #### login
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+    my $pref; my $port = -1; my $max = 2; my $count = 0; my $timeout = 1;
+
+    my $OID = '.1.3.6.1.2.1.17.4.3.1.2.'. (join".", map{hex} split/:/,$arg->{'MAC'});
+    my $idx1 = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'}.'@'.$arg->{'VLAN'} );
+
+    if ( not defined($idx1) ) {
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $NSNMP::Simple::error );
+        $port = -1;
+    } else {
+        print STDERR "NSNMP fix port index1 = ".$idx1."\n" if $debug;
+
+        $OID = '.1.3.6.1.2.1.17.1.4.1.2.'.$idx1;
+        my $idx = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'}.'@'.$arg->{'VLAN'} );
+        print STDERR "NSNMP fix port index = ".$idx."\n" if $debug;
+
+        if ( defined($idx) ) {
+            $OID = '1.3.6.1.2.1.31.1.1.1.1.'.$idx;
+            my $portname = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
+            print STDERR "NSNMP fix portname = ".$portname."\n" if $debug;
+            if ( defined($portname) ) {
+                if ( $portname =~ /^(\S+\/)(\d+)$/ ) {
+                    $pref = $1;
+                    $port = $2;
+                    print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
+                } elsif ( $portname =~ /^(\S+)(\d+)$/ ) {
+                    $pref = $1;
+                    $port = $2;
+                    print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
+                } else {
+                    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
+                    print STDERR "Unknown portname type '$portname'\n" if $debug;
+                }
+            } else {
+                SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $NSNMP::Simple::error );
+                $port = -1;
+            }
+        }
+    }
+    print STDERR "NSNMP fix port = ".$pref.$port."\n" if $debug;
+    return ($pref, $port);
 }
 
 1;

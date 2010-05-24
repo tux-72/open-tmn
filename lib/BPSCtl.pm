@@ -45,18 +45,12 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 
 sub BPS_conf_first {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' first configured MANUALLY!!!" );
     return -1;
 }
 
 sub BPS_pass_change {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' changed password MANUALLY!!!" );
     return -1;
 }
@@ -197,9 +191,6 @@ sub BPS_fix_macport {
 sub BPS_conf_save {
 #   IP LOGIN PASS ENA_PASS
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in switch '".$arg->{'IP'}."'" );
@@ -213,9 +204,6 @@ sub BPS_conf_save {
 sub BPS_port_up {
 #    IP LOGIN PASS ENA_PASS PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port UP in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
@@ -232,9 +220,6 @@ sub BPS_port_up {
 sub BPS_port_down {
 #    IP LOGIN PASS ENA_PASS PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Set port DOWN in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
@@ -252,9 +237,6 @@ sub BPS_port_down {
 sub BPS_port_defect {
 #    IP LOGIN PASS PORT PORTPREF BLOCK_VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure DEFECT port in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
@@ -278,9 +260,6 @@ sub BPS_port_defect {
 sub BPS_port_free {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     return -1 if (not $arg->{'VLAN'});
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure FREE port in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
@@ -307,9 +286,6 @@ sub BPS_port_free {
 sub BPS_speed_char {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     $arg->{'DUPLEX'} += 0;
     my @dpl = ''; $dpl[0] = 'half'; $dpl[1] = 'full';
 
@@ -325,9 +301,6 @@ sub BPS_speed_char {
 sub BPS_port_trunk {
 #   IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "Configure TRUNK port in '".$arg->{'IP'}."', port ".$arg->{'PORT'});
 
     my ($speed, $duplex ) = &$speed_char( $arg );
@@ -356,9 +329,6 @@ sub BPS_port_system {
 
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
 
@@ -386,9 +356,6 @@ sub BPS_port_system {
 sub BPS_port_setparms {
 #    IP LOGIN PASS PORT PORTPREF DS US VLAN TAG MAXHW AUTONEG SPEED DUPLEX
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SET PORT parameters in '".$arg->{'IP'}."', port ".$arg->{'PORT'} );
@@ -415,9 +382,6 @@ sub BPS_port_setparms {
 sub BPS_vlan_trunk_add {
 #    IP LOGIN PASS VLAN PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD VLAN '".$arg->{'VLAN'}."' in '".$arg->{'IP'}."', trunk port ".$arg->{'PORT'} );
@@ -437,9 +401,6 @@ sub BPS_vlan_trunk_add {
 sub BPS_vlan_trunk_remove  {
 #    IP LOGIN PASS VLAN PORT PORTPREF
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from '".$arg->{'IP'}."', trunk port ".$arg->{'PORT'} );
@@ -455,9 +416,6 @@ sub BPS_vlan_trunk_remove  {
 sub BPS_vlan_remove  {
 #    IP LOGIN PASS VLAN
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE VLAN '".$arg->{'VLAN'}."' from switch '".$arg->{'IP'}."'" );

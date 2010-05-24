@@ -74,9 +74,6 @@ sub C73_cmd {
 sub C73_conf_save {
 #   IP LOGIN PASS ENA_PASS
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # login
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "SAVING $LIB config in router '".$arg->{'IP'}."'");
@@ -91,9 +88,6 @@ sub C73_conf_save {
 
 sub C73_term_l3net4_add {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS IFACE VLAN VLANNAME IPGW NETMASK UP_ACLIN UP_ACLOUT
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "ADD Transport Net Iface in router '".$arg->{'IP'}."'");
@@ -121,9 +115,6 @@ sub C73_term_l3net4_add {
 sub C73_term_l3net4_remove {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS IFACE VLAN 
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "REMOVE Transport Net Iface from router '".$arg->{'IP'}."'" );
@@ -150,9 +141,6 @@ sub C73_term_l3net4_remove {
 
 sub C73_term_l3net4_down {
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS IFACE VLAN DOWN_ACLIN DOWN_ACLOUT
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "BLOCK Transport Net Iface from router '".$arg->{'IP'}."'" );
@@ -174,9 +162,6 @@ sub C73_term_l3net4_down {
 sub C73_term_l3net4_up {
 
     my $arg = shift;
-    #my %arg = (
-    #    @_,
-    #);
     # IP LOGIN PASS ENA_PASS IFACE VLAN UP_ACLIN UP_ACLOUT
     my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}, $arg->{'ENA_PASS'}) < 1 );
     SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "UNBLOCK Transport Net Iface from router '".$arg->{'IP'}."'" );

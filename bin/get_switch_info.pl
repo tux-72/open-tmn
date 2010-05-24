@@ -179,7 +179,7 @@ if (not defined($ARGV[0])) {
     }
 
     my $stm2 = $dbm->prepare("SELECT h.hostname, h.model_id, h.hw_mac, h.sw_id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_portpref".
-    ", h.parent_port, h.control_vlan, m.lib, m.mon_login, m.mon_pass FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id and h.control_vlan>0 ".$Q_end);
+    ", h.parent_port, h.control_vlan, m.lib, m.mon_login, m.mon_pass, m.rocom, m.snmp_ap_fix FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id and h.control_vlan>0 ".$Q_end);
     $stm2->execute();
     dlog ( SUB =>'chk_trunk', DBUG => 0, MESS => "Not found switches for input parameters" ) if ($stm2->rows < 1 ) ;
 
@@ -208,7 +208,7 @@ if (not defined($ARGV[0])) {
 #	    );
 	    %sw_arg = (
 		LIB => $ref->{'lib'}, ACT => 'fix_macport', IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'}, 
-		MAC => $checkmac->{$ref->{'control_vlan'}}, VLAN => $ref->{'control_vlan'},
+		MAC => $checkmac->{$ref->{'control_vlan'}}, VLAN => $ref->{'control_vlan'}, ROCOM => $ref->{'rocom'}, USE_SNMP => $ref->{'snmp_ap_fix'},
 	    );
 	    ( $uplink_portpref, $uplink_port ) = SW_ctl(\%sw_arg);
 	    if ( $uplink_port > 0 ) {
@@ -221,7 +221,7 @@ if (not defined($ARGV[0])) {
 	}
 
 	# -------- Fix parent PORT -----------
-	my $stm22 = $dbm->prepare("SELECT h.hostname, h.model_id, h.ip, h.sw_id, m.lib, m.mon_login, m.mon_pass FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id and h.sw_id=".$ref->{'parent'} );
+	my $stm22 = $dbm->prepare("SELECT h.hostname, h.model_id, h.ip, h.sw_id, m.lib, m.mon_login, m.mon_pass, m.rocom, m.snmp_ap_fix FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id and h.sw_id=".$ref->{'parent'} );
 	$stm22->execute();
 	while (my $ref2 = $stm22->fetchrow_hashref()) {
 	    if ( $ref2->{'lib'} ) {
@@ -232,7 +232,7 @@ if (not defined($ARGV[0])) {
 #		);
 		%sw_arg = ( 
 		    LIB => $ref2->{'lib'}, ACT => 'fix_macport', IP => $ref2->{'ip'}, LOGIN => $ref2->{'mon_login'}, PASS => $ref2->{'mon_pass'},
-		    MAC => $ref->{'hw_mac'}, VLAN => $ref->{'control_vlan'},
+		    MAC => $ref->{'hw_mac'}, VLAN => $ref->{'control_vlan'}, ROCOM => $ref2->{'rocom'}, USE_SNMP => $ref2->{'snmp_ap_fix'},
 		);
 		( $parent_portpref, $parent_port ) = SW_ctl(\%sw_arg);
 		if ( $parent_port > 0 ) {
