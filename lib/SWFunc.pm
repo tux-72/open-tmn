@@ -1140,7 +1140,7 @@ sub SNMP_fix_macport {
     my $port = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
 
     if ( not defined($port) ) {
-        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => $NSNMP::Simple::error );
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => "Error in SNMP get port index for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
         $port = -1;
     }
     print STDERR "NSNMP fix portindex = ".$port."\n" if $debug;
@@ -1151,25 +1151,21 @@ sub SNMP_fix_macport {
         if ( defined($portname) ) {
             if ( $portname =~ /^(\d+)$/ ) {
                 $port = $1;
-                print STDERR "NSNMP port name fix = '".$port."'\n" if $debug;
             } elsif ( $portname =~ /^\d+\/(\d+)$/ ) {
                 $port = $1;
-                print STDERR "NSNMP port name fix = '".$port."'\n" if $debug;
             } elsif ( $portname =~ /^(\S+\/)(\d+)$/ ) {
                 $pref = $1;
                 $port = $2;
-                print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
             } elsif ( $portname =~ /^(\S+)(\d+)$/ ) {
                 $pref = $1;
                 $port = $2;
-                print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
             } else {
                 SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
-                print STDERR "Unknown portname type '$portname'\n" if $debug;
+                print STDERR "Unknown portname type '$portname'\n";
             }
             print STDERR "NSNMP fix portname = ".$portname."\n" if $debug;
         } else {
-            SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $NSNMP::Simple::error );
+            SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Error in SNMP get port name for index '$port'. MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
             $port = -1;
         }
     }
@@ -1189,7 +1185,7 @@ sub SNMP_cisco_fix_macport {
     my $idx1 = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'}.'@'.$arg->{'VLAN'} );
 
     if ( not defined($idx1) ) {
-        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $NSNMP::Simple::error );
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => "Error in CISCO SNMP get idx1 for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
         $port = -1;
     } else {
         print STDERR "NSNMP fix port index1 = ".$idx1."\n" if $debug;
@@ -1206,17 +1202,15 @@ sub SNMP_cisco_fix_macport {
                 if ( $portname =~ /^(\S+\/)(\d+)$/ ) {
                     $pref = $1;
                     $port = $2;
-                    print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
                 } elsif ( $portname =~ /^(\S+)(\d+)$/ ) {
                     $pref = $1;
                     $port = $2;
-                    print STDERR "NSNMP pref & port name fix = '".$pref."' '".$port."'\n" if $debug;
                 } else {
                     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
                     print STDERR "Unknown portname type '$portname'\n" if $debug;
                 }
             } else {
-                SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $NSNMP::Simple::error );
+                SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Error in CISCO SNMP get idx for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
                 $port = -1;
             }
         }
