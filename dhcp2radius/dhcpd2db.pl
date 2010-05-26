@@ -106,7 +106,7 @@ sub post_auth {
 
 	} elsif  ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
 	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information и типу абонента
-	    my $Q_check_macport = "SELECT l.port_id, l.head_id, l.static_ip, l.status, l.login, l.dhcp_use, h.term_ip, l.pppoe_up ".
+	    my $Q_check_macport = "SELECT l.port_id, l.head_id, l.white_static_ip, l.status, l.login, l.dhcp_use, h.term_ip, l.pppoe_up ".
 	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0 ".
 	    " and ( h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' or h.dhcp_relay_ip2='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' )".
 	    " and l.status=1 and l.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
@@ -127,16 +127,16 @@ sub post_auth {
  			return RLM_MODULE_NOTFOUND;
 		    }
 		    # Выделить IP
-		    my $Q_Discover_start  = "SELECT a.login, a.ip, a.start_lease, a.end_lease, p.mask, p.gw, p.dhcp_lease FROM dhcp_addr a, dhcp_pools p ".
+		    my $Q_Discover_start  = "SELECT a.login, a.ip, a.start_lease, a.end_lease, p.mask, p.gw, p.dhcp_lease, p.name_server FROM dhcp_addr a, dhcp_pools p ".
 		    " WHERE p.head_id=".$ref_port->{'head_id'}." and p.pool_id=a.pool_id";
 
 		    my $Q_Discover_reuse = ""; my $Q_Discover_new ='' ; my $Q_Discover_grey ='' ;
 		    ### Поиск назначенного статического белого IP
-		    if ( $ref_port->{'static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
+		    if ( $ref_port->{'white_static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
 			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
 			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()";
 		    ### Поиск ранее выдаваемого динамического белого IP
-		    } elsif ( $ref_port->{'static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
+		    } elsif ( $ref_port->{'white_static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
 			if ( $start_conf->{'DHCP_DYN_GREYIP'} ) {
 			    $Q_Discover_reuse = " and p.real_ip<1 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
 			    $Q_Discover_new   = " and p.real_ip<1 and p.static_ip>0 and a.end_lease<now()";
@@ -167,7 +167,7 @@ sub post_auth {
 			$stm_disc->finish;
 			$stm_disc = $dbm->prepare($Q_Discover_start.$Q_Discover_new);
 			$stm_disc->execute();
-			if  ( not $stm_disc->rows and $ref_port->{'static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
+			if  ( not $stm_disc->rows and $ref_port->{'white_static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
 			    $stm_disc->finish;
 			    $stm_disc = $dbm->prepare($Q_Discover_start.$Q_Discover_grey);
 			    $stm_disc->execute();
@@ -190,8 +190,9 @@ sub post_auth {
 			$RAD_REPLY{'DHCP-IP-Address-Lease-Time'} = $ref_disc->{'dhcp_lease'};
 			$RAD_REPLY{'DHCP-Your-IP-Address'}	 = $ref_disc->{'ip'};
 			$RAD_REPLY{'DHCP-Subnet-Mask'}		 = $ref_disc->{'mask'};
-			if ( $ref_port->{'static_ip'} || ( not $start_conf->{'DHCP_DYN_GREYIP'} )) {
-			     $RAD_REPLY{'DHCP-Router-Address'}	 = $ref_disc->{'gw'};
+			$RAD_REPLY{'DHCP-Domain-Name-Server'}    = $ref_disc->{'name_server'};
+			if ( defined($ref_disc->{'gw'}) ) {
+			    $RAD_REPLY{'DHCP-Router-Address'}    = $ref_disc->{'gw'};
 			}
 			my $Q_Disc_up = "UPDATE dhcp_addr SET agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."', login='".$ref_port->{'login'}."'".
 			", port_id=".$ref_port->{'port_id'}.", vlan_id=".$vlan.", hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."', start_lease=now() ".
@@ -226,10 +227,11 @@ sub post_auth {
 		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug;
 		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'") if $debug;
 
-		my $Q_Request = "SELECT a.session, a.ip, a.port_id, a.start_lease, p.mask, p.gw, l.static_ip, p.dhcp_lease, l.login, h.term_ip".
-		" FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
-		" and a.port_id=l.port_id and a.pool_id=p.pool_id and l.status=1 and l.inet_priority<=".$start_conf->{'DHCP_PRI'}." and l.communal=0".
-		" and ( h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' or h.dhcp_relay_ip2='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' )".
+		my $Q_Request = "SELECT a.session, a.ip, a.port_id, a.start_lease, p.mask, p.gw, p.dhcp_lease, p.name_server, p.real_ip, p.static_ip, l.white_static_ip".
+		", l.login, h.term_ip FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
+		" and a.port_id=l.port_id and a.pool_id=p.pool_id  and l.status=1 and l.inet_priority<=".$start_conf->{'DHCP_PRI'}.
+		" and l.communal=0"." and ( h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."'".
+		" or h.dhcp_relay_ip2='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."' )".
 		" and l.dhcp_use=1 and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
 		" and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
@@ -239,7 +241,10 @@ sub post_auth {
 		#&radiusd::radlog(1, "stm_req exec SET Reply data rows - ".$stm_req->rows);
 		if  ( $stm_req->rows == 1 ) {
 		    while (my $ref_req = $stm_req->fetchrow_hashref()) {
-
+			if ( $ref_req->{'white_static_ip'} and not ( $ref_req->{'real_ip'} and $ref_req->{'static_ip'} ) ) {
+			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
+			    return RLM_MODULE_NOTFOUND;
+			}
 			if ( ( not defined ($ref_req->{'session'}) ) || ($ref_req->{'session'} ne $RAD_REQUEST{'DHCP-Transaction-Id'}) ) {
 			    $AP{'trust_id'}	= $ref_req->{'port_id'};
 			    $AP{'nas_ip'}	= $ref_req->{'term_ip'};
@@ -257,7 +262,8 @@ sub post_auth {
 			$RAD_REPLY{'DHCP-IP-Address-Lease-Time'} = $ref_req->{'dhcp_lease'};
 			$RAD_REPLY{'DHCP-Your-IP-Address'}	 = $ref_req->{'ip'};
 			$RAD_REPLY{'DHCP-Subnet-Mask'}		 = $ref_req->{'mask'};
-			if ( $ref_req->{'static_ip'} || ( not $start_conf->{'DHCP_DYN_GREYIP'} ) ) {
+			$RAD_REPLY{'DHCP-Domain-Name-Server'}    = $ref_req->{'name_server'};
+			if ( defined($ref_req->{'gw'}) ) {
 			    $RAD_REPLY{'DHCP-Router-Address'}    = $ref_req->{'gw'};
 			}
 

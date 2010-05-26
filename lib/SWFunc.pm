@@ -487,7 +487,7 @@ sub SW_AP_get {
 			    } else {
 				$AP{'pri'} = 3;
 			    }
-			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, static_ip=0, dhcp_use=".$start_conf->{'DHCP_USE'}.", ";
+			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, white_static_ip=0, dhcp_use=".$start_conf->{'DHCP_USE'}.", ";
 			    $Q_upd = " vlan_id=".$AP{'vlan_id'}.", login='".$fparm->{'login'}."', hw_mac='".$fparm->{'mac'}."', communal=".$AP{'communal'}.
 			    ", inet_shape=".$fparm->{'inet_rate'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$fparm->{'ip_addr'}."'".
 			    ", head_id=".$headinfo{'LHEAD_'.$fparm->{'nas_ip'}}.", pppoe_up=1";
