@@ -150,11 +150,11 @@ sub TCOM4500_fix_vlan {
 sub TCOM4500_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    my $port = -1; my $pref; my $max=3; my $count=0; 
+    my $port = -1; my $pref; my $index; my $max=3; my $count=0; 
 ################
     if ($arg->{'USE_SNMP'}) {
 	SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => " SNMP Fix PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'..." );
-	($pref, $port ) = SWFunc::SNMP_fix_macport($arg);
+	($pref, $port, $index ) = SWFunc::SNMP_fix_macport_name($arg);
     } else {
 ################
 	# login
@@ -178,7 +178,7 @@ sub TCOM4500_fix_macport {
 	}
 	$sw->close();
     }
-    return ($pref, $port);
+    return ($pref, $port, $index);
 }
 
 

@@ -25,13 +25,13 @@ my $debug=2;
 
 my $script_name=$0;
 $script_name="$2" if ( $0 =~ /(\S+)\/(\S+)$/ );
-dlog ( SUB => $script_name, DBUG => 2, MESS => "Use BIN directory - $Bin" );
+dlog ( SUB => $script_name, DBUG => 2, LOGTYPE => 'CHKTRUNK', MESS => "Use BIN directory - $Bin" );
 
 
 my $dbm; 
 my $res = DB_mysql_connect(\$dbm);
 if ($res < 1) {
-    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
+    dlog ( SUB => (caller(0))[3], DBUG => 0, LOGTYPE => 'CHKTRUNK', MESS => "Connect to MYSQL DB FAILED, RESULT = $res" );
     DB_mysql_connect(\$dbm);
 }
 
@@ -99,8 +99,10 @@ if (not defined($ARGV[0])) {
 
     my $stm = $dbm->prepare("SELECT h.hostname, h.hw_mac, h.model_id, h.sw_id, h.ip, m.rocom FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id ".$Q_end );
     $stm->execute();
-    dlog ( SUB =>'chk_model', DBUG => 0, MESS => "Not found switches for input parameters" ) if ($stm->rows < 1 );
-
+    if ($stm->rows < 1 ) { 
+        dlog ( SUB =>'chk_model', DBUG => 0, LOGTYPE => 'CHKTRUNK', MESS => "Not found switches for input parameters" );
+        #print STDERR $Q_end."\n";
+    }
     while (my $ref = $stm->fetchrow_hashref()) {
 
 	$ref->{'rocom'} = $conf->{'DEF_COMUNITY'} if not defined($ref->{'rocom'}); 
@@ -152,12 +154,12 @@ if (not defined($ARGV[0])) {
 	}
 	close ARPTABLE;
 	
-	dlog ( SUB =>'chk_model', DBUG => 1, MESS => $fix_rez );
+	dlog ( SUB =>'chk_model', DBUG => 1, LOGTYPE => 'CHKTRUNK', MESS => $fix_rez );
 	#  END check switch parameters -------
 	$Q_update .= " WHERE sw_id=".$ref->{'sw_id'};
 	#$Q_update .= ";";
 	if ( $Q_update =~ /\,/ ) {
-	    dlog ( SUB =>'chk_model', DBUG => 2, MESS => "$Q_update");
+	    dlog ( SUB =>'chk_model', DBUG => 2, LOGTYPE => 'CHKTRUNK', MESS => "$Q_update");
 	    $dbm->do($Q_update) if $debug < 2;
 	}
     }
@@ -178,14 +180,17 @@ if (not defined($ARGV[0])) {
 	}
     }
 
-    my $stm2 = $dbm->prepare("SELECT h.hostname, h.model_id, h.hw_mac, h.sw_id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_portpref".
-    ", h.parent_port, h.control_vlan, m.lib, m.mon_login, m.mon_pass, m.rocom, m.snmp_ap_fix FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id and h.control_vlan>0 ".$Q_end);
+    my $stm2 = $dbm->prepare("SELECT h.hostname, h.model_id, h.hw_mac, h.sw_id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_portpref, h.parent_port".
+    ", h.control_vlan, m.lib, m.mon_login, m.mon_pass, m.rocom, m.snmp_ap_fix FROM hosts h, models m WHERE h.visible>0 and h.model_id=m.model_id and h.control_vlan>0 ".$Q_end);
     $stm2->execute();
-    dlog ( SUB =>'chk_trunk', DBUG => 0, MESS => "Not found switches for input parameters" ) if ($stm2->rows < 1 ) ;
+    if ($stm2->rows < 1 ) { 
+        dlog ( SUB =>'chk_trunk', DBUG => 0, LOGTYPE => 'CHKTRUNK', MESS => "Not found switches for input parameters" );
+        print STDERR $Q_end."\n";
+    }
 
     while (my $ref = $stm2->fetchrow_hashref()) {
 	if ($ref->{'parent'} < 1 ) {
-	    dlog ( SUB =>'chk_trunk', DBUG => 0, MESS => "NOT found PARENT switch for '".$ref->{'hostname'} );
+	    dlog ( SUB =>'chk_trunk', DBUG => 0, LOGTYPE => 'CHKTRUNK', MESS => "NOT found PARENT switch for '".$ref->{'hostname'} );
 	    #print STDERR "NOT found PARENT switch for '".$ref->{'hostname'}."'\n";
 	    next;
 	}
@@ -198,7 +203,7 @@ if (not defined($ARGV[0])) {
 
 	if ( $ref->{'lib'} ) {
 	    $fix_rez = "-------- HOST '".$ref->{'hostname'}."' --------\n"; 
-	    dlog ( SUB =>'chk_trunk', DBUG => 2, MESS => "Checking MAC = ".$checkmac->{$ref->{'control_vlan'}} );
+	    dlog ( SUB =>'chk_trunk', DBUG => 2, LOGTYPE => 'CHKTRUNK', MESS => "Checking MAC = ".$checkmac->{$ref->{'control_vlan'}} );
 	    #print $checkmac->{$ref->{'control_vlan'}}."\n";
 	    #$LIB_action = $ref->{'lib'}."_fix_macport";
 #	    %sw_arg = (
@@ -285,9 +290,9 @@ if (not defined($ARGV[0])) {
 	    }
 	}
 	$stm22->finish();
-	dlog ( SUB =>'chk_trunk', DBUG => 1, MESS => $fix_rez." " );
-	dlog ( SUB =>'chk_trunk', DBUG => 2, MESS => $Q_uplink.";" );
-	dlog ( SUB =>'chk_trunk', DBUG => 2, MESS => $Q_downlink.";" );
+	dlog ( SUB =>'chk_trunk', DBUG => 1, LOGTYPE => 'CHKTRUNK', MESS => $fix_rez." " );
+	dlog ( SUB =>'chk_trunk', DBUG => 2, LOGTYPE => 'CHKTRUNK', MESS => $Q_uplink.";" );
+	dlog ( SUB =>'chk_trunk', DBUG => 2, LOGTYPE => 'CHKTRUNK', MESS => $Q_downlink.";" );
 
 	if ( $ARGV[1] ne "allhosts" and $debug < 2 ) {
             $dbm->do($Q_uplink)         if $Q_uplink    =~ /\S/;
@@ -297,7 +302,7 @@ if (not defined($ARGV[0])) {
 	# ------ END check switch parameters -------
 	$Q_update .= " WHERE sw_id=".$ref->{'sw_id'};
 	if ( $Q_update =~ /\,/ ) {
-	    dlog ( SUB =>'chk_trunk', DBUG => 2, MESS => $Q_update.";" );
+	    dlog ( SUB =>'chk_trunk', DBUG => 2, LOGTYPE => 'CHKTRUNK', MESS => $Q_update.";" );
 	    $dbm->do($Q_update) if ( $ARGV[1] ne "allhosts" and $debug < 2 );
 	}
     }

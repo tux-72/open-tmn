@@ -241,7 +241,7 @@ sub post_auth {
 		#&radiusd::radlog(1, "stm_req exec SET Reply data rows - ".$stm_req->rows);
 		if  ( $stm_req->rows == 1 ) {
 		    while (my $ref_req = $stm_req->fetchrow_hashref()) {
-			if ( $ref_req->{'white_static_ip'} and not ( $ref_req->{'real_ip'} and $ref_req->{'static_ip'} ) ) {
+			if ( $ref_req->{'white_static_ip'} !=  $ref_req->{'real_ip'} * $ref_req->{'static_ip'} ) {
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			    return RLM_MODULE_NOTFOUND;
 			}

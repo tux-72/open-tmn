@@ -110,34 +110,42 @@ sub GS_fix_vlan {
     return $vlan;
 }
 
-
-
 sub GS_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    # login
-    my $sw;  return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', VLAN '".$arg->{'VLAN'}."', MAC '".$arg->{'MAC'}."' ..." );
+    my $port = -1; my $pref; my $index; my $max=3; my $count=0;
 
-    my $port = -1; my $pref; my $max=3; my $count=0;
-    while ($count < $max) {
-	my @ln = $sw->cmd("show mac address-table all VID" );
-	foreach (@ln) {
-	    #Port      VLAN ID        MAC Address         Type
-	    #26        1              00:03:42:97:66:a1   Dynamic
-    	    if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+\S+/ and $2 eq $arg->{'VLAN'} and $3 eq $arg->{'MAC'} ) {
+   if ($arg->{'USE_SNMP'}) {
+        SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+        ( $pref, $port, $index ) = SWFunc::SNMP_fix_macport($arg);
+        if ($pref eq 'swp') {
+            $index = $port+1;
+        }
+    ################
+    } else {
+
+      # login
+      my $sw;  return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+      SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', VLAN '".$arg->{'VLAN'}."', MAC '".$arg->{'MAC'}."' ..." );
+      while ($count < $max) {
+        my @ln = $sw->cmd("show mac address-table all VID" );
+        foreach (@ln) {
+            #Port      VLAN ID        MAC Address         Type
+            #26        1              00:03:42:97:66:a1   Dynamic
+            if ( /(\d+)\s+(\d+)\s+(\w\w\:\w\w\:\w\w\:\w\w\:\w\w\:\w\w)\s+\S+/ and $2 eq $arg->{'VLAN'} and $3 eq $arg->{'MAC'} ) {
                 $port = $1+0;
-    	    }
-	}
+            }
+        }
         if ($port>0) {
             last;
         } else {
             $count+=1;
         }
+      }
+      $sw->close();
     }
-    $sw->close();
     print STDERR "MAC Port - $port\n" if $debug > 1;
-    return ($pref, $port);
+    return ($pref, $port, $index);
 }
 
 

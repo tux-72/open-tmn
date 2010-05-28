@@ -144,14 +144,20 @@ sub CATOS_fix_vlan {
 sub CATOS_fix_macport {
     # IP LOGIN PASS MAC VLAN
     my $arg = shift;
-    my $sw;  return -1  if (&$login_nopriv(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
-    SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'");
+    my $port = -1; my $pref; my $index; my $max=3; my $count=0;
+    ################
+    if ($arg->{'USE_SNMP'}) {
+        SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+        ($pref, $port, $index ) = SWFunc::SNMP_fix_macport_name($arg);
+    ################
+    } else {
+      my $sw;  return -1  if (&$login_nopriv(\$sw, $arg->{'IP'}, $arg->{'PASS'}) < 1 );
+      SWFunc::dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "Fixing PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}."', VLAN '".$arg->{'VLAN'}."'");
 
-    $arg->{'MAC'} =~ s/\:/\-/g;
-    my $port = -1; my $pref; my $max=3; my $count=0; my @p = '';
-
-    while ($count < $max) {
-    my @ln= $sw->cmd('show cam dynamic '.$arg->{'VLAN'}.' | inc '.$arg->{'MAC'});
+      $arg->{'MAC'} =~ s/\:/\-/g;
+      my @p = '';
+      while ($count < $max) {
+      my @ln= $sw->cmd('show cam dynamic '.$arg->{'VLAN'}.' | inc '.$arg->{'MAC'});
         foreach (@ln) {
 	    #	print STDERR "lines - $lnv\n";
 	    #VLAN  Dest MAC/Route Des    [CoS]  Destination Ports
@@ -166,10 +172,11 @@ sub CATOS_fix_macport {
         } else {
             $count+=1;
         }
+      }
+      $sw->close();
     }
-    $sw->close();
     print STDERR "MAC Port - $pref / $port\n" if $debug > 1;
-    return ($pref, $port);
+    return ($pref, $port, $index);
 }
 
 
