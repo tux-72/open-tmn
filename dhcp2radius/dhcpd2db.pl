@@ -74,12 +74,18 @@ sub post_auth {
 		$stm_rel->execute();
 		#&radiusd::radlog(1, "stm_req exec SET Reply data rows - ".$stm_req->rows);
 		if  ( $stm_rel->rows == 1 ) {
-			my $ref_rel = $stm_rel->fetchrow_hashref;
+		    my $ref_rel = $stm_rel->fetchrow_hashref;
+		    #################################################
+		    $dbm->do("UPDATE dhcp_addr SET end_lease=now() WHERE ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}.
+		    "' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
+		    " and login=".$ref_rel->{'login'} );
+		    $res = RLM_MODULE_OK;
+		    if ($start_conf->{'DHCP_ACCOUNT'}) {
 			################## ACCOUNTING ###################
 			%acc_attr = (
 			    'Acct-Status-Type'              => 'Stop',
 			    'Acct-Delay-Time'               => 0,
-			    'NAS-IP-Address'                => '192.168.100.20',
+			    'NAS-IP-Address'                => $start_conf->{'DHCP_NAS_IP'},
 			    'Acct-Authentic'                => 'RADIUS',
 			    'NAS-Port-Type'                 => 'Virtual',
 			    'Service-Type'                  => 'Framed-User',
@@ -95,12 +101,8 @@ sub post_auth {
 			    'Acct-Session-Time'             => ( time - $ref_rel->{'start_lease'}),
 			    'Request-Number'                => $RAD_REQUEST{'DHCP-Transaction-Id'},
 			);
-			#################################################
-			$dbm->do("UPDATE dhcp_addr SET end_lease=now() WHERE ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}.
-			"' and hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
-			" and login=".$ref_rel->{'login'} );
-			$res = RLM_MODULE_OK;
 			send_accounting (\%acc_attr);
+		    }
 		}
 		$stm_rel->finish;
 
@@ -150,7 +152,6 @@ sub post_auth {
 			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
 			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()";
 		    } else {
-			#$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			$RAD_REPLY{'DHCP-Message-Type'} = 0;
 			return RLM_MODULE_NOTFOUND;
 		    }
@@ -174,7 +175,6 @@ sub post_auth {
 			}
 			if  (not $stm_disc->rows ) {
 			    &radiusd::radlog(1, 'All IP used in available DHCP scopes... :-('); 
-			    #$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 			    return RLM_MODULE_NOTFOUND;
 			}
@@ -205,13 +205,11 @@ sub post_auth {
 		    $stm_disc->finish;
 		  } else {
 		    &radiusd::radlog(1, "AP for MAC = ".$AP{'hw_mac'}." and VLAN = ".$AP{'vlan'}." not fixed :-( ...\n") if $debug;
-		    #$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 		    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 		    $res = RLM_MODULE_NOTFOUND;
 		  }
 		}
 	    } else {
-		    #$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 		    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 		    $res = RLM_MODULE_NOTFOUND;
 	    }
@@ -249,7 +247,6 @@ sub post_auth {
 			    $AP{'trust_id'}	= $ref_req->{'port_id'};
 			    $AP{'nas_ip'}	= $ref_req->{'term_ip'};
 			    $AP{'login'}	= $ref_req->{'login'};
-			    #SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_req->{'term_ip'}, LOGIN => $ref_req->{'login'} , VLAN => $AP{'vlan'}, HW_MAC => $AP{'hw_mac'} );
 			    SW_AP_fix( \%AP );
 			    if ( $AP{'id'} != $ref_req->{'port_id'} ) {
 				$RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
@@ -279,8 +276,9 @@ sub post_auth {
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-Ack';
 			    &radiusd::radlog(1, "UPDATE ".$rows_up." rows in Request");
 			    ################## ACCOUNTING ###################
+			     if ($start_conf->{'DHCP_ACCOUNT'}) {
 				%acc_attr = (
-				    'NAS-IP-Address'                => '192.168.100.20',
+				    'NAS-IP-Address'                => $start_conf->{'DHCP_NAS_IP'},
 				    'User-Name'                     => $ref_req->{'login'},
 				    'DHCP-Client-Hardware-Address'  => $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
 				    'Framed-IP-Address'             => $cli_addr,
@@ -303,6 +301,7 @@ sub post_auth {
 				}	
 				#print Dumper %acc_attr;
 				send_accounting (\%acc_attr);
+			    }
 			    #################################################
 			} else {
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';

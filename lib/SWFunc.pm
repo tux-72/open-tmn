@@ -282,7 +282,7 @@ sub SW_AP_fix {
 					$AP->{'portvlan'} = $refp->{'vlan_id'} if defined($refp->{'vlan_id'});
 
 				}
-                                        $AP->{'name'} .= ", порт ".$AP->{'port'};
+                                        $AP->{'name'} .= ", порт ".( defined($AP->{'portpref'}) ? $AP->{'portpref'} : '' ).$AP->{'port'};
 					$stm1->finish;
 			}
 			$AP->{'fix_vlan_type'} = " CLI_VLAN";
