@@ -499,6 +499,7 @@ sub SW_AP_get {
 			    $dbm->do("$Query") or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "$Query \n$DBI::errstr" );
 			}
 		######################## SET JOB PARAMETERS
+			# Если необходимо делать изменения на порту - $AP{'set'} и коммутатор управляется
 			if ( $AP{'set'} and $AP{'automanage'} ) {
 			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Access Point parm change" );
 			    $AP{'update_db'}=1;
@@ -510,44 +511,51 @@ sub SW_AP_get {
 
 			    ########  VPN  VLAN  ########
 			    if ( $fparm->{'link_type'} == $link_type{'l2link'} ) {
-				$Query .= ", ltype_id=".$fparm->{'link_type'};
-				if ( "x".$fparm->{'vlan_id'} eq "x" and $AP{'link_type'} != $link_type{'l2link'} ) {
-				    ( $fparm->{'vlan_id'}, $AP{'link_head'} ) = VLAN_VPN_get ( PORT_ID => $AP{'id'}, 
-				    LINK_TYPE => $link_type{'l2link'}, ZONE => $AP{'vlan_zone'} );
+				#$Query .= ", ltype_id=".$fparm->{'link_type'};
+				if ( "x".$fparm->{'vlan_id'} eq "x" ) {
+				    # PORT_ID LINK_TYPE ZONE
+				    ( $fparm->{'vlan_id'}, $AP{'head_id'} ) = VLAN_get ( PORT_ID => $AP{'id'}, 
+				    LINK_TYPE => $fparm->{'link_type'}, ZONE => $AP{'vlan_zone'} );
 				    if ( $fparm->{'vlan_id'} > 1 ) {
 					$Fvalue .= 'vlan_id:'.$fparm->{'vlan_id'}.';';
-		    			$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';';
-		    			$job_parms .= 'link_head:'.$AP{'link_head'}.';'  if ( $AP{'link_head'} > 1 );
+					$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';';
 				    }
-				} elsif ("x".$fparm->{'vlan_id'} ne "x"  and $AP{'link_type'} != $link_type{'l2link'}) {
-		    		    $job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';';
+				} else {
+				    $job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';';
 				}
 			    }
 			    ######## Transport Net ############
-		    	    if ( defined($fparm->{'ip_addr'}) and $fparm->{'link_type'} == $link_type{'l3net4'} ) {
-				$Query .= ", ltype_id=".$fparm->{'link_type'};
-				$job_parms .= 'ip_subnet:'.$fparm->{'ip_addr'}.'/30;';
+			    if ( defined($fparm->{'ip_addr'}) and $fparm->{'link_type'} == $link_type{'l3net4'} ) {
+				if ( "x".$fparm->{'vlan_id'} eq "x" ) {
+				    $job_parms .= 'ip_subnet:'.$fparm->{'ip_addr'}.'/30;' ;
+				    # PORT_ID LINK_TYPE ZONE
+				    ( $fparm->{'vlan_id'}, $AP{'head_id'} ) = VLAN_get ( PORT_ID => $AP{'id'}, 
+				    LINK_TYPE => $link_type{'l3net4'}, ZONE => $AP{'vlan_zone'} );
+				    if ( $fparm->{'vlan_id'} > 1 ) {
+					$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';';
+				    }
+				}
 			    }
 
 			    # Проверка изменений link_type
 			    ## Если порт был свободен и задействуется под PPPoE
 			    if ( $AP{'link_type'} == $link_type{'free'} and $fparm->{'link_type'} == $start_conf->{'CLI_VLAN_LINKTYPE'} ) {
 				$Query .= ", ltype_id=".$fparm->{'link_type'};
-		    		$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
+				$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
 			    ## Иначе если порт был свободен и задействуется под другие типы подключений  
 			    } elsif ( $AP{'link_type'} == $link_type{'free'} ) {
 				$Query .= ", ltype_id=".$fparm->{'link_type'};
-		    		$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( $fparm->{'vlan_id'} > 1 );
+				$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( $fparm->{'vlan_id'} > 1 );
 			    ## Иначе если порт занят под такой же тип подключения
 			    } elsif ( $AP{'link_type'} > $start_conf->{'STARTLINKCONF'} and $fparm->{'link_type'}+0 == $AP{'link_type'}+0 ) {
 				$Query .= ", ltype_id=".$link_type{'setparms'};
-		    		$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
+				$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
 			    ## Иначе если порт ЗАНЯТ! и задействуется под другой тип подключения
 			    } elsif ( $AP{'link_type'} > $start_conf->{'STARTLINKCONF'} and $fparm->{'link_type'}+0 != $AP{'link_type'}+0  ) {
 				$PreQuery .= "INSERT INTO bundle_jobs SET port_id=".$AP{'id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date_insert=NULL';
 
 				$Query .= ", ltype_id=".$fparm->{'link_type'};
-		    		$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( defined($fparm->{'vlan_id'}) and $fparm->{'vlan_id'} > 1 );
+				$job_parms .= 'vlan_id:'.$fparm->{'vlan_id'}.';' if ( defined($fparm->{'vlan_id'}) and $fparm->{'vlan_id'} > 1 );
 			    } else {
 				$AP{'update_db'}=0;
 			    }
@@ -555,7 +563,7 @@ sub SW_AP_get {
 			    if ( $AP{'update_db'} ) {
 				if ("x".$PreQuery ne "x" ) { $dbm->do($PreQuery); }
 				$Query .= ", parm='".$job_parms."', archiv=0 ON DUPLICATE KEY UPDATE date_insert=NULL, parm='".$job_parms."'";
-                    		dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Update port DB parameters info" );
+				dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Update port DB parameters info" );
 				$dbm->do($Query) or dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGDISP', 
 				MESS => "ERROR change table 'Bundle_jobs' Querry --".$Query."--" );
 			    } else {
@@ -566,14 +574,14 @@ sub SW_AP_get {
 
 			if ( not $AP{'trust'} ) {
 			    dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "'".$fparm->{'login'}."' access point not agree !!!" );
-	    		    $Fres = 1;
+			    $Fres = 1;
 			    $Fvalue = 'ap_id:'.$AP{'id'}.';ap_name:'.&$k2w($AP{'name'}).';bw_ctl:'.$AP{'bw_ctl'}.';ap_swid:'.$AP{'swid'}.';ap_communal:'.$AP{'communal'}.';';
 			}
 
 		} elsif ( $AP{'vlan_id'} ) {
 		    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "AP ID '".$fparm->{'login'}."' in VLAN ".$AP{'vlan_id'}." not fixed!!!" );
 		    $Fres = 2;
-	            $Fvalue = 'error:MAC found in VLAN '.$AP{'vlan_id'}.'. Access point not fixed... :-(;';
+		    $Fvalue = 'error:MAC found in VLAN '.$AP{'vlan_id'}.'. Access point not fixed... :-(;';
 		}
 	}
         dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => 

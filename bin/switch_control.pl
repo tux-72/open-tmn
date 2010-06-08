@@ -503,7 +503,7 @@ if ( not defined($ARGV[0]) ) {
 	    if ( defined($ref->{'clients_vlan'}) and ( $ref->{'new_ltype'}  == $conf->{'CLI_VLAN_LINKTYPE'} ||  $ref->{'new_ltype'}  ==  $link_type{'l3realnet'} ) ) {
                 $trunking_vlan=0;
 		if ( not defined($parm{'vlan_id'}) ) {
-            	    $parm{'vlan_id'} = $ref->{'clients_vlan'};
+		    $parm{'vlan_id'} = $ref->{'clients_vlan'};
 		} elsif ($parm{'vlan_id'} != $ref->{'clients_vlan'}) {
 		    $trunking_vlan = 1;
 		}
