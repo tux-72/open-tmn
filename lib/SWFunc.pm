@@ -527,7 +527,7 @@ sub SW_AP_get {
 			    ######## Transport Net ############
 			    if ( defined($fparm->{'ip_addr'}) and $fparm->{'link_type'} == $link_type{'l3net4'} ) {
 				if ( "x".$fparm->{'vlan_id'} eq "x" ) {
-				    $job_parms .= 'ip_subnet:'.$fparm->{'ip_addr'}.'/30;' ;
+				    $job_parms .= 'ip_subnet:'.(GET_IP3($fparm->{'ip_addr'}.'/30')).'/30;' ;
 				    # PORT_ID LINK_TYPE ZONE
 				    ( $fparm->{'vlan_id'}, $AP{'head_id'} ) = VLAN_get ( PORT_ID => $AP{'id'}, 
 				    LINK_TYPE => $link_type{'l3net4'}, ZONE => $AP{'vlan_zone'} );
