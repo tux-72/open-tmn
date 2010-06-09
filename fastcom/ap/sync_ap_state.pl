@@ -8,6 +8,7 @@ use Data::Dumper;
 my $ver = "0.4";
 
 my $debug=0;
+#$debug=1;
 
 $ENV{'NLS_LANG'}='RUSSIAN_AMERICA.AL32UTF8';
 my $ipcalc ='/usr/bin/ipcalc';
@@ -60,6 +61,12 @@ my %ora_srv = (
     'CANCEL'	=>	3,
 );
 
+my %ora_srv_rev = (
+    '1'	=>	'SERVICE',
+    '2'	=>	'BLOCK',
+    '3'	=>	'CANCEL',
+);
+
 my $stm = $dbm->prepare("SELECT l.ip_subnet, l.port_id, l.login, l.status, l.hw_mac, l.inet_shape, p.ltype_id, p.communal, p.us_speed, p.ds_speed FROM head_link l, swports p WHERE l.port_id=p.port_id");
 $stm->execute();
 while (my $refm = $stm->fetchrow_hashref()) {
@@ -75,6 +82,7 @@ while (my $refm = $stm->fetchrow_hashref()) {
     };
 
     if (defined($refm->{'ip_subnet'}) and $refm->{'ip_subnet'} =~ /^77\.239\.21[01]\.\d{1,3}\/30$/) {
+	$refm->{'ip_subnet'} = GET_IP3SUB($refm->{'ip_subnet'});
 	$TRANSP{$refm->{'ip_subnet'}} = $refm->{'status'};
 	$TR{$refm->{'ip_subnet'}} = 
 	{	inet_shape => $refm->{'inet_shape'},
@@ -100,9 +108,9 @@ while (($ltype_name, $state, $service,  $ap_id, $login, $ltype_id, $inet_shape, 
     }
     if ( defined($ORA{$ap_id}) and $state eq 'ALLOW' ) { 
 	print " AP ".$ap_id." (".$login.") in current state '".$state."', service '".$service."' =>  Already exist (".
-	$ORA{$ap_id}{'login'}.") for state '".$ORA{$ap_id}{'state'}."', service '".$ORA{$ap_id}{'service'}."'\n";
+	$ORA{$ap_id}{'login'}.") for state '".$ORA{$ap_id}{'state'}."', service '".$ora_srv_rev{$ORA{$ap_id}{'service'}}."'\n";
     }
-    if ( not defined($ORA{$ap_id}) or $ORA{$ap_id}{'state'} eq 'DENY' ) {
+    if ( ( not defined($ORA{$ap_id})) or ($ORA{$ap_id}{'state'} eq 'DENY') ) {
 	$ORA{$ap_id} =
 	{	login		=> $login,
 		state		=> $state,
@@ -156,7 +164,7 @@ while (($ltype_name, $state, $service,  $ap_id, $login, $ltype_id, $inet_shape, 
 $sth->finish;
 
 ###############################################################
-##################### TRANPORT NETWORKS #######################
+##################### TRANSPORT NETWORKS #######################
 ###############################################################
 # 'alferov' '10.13.69.210' '512' 'RATE'
 
@@ -234,7 +242,9 @@ $dbh->disconnect; # ORACLE
 
 sub GET_IP3SUB {
     my $subip3 = shift;
-    $subip3 .= "/30";
+    if ( $subip3 =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ ) { 
+        $subip3 .= "/30"; 
+    }
     my @ln = `$ipcalc $subip3`;
     foreach (@ln) {
         if ( /HostMax\:\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+/ ) {

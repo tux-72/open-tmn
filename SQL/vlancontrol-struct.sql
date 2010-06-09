@@ -66,7 +66,7 @@ CREATE TABLE `bundle_jobs` (
   `archiv` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`job_id`) USING BTREE,
   UNIQUE KEY `ch_id` (`port_id`,`ltype_id`,`archiv`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=238 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=331 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -359,14 +359,15 @@ CREATE TABLE `dhcp_pools` (
   `pool_id` int(11) NOT NULL,
   `head_id` int(11) NOT NULL DEFAULT '1',
   `pool_name` varchar(50) DEFAULT NULL,
-  `subnet` varchar(18) NOT NULL,
+  `subnet` varchar(18) DEFAULT NULL,
   `real_ip` tinyint(1) NOT NULL DEFAULT '0',
-  `gw` varchar(15) NOT NULL,
+  `gw` varchar(15) DEFAULT NULL,
   `mask` varchar(15) NOT NULL,
   `static_ip` tinyint(1) NOT NULL DEFAULT '0',
   `dhcp_lease` int(11) NOT NULL DEFAULT '3600',
+  `name_server` varchar(15) NOT NULL DEFAULT '77.239.208.17',
   PRIMARY KEY (`pool_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=koi8r;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -381,6 +382,7 @@ DELIMITER ;;
                 FOR EACH ROW
                 BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('static_ip="', IFNULL(new.`static_ip`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'insert', 'dhcp_pools', CONCAT('name_server="', IFNULL(new.`name_server`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('gw="', IFNULL(new.`gw`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('real_ip="', IFNULL(new.`real_ip`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'insert', 'dhcp_pools', CONCAT('head_id="', IFNULL(new.`head_id`,''),'"')); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
@@ -411,6 +413,9 @@ DELIMITER ;;
                         (now(), 'update', 'dhcp_pools', CONCAT('PK_pool_id: from="', IFNULL(old.`pool_id`,''), '" to="', IFNULL(new.`pool_id`,''),'"')); IF IFNULL(old.`static_ip`,'') != IFNULL(new.`static_ip`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_pools', CONCAT('static_ip: from="', IFNULL(old.`static_ip`,''), '" to="', IFNULL(new.`static_ip`,''),'"'));
+                        END IF; IF IFNULL(old.`name_server`,'') != IFNULL(new.`name_server`,'') THEN
+                            INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                            (now(), 'update', 'dhcp_pools', CONCAT('name_server: from="', IFNULL(old.`name_server`,''), '" to="', IFNULL(new.`name_server`,''),'"'));
                         END IF; IF IFNULL(old.`gw`,'') != IFNULL(new.`gw`,'') THEN
                             INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                             (now(), 'update', 'dhcp_pools', CONCAT('gw: from="', IFNULL(old.`gw`,''), '" to="', IFNULL(new.`gw`,''),'"'));
@@ -456,6 +461,7 @@ DELIMITER ;;
                 FOR EACH ROW
                 BEGIN INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('static_ip="',IFNULL(old.`static_ip`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
+                        (now(), 'delete', 'dhcp_pools', CONCAT('name_server="',IFNULL(old.`name_server`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('gw="',IFNULL(old.`gw`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('real_ip="',IFNULL(old.`real_ip`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
                         (now(), 'delete', 'dhcp_pools', CONCAT('head_id="',IFNULL(old.`head_id`,''),'"') ); INSERT INTO `log` ( `time`, `event`, `table`, `changes` ) VALUES
@@ -491,7 +497,7 @@ CREATE TABLE `head_link` (
   `status` tinyint(4) NOT NULL DEFAULT '1',
   `set_status` tinyint(4) DEFAULT NULL,
   `hw_mac` varchar(17) DEFAULT NULL,
-  `static_ip` tinyint(4) DEFAULT '0',
+  `white_static_ip` tinyint(4) DEFAULT '0',
   `inet_shape` int(11) NOT NULL DEFAULT '1000',
   `inet_priority` tinyint(4) NOT NULL DEFAULT '0',
   `dhcp_use` tinyint(4) NOT NULL DEFAULT '1',
@@ -783,7 +789,7 @@ CREATE TABLE `hosts` (
   UNIQUE KEY `sw_unit` (`street_id`,`dom`,`podezd`,`unit`) USING BTREE,
   KEY `swmodel` (`model_id`),
   KEY `house` (`street_id`,`dom`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=340 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=345 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1062,7 +1068,7 @@ CREATE TABLE `log` (
   `time` datetime NOT NULL,
   `changes` varchar(4096) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=51035 DEFAULT CHARSET=koi8r;
+) ENGINE=InnoDB AUTO_INCREMENT=53939 DEFAULT CHARSET=koi8r;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1570,7 +1576,7 @@ CREATE TABLE `swports` (
   KEY `head` (`head_id`),
   KEY `PHY` (`phy_id`),
   CONSTRAINT `switch` FOREIGN KEY (`sw_id`) REFERENCES `hosts` (`sw_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5290 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=5343 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1948,4 +1954,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2010-05-21 18:03:37
+-- Dump completed on 2010-06-09  1:05:02
