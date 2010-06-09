@@ -65,7 +65,7 @@ sub post_auth {
 
 
 	if ( $RAD_REQUEST{'DHCP-Message-Type'} eq 'DHCP-Release' ) {
-		my $Q_Request = "SELECT a.session, a.port_id, a.start_lease, l.login  FROM dhcp_addr a, head_link l WHERE l.login=a.login and l.hw_mac=a.hw_mac".
+		my $Q_Request = "SELECT a.session, a.port_id, UNIX_TIMESTAMP(a.start_lease) as start_lease, l.login  FROM dhcp_addr a, head_link l WHERE l.login=a.login and l.hw_mac=a.hw_mac".
 		" and a.ip='".$RAD_REQUEST{'DHCP-Client-IP-Address'}."' and a.agent_info='".$RAD_REQUEST{'DHCP-Relay-Agent-Information'}."'".
 		" and a.hw_mac='".$RAD_REQUEST{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
@@ -129,7 +129,7 @@ sub post_auth {
  			return RLM_MODULE_NOTFOUND;
 		    }
 		    # Выделить IP
-		    my $Q_Discover_start  = "SELECT a.login, a.ip, a.start_lease, a.end_lease, p.mask, p.gw, p.dhcp_lease, p.name_server FROM dhcp_addr a, dhcp_pools p ".
+		    my $Q_Discover_start  = "SELECT a.login, a.ip, UNIX_TIMESTAMP(a.start_lease) as start_lease, a.end_lease, p.mask, p.gw, p.dhcp_lease, p.name_server FROM dhcp_addr a, dhcp_pools p ".
 		    " WHERE p.head_id=".$ref_port->{'head_id'}." and p.pool_id=a.pool_id";
 
 		    my $Q_Discover_reuse = ""; my $Q_Discover_new ='' ; my $Q_Discover_grey ='' ;
@@ -225,7 +225,7 @@ sub post_auth {
 		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug;
 		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'") if $debug;
 
-		my $Q_Request = "SELECT a.session, a.ip, a.port_id, a.start_lease, p.mask, p.gw, p.dhcp_lease, p.name_server, p.real_ip, p.static_ip, l.white_static_ip".
+		my $Q_Request = "SELECT a.session, a.ip, a.port_id, UNIX_TIMESTAMP(a.start_lease) as start_lease, p.mask, p.gw, p.dhcp_lease, p.name_server, p.real_ip, p.static_ip, l.white_static_ip".
 		", l.login, h.term_ip FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
 		" and a.port_id=l.port_id and a.pool_id=p.pool_id  and l.status=1 and l.inet_priority<=".$start_conf->{'DHCP_PRI'}.
 		" and l.communal=0"." and ( h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."'".
