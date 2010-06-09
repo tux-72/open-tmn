@@ -1,0 +1,22 @@
+[% INCLUDE header.tt %]
+
+
+
+<table align=center class=data border=1>
+<tr class="bbheader3"> <td colspan=4>--Created But Not Used Vlans--</td></tr>
+<tr class="bbheader3">
+    <td width=5%>Zone</td>
+    <td>Vlan</td>
+    <td>Info</td>
+    <td>Desc</td>
+</tr>
+    [% FOREACH vlan IN free_vlans %]
+    <tr valign=top>
+        <td>[% vlan.zone_id %]</td>
+        <td> <a href="/swctl/?search_vlan=[% vlan.vlan_id %]&search_vlan_in_trunk=on" target=_blank>[% vlan.vlan_id %]</a> </td>
+        <td>[% vlan.info %]</td>
+        <td>[% vlan.desc %]</td>
+    </tr>
+    [% END %]
+</table>
+

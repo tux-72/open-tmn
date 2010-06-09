@@ -1,24 +1,35 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
-<header>
-<title> [% IF title %] [% title %] [% ELSE %] TITLE [% END %] </title>
+<head>
+<title> [% IF title %] [% title %] [% ELSE %] TITLE [% END %] [%IF admin %][admin][% END %] </title>
 <meta http-equiv="Content-Type" content="text/html; charset=KOI8-R">
 <!--
 <link href="main.css" rel="stylesheet" type="text/css">
 -->
-<link href="/styles/netstat.css" rel="stylesheet" type="text/css">
+<link href="/swctl/?css=main.css" rel="stylesheet" type="text/css">
 
-<script language="javascript">
+<script language="javascript" type="text/javascript">
 function toggleDisplay(e){
     element = document.getElementById(e).style;
     element.display == 'none' ? element.display = 'block' : element.display='none';
+    if( document.getElementById(e).width == '100%')
+        document.getElementById(e).width = document.getElementById(e+'_w').clientWidth+10;
 }
 
 function conf_del(p,u){
     if( confirm( 'Delete ' + p ) )
         window.location.href = u;
 }
+
+function toggleDisplay_all(r){
+    var t = document.getElementsByTagName('table')
+    for(var i=0; i<t.length; i++){
+        if(t[i].id.match(r))
+            toggleDisplay(t[i].id)
+    }
+}
 </script>
 
-</hedaer>
+</head>
 <body>
 [% IF err %] <h1 align=center><font color=red> [% err %]</font></h1>[% END %]

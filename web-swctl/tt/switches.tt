@@ -2,47 +2,62 @@
 <table border="1" align="center" cellpadding="1" cellspacing="2">
 
 <tr class="bbheader3">
-
 <td> model               </td>
+[% IF admin %]
 <td> manage                </td>
+[% END %]
 <td> hostname  </td>
+[% IF admin %]
 <td> hw_mac  </td>
 <td> ip  </td>
 <td> visible           </td>
 <td> bw_ctl            </td>
 <td> automanage        </td>
+[% END %]
 <td> uplink_port       </td>
 <td> parent            </td>
 <td> parent_port       </td>
+[% IF admin %]
 <td> clients_vlan      </td>
 <td> vlan_zone         </td>
 <td> control_vlan      </td>
+[% END %]
 <td> Street, dom       </td>
-<td> Util              </td></tr>
-
+<td> Util              </td>
 </tr>
 
 
 
 [% FOREACH sw IN sw %]
 <tr class=data>
-
 <td class="data2"> [% sw.model_name %] </td>
+[% IF admin %]
 <td> [% sw.manage               %] </td>
+[% END %]
 <td class="data2"> <a href="/swctl/?mode=host&action=view&sw_id=[% sw.sw_id %]">[% sw.hostname %]</a> </td>
+[% IF admin %]
 <td> [% sw.hw_mac %] </td>
-<td> [% sw.ip %] </td>
+<td> <a href="telnet://[%sw.ip%]">[%sw.ip%]</a> </td>
 <td> [%IF sw.visible %] [% sw.visible %] [% ELSE %] <font color="red">hidden</font> [%END%] </td>
 <td> [% sw.bw_ctl           %] </td>
 <td> [% sw.automanage       %] </td>
+[% END %]
 <td> [% sw.uplink_portpref  %][% sw.uplink_port      %] </td>
-<td class="data2"> <a href="/swctl/?mode=host&action=view&sw_id=[% sw.parent %]">[% sw.parent_name %]</a> </td>
+<td class="data2"> <a href="/swctl/?mode=host&action=view&sw_id=[% sw.parent %]&hlport=[% sw.parent_portpref %][% sw.parent_port %]">[% sw.parent_name %]</a> </td>
 <td> [% sw.parent_portpref  %][% sw.parent_port      %] </td>
+[% IF admin %]
 <td> [% sw.clients_vlan     %] </td>
 <td> [% sw.zone_id          %] </td>
 <td> [% sw.control_vlan     %] </td>
+[% END %]
 <td class="data2"> [% sw.street_name %], [% sw.dom %] [% IF sw.podezd %] p[% sw.podezd %]  [% END %] [% IF sw.unit %] u[% sw.unit %] [% END %] </td>
 <td> <font color="[% sw.utilisation.color %]">[% sw.utilisation.value %]</font> </td>
 </tr>
 [% END %]
+
+<tr  class=data>
+<td colspan=[% IF admin %]15[%ELSE%]6[% END %]> Total: </td>
+<td> [% total %] </td>
+</tr>
+
 </table>

@@ -1,6 +1,9 @@
 [% INCLUDE header.tt %]
 
-<h3><center>Host: [% hostname %]</center>
+<h3><center>Host: [% sw.hostname %]</center>
+
+<table align=center border=0 celspasing=10>
+<tr valign=top><td>
 
 <table align=center class=data border=1 width=20%>
 <tr class="bbheader3"> <td colspan=3>--MAC's--</td></tr>
@@ -18,7 +21,7 @@
 
                 <td>
                 [% FOREACH mac IN port.macs %]
-                    [% mac.value %]<br>
+                    <a title="[% mac.oui %]">[% mac.value %]<a><br>
                 [% END %]
                 </td>
             </tr>
@@ -27,4 +30,23 @@
 <tr><td colspan=2>Total</td><td>[%total%]</td></tr>
 </table>
 
+</td><td>
+&nbsp;
+<table align=center class=data border=1 width=20%>
+<tr class="bbheader3"> <td colspan=2>--Stats--</td></tr>
+<tr class="bbheader3">
+    <td width=5%>port</td>
+    <td>count</td>
+</tr>
+    [% FOREACH row IN stats %]
+        <tr valign=top><td>[% row.port %]</td><td>[% row.count %]</td></tr>
+    [% END %]
+    <tr valign=top><td colspan=2>
+        <a title="[% FOREACH vlan IN vlans_list %][%vlan%]; [%END%]">
+            vlans:&nbsp;[%vlans_current%][%IF vlans_total%]([%vlans_total%])[%END%]
+        </a>
+    </td></tr>
+</table>
 
+</td></tr>
+</table>

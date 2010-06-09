@@ -54,8 +54,8 @@
     </select>
 </td> </tr>
 <tr><td> control_vlan    </td><td><input name="control_vlan"    value="[% host.control_vlan    %]"></td> </tr>
-<tr><td> info            </td><td><input name="info"            value="[% host.info            %]"></td> </tr>
 
+[% IF host.stamp %]<input type=hidden name=stamp value="[%host.stamp%]">[%END%]
 <input type=hidden name=do value=1>
 <input type=hidden name=mode value=host>
 [% IF sw_id %] <input type=hidden name=sw_id value=[% sw_id %]> [% END %]

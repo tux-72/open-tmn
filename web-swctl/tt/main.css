@@ -15,4 +15,6 @@ body            {font-family:   Verdana, Tahoma, Arial; font-size:11px; color:#0
 .bbheader2      {font-size:9px; color:darkblue; background-color:#AAAAAA; text-align:right;     border-right:1px solid #6A5ACD; border-bottom:1px solid #6A5ACD;}
 .bbheader3      {font-size:9px; color:darkblue; background-color:#AAAAAA; text-align:center;    border-right:1px solid #6A5ACD; border-bottom:1px solid #6A5ACD;}
 .data           {font-size:9px; color:#000000;  background-color:lavender; text-align:right;    border-right:1px solid #6A5ACD; border-bottom:1px solid #6A5ACD;}
+.broken_port    {font-size:9px; color:#000000;  background-color:#FF9999; text-align:right;    border-right:1px solid #6A5ACD; border-bottom:1px solid #6A5ACD;}
 .data2          {font-size:9px; color:#000000;  background-color:lavender; text-align:left;     border-right:1px solid #6A5ACD; border-bottom:1px solid #6A5ACD;}
+.data_c         {font-size:9px; color:#000000;  background-color:lavender; text-align:left;     border-right:1px solid #6A5ACD; border-bottom:1px solid #6A5ACD; margin-left: auto; margin-right: auto;}
