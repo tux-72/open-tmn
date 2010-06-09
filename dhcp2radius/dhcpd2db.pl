@@ -93,13 +93,13 @@ sub post_auth {
 			    'NAS-Port'                      => $vlan,
 			    'NAS-Port-Id'                   => $ref_rel->{'port_id'},
 			    'Acct-Session-Id'               => $ref_rel->{'session'},
-			    'DHCP-Hardware-Type'            => $RAD_REQUEST{'DHCP-Hardware-Type'},
-			    'DHCP-Client-Hardware-Address'  => $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
-			    'DHCP-Relay-Agent-Information'  => $RAD_REQUEST{'DHCP-Relay-Agent-Information'},
 			    'Framed-IP-Address'             => $RAD_REQUEST{'DHCP-Client-IP-Address'},
 			    'Acct-Terminate-Cause'          => 'User-Request',
 			    'Acct-Session-Time'             => ( time - $ref_rel->{'start_lease'}),
 			    'Request-Number'                => $RAD_REQUEST{'DHCP-Transaction-Id'},
+			    #'DHCP-Hardware-Type'            => $RAD_REQUEST{'DHCP-Hardware-Type'},
+			    #'DHCP-Client-Hardware-Address'  => $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
+			    #'DHCP-Relay-Agent-Information'  => $RAD_REQUEST{'DHCP-Relay-Agent-Information'},
 			);
 			send_accounting (\%acc_attr);
 		    }
@@ -280,7 +280,6 @@ sub post_auth {
 				%acc_attr = (
 				    'NAS-IP-Address'                => $start_conf->{'DHCP_NAS_IP'},
 				    'User-Name'                     => $ref_req->{'login'},
-				    'DHCP-Client-Hardware-Address'  => $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
 				    'Framed-IP-Address'             => $cli_addr,
 				    'NAS-Port'                      => $vlan,
 				    'NAS-Port-Id'                   => $ref_req->{'port_id'},
@@ -289,8 +288,9 @@ sub post_auth {
 				    'NAS-Port-Type'                 => 'Virtual',
 				    'Service-Type'                  => 'Framed-User',
 				    'Acct-Session-Id'               => $ref_req->{'session'},
-				    'DHCP-Hardware-Type'            => $RAD_REQUEST{'DHCP-Hardware-Type'},
-				    'DHCP-Relay-Agent-Information'  => $RAD_REQUEST{'DHCP-Relay-Agent-Information'},
+				    #'DHCP-Client-Hardware-Address'  => $RAD_REQUEST{'DHCP-Client-Hardware-Address'},
+				    #'DHCP-Hardware-Type'            => $RAD_REQUEST{'DHCP-Hardware-Type'},
+				    #'DHCP-Relay-Agent-Information'  => $RAD_REQUEST{'DHCP-Relay-Agent-Information'},
 				);
 				if ($new_session) { 
 				    $acc_attr{'Acct-Status-Type'} = 'Start';
@@ -333,7 +333,7 @@ sub log_request_attributes {
 sub send_accounting  {
     my $attr = shift;
     my ( $res, $err, $strerr );
-    my $r = new Authen::Radius(Host => $start_conf->{'DHCP_ACC_NAS'}.":".$start_conf->{'DHCP_ACC_PORT'}, Secret => $start_conf->{'DHCP_ACC_SECRET'}, Debug => 0);
+    my $r = new Authen::Radius(Host => $start_conf->{'DHCP_ACC_HOST'}.":".$start_conf->{'DHCP_ACC_PORT'}, Secret => $start_conf->{'DHCP_ACC_SECRET'}, Debug => 0);
     #print Dumper $attr;
     $r->add_attributes ( map {  { Name => $_,  Value =>  $attr->{$_} } } keys %$attr );
     $r->send_packet(ACCOUNTING_REQUEST);
