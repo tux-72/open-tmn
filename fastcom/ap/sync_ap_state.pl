@@ -27,13 +27,13 @@ my %conf = (
 	'MYSQL_host'	=> '192.168.29.20',
 	'MYSQL_base'	=> 'vlancontrol',
 	'MYSQL_user'	=> 'datasync',
-	'MYSQL_pass'	=> 'Dyrikwas1',
+	'MYSQL_pass'	=> 'mysql_password',
 
 	'ORA_host'	=> 'fst',
 	'ORA_port'	=> '1521',
 	'ORA_sid'	=> 'fst10',
 	'ORA_usn'	=> 'fastcom',
-	'ORA_psw'	=> 'fastcom',
+	'ORA_psw'	=> 'fst_password',
 );
 
 ### MYSQL Connect
