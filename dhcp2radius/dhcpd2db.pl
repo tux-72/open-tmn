@@ -89,7 +89,7 @@ sub post_auth {
 			    'Acct-Authentic'                => 'RADIUS',
 			    'NAS-Port-Type'                 => 'Virtual',
 			    'Service-Type'                  => 'Framed-User',
-			    'User-Name'                     => $ref_rel->{'login'},
+			    'User-Name'                     => $start_conf->{'DHCP_ACC_USERPREF'}.$ref_rel->{'login'},
 			    'NAS-Port'                      => $vlan,
 			    'NAS-Port-Id'                   => $ref_rel->{'port_id'},
 			    'Acct-Session-Id'               => $ref_rel->{'session'},
@@ -279,7 +279,7 @@ sub post_auth {
 			     if ($start_conf->{'DHCP_ACCOUNT'}) {
 				%acc_attr = (
 				    'NAS-IP-Address'                => $start_conf->{'DHCP_NAS_IP'},
-				    'User-Name'                     => $ref_req->{'login'},
+				    'User-Name'                     => $start_conf->{'DHCP_ACC_USERPREF'}.$ref_req->{'login'},
 				    'Framed-IP-Address'             => $cli_addr,
 				    'NAS-Port'                      => $vlan,
 				    'NAS-Port-Id'                   => $ref_req->{'port_id'},
