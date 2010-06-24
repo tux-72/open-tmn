@@ -89,7 +89,7 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
     
     $sth2->finish();
 
-    my $sth3 = $dbh->prepare("SELECT h.sw_id, h.hostname, p.port_id, p.port, p.info, p.vlan_id, p.portpref, p.snmp_idx FROM hosts h, swports p where h.visible>0 and h.model_id>0 and h.grp='".$grp."' and h.sw_id=p.sw_id and p.ltype_id not in (0,20,19) and p.type>0 order by h.sw_id, p.portpref, p.port");
+    my $sth3 = $dbh->prepare("SELECT h.sw_id, h.hostname, p.port_id, p.port, p.info, p.vlan_id, p.portpref, p.snmp_idx FROM hosts h, swports p where h.visible>0 and h.model_id>0 and h.grp='".$grp."' and h.sw_id=p.sw_id and p.ltype_id not in (0,20,19) and p.type=1 order by h.sw_id, p.portpref, p.port");
     $sth3->execute();
     while (my $ref3 = $sth3->fetchrow_hashref()) {
 

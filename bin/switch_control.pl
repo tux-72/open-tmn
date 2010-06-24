@@ -218,7 +218,7 @@ if ( not defined($ARGV[0]) ) {
     h.parent_portpref, h.zone_id, h.automanage, j.ltype_id as new_ltype, j.job_id, j.parm, \
     p.sw_id, p.port_id, p.port, p.portpref, p.ds_speed, p.us_speed, p.vlan_id, p.tag, p.ltype_id, \
     m.lib, m.bw_free, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, swports p, models m, bundle_jobs j \
-    WHERE h.model_id=m.model_id and h.sw_id=p.sw_id and j.archiv<2 and p.type>0 and j.port_id=p.port_id \
+    WHERE h.model_id=m.model_id and h.sw_id=p.sw_id and j.archiv<2 and p.type=1 and j.port_id=p.port_id \
     and h.automanage=1  and (( j.ltype_id=".$link_type{'setparms'}." and date_insert < DATE_SUB(now(), INTERVAL 60 SECOND) ) OR j.ltype_id in (";
     if ($script_name eq 'cycle_check.pl' ) {
 	$Q_jobs .= $link_type{'pppoe'};
