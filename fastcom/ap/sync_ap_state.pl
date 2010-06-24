@@ -128,7 +128,7 @@ while (($ltype_name, $state, $service,  $ap_id, $login, $ltype_id, $inet_shape, 
 
     if ( defined($AP{$ap_id}{'login'}) ) {
 	my $Q_up = '';
-	if ($ORA{$ap_id}{'state'} eq 'DENY' or $ORA{$ap_id}{'service'} == 3 ) {
+	if ( ($ORA{$ap_id}{'state'} eq 'DENY' or $ORA{$ap_id}{'service'} == 3 ) and $ltype_id != 24 ) {
 	    $Q_up = "DELETE from head_link WHERE port_id=".$ap_id;
 	} elsif ($ORA{$ap_id}{'state'} eq 'ALLOW' ) {
 	    if ($ORA{$ap_id}{'service'} != $AP{$ap_id}{'status'} ) {
