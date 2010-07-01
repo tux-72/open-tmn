@@ -34,6 +34,7 @@ our %conf = (
     'DHCP_ACC_PORT'     => 1813,
     'DHCP_ACC_SECRET'   => 'secret2account',
     'DHCP_ACC_USERPREF' => 'DHCP',
+    'DHCP_WINDOW'       => 3600,
 );
 
 our %checkmac = (

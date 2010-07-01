@@ -136,21 +136,21 @@ sub post_auth {
 		    ### Поиск назначенного статического белого IP
 		    if ( $ref_port->{'white_static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
 			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
-			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()";
+			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
 		    ### Поиск ранее выдаваемого динамического белого IP
 		    } elsif ( $ref_port->{'white_static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
 			if ( $start_conf->{'DHCP_DYN_GREYIP'} ) {
 			    $Q_Discover_reuse = " and p.real_ip<1 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
-			    $Q_Discover_new   = " and p.real_ip<1 and p.static_ip>0 and a.end_lease<now()";
+			    $Q_Discover_new   = " and p.real_ip<1 and p.static_ip>0 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
 			} else {
 			    $Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
-			    $Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now()";
+			    $Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
 			}
-			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>0 and ( a.login='".$ref_port->{'login'}."' or a.end_lease<now() )";
+			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>0 and ( a.login='".$ref_port->{'login'}."' or a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'}." )";
 		    ### Поиск ранее выдаваемого серого IP ( линк заблокирован в билинге )
 		    } elsif ( $ref_port->{'status'} == 2 ) {
 			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
-			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()";
+			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
 		    } else {
 			$RAD_REPLY{'DHCP-Message-Type'} = 0;
 			return RLM_MODULE_NOTFOUND;
