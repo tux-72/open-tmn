@@ -22,7 +22,7 @@ if ($res < 1) {
     DB_mysql_connect(\$dbm);
 }
 
-my $Querry = "SELECT login, ip_subnet FROM head_link WHERE login is not NULL ORDER by status desc";
+my $Querry = "SELECT login, ip_subnet FROM head_link WHERE login is not NULL ORDER by status desc, ip_subnet";
 my $stm0 = $dbm->prepare($Querry);
 $stm0->execute();
 while (my $ref0 = $stm0->fetchrow_hashref()) {
@@ -32,11 +32,13 @@ while (my $ref0 = $stm0->fetchrow_hashref()) {
 }
 $stm0->finish();
 
-$Querry = "SELECT a.ip, a.login FROM dhcp_addr a, head_link l WHERE l.login=a.login and a.pool_id<100 order by a.end_lease";
+$Querry = "SELECT a.ip, a.login FROM dhcp_addr a, head_link l, dhcp_pools p WHERE l.login=a.login and a.pool_id=p.pool_id ".
+" and p.pool_type>0 and (UNIX_TIMESTAMP(a.end_lease)+".$conf->{'DHCP_WINDOW'}.")>UNIX_TIMESTAMP(now()) ORDER by a.end_lease";
 $stm0 = $dbm->prepare($Querry);
 $stm0->execute();
 while (my $ref0 = $stm0->fetchrow_hashref()) {
     if (defined($ref0->{'ip'}) ) {
+        #print $ref0->{'ip'}."\t".$ref0->{'login'}."  ".$ref0->{'end_lease'}."\n";
         print $ref0->{'ip'}."\t".$ref0->{'login'}."\n";
     }
 }

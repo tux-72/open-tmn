@@ -133,24 +133,20 @@ sub post_auth {
 		    " WHERE p.head_id=".$ref_port->{'head_id'}." and p.pool_id=a.pool_id";
 
 		    my $Q_Discover_reuse = ""; my $Q_Discover_new ='' ; my $Q_Discover_grey ='' ;
+		    my $Q_window = " (UNIX_TIMESTAMP(a.end_lease)+".$start_conf->{'DHCP_WINDOW'}.")<UNIX_TIMESTAMP(now())";
 		    ### Поиск назначенного статического белого IP
 		    if ( $ref_port->{'white_static_ip'} == 1 and $ref_port->{'status'} == 1 ) {
-			$Q_Discover_reuse = " and p.real_ip>0 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
-			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
+			$Q_Discover_reuse = " and p.pool_type=1 and a.login='".$ref_port->{'login'}."'";
+			$Q_Discover_new   = " and p.pool_type=0 and ".$Q_window;
 		    ### Поиск ранее выдаваемого динамического белого IP
 		    } elsif ( $ref_port->{'white_static_ip'} < 1 and $ref_port->{'status'} == 1 ) {
-			if ( $start_conf->{'DHCP_DYN_GREYIP'} ) {
-			    $Q_Discover_reuse = " and p.real_ip<1 and p.static_ip>0 and a.login='".$ref_port->{'login'}."'";
-			    $Q_Discover_new   = " and p.real_ip<1 and p.static_ip>0 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
-			} else {
-			    $Q_Discover_reuse = " and p.real_ip>0 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
-			    $Q_Discover_new   = " and p.real_ip>0 and p.static_ip<1 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
-			}
-			$Q_Discover_grey  = " and p.real_ip<1 and p.static_ip>0 and ( a.login='".$ref_port->{'login'}."' or a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'}." )";
+			$Q_Discover_reuse = " and p.pool_type=".$start_conf->{'DHCP_POOLTYPE'}." and a.login='".$ref_port->{'login'}."'";
+			$Q_Discover_new   = " and p.pool_type=".$start_conf->{'DHCP_POOLTYPE'}." and ".$Q_window;
+			$Q_Discover_grey  = " and p.pool_type=3 and ( a.login='".$ref_port->{'login'}."' or ".$Q_window." )";
 		    ### Поиск ранее выдаваемого серого IP ( линк заблокирован в билинге )
 		    } elsif ( $ref_port->{'status'} == 2 ) {
-			$Q_Discover_reuse = " and p.real_ip<1 and p.static_ip<1 and a.login='".$ref_port->{'login'}."'";
-			$Q_Discover_new   = " and p.real_ip<1 and p.static_ip<1 and a.end_lease<now()-".$start_conf->{'DHCP_WINDOW'};
+			$Q_Discover_reuse = " and p.pool_type=0 and a.login='".$ref_port->{'login'}."'";
+			$Q_Discover_new   = " and p.pool_type=0 and ".$Q_window;
 		    } else {
 			$RAD_REPLY{'DHCP-Message-Type'} = 0;
 			return RLM_MODULE_NOTFOUND;
@@ -174,7 +170,7 @@ sub post_auth {
 			    $stm_disc->execute();
 			}
 			if  (not $stm_disc->rows ) {
-			    &radiusd::radlog(1, 'All IP used in available DHCP scopes... :-('); 
+			    &radiusd::radlog(1, 'All IP used in available DHCP pools... :-(, Need increase pools?');
 			    $RAD_REPLY{'DHCP-Message-Type'} = 0;
 			    return RLM_MODULE_NOTFOUND;
 			}
@@ -225,7 +221,7 @@ sub post_auth {
 		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug;
 		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST{'DHCP-Transaction-Id'}."'") if $debug;
 
-		my $Q_Request = "SELECT a.session, a.ip, a.port_id, UNIX_TIMESTAMP(a.start_lease) as start_lease, p.mask, p.gw, p.dhcp_lease, p.name_server, p.real_ip, p.static_ip, l.white_static_ip".
+		my $Q_Request = "SELECT a.session, a.ip, a.port_id, UNIX_TIMESTAMP(a.start_lease) as start_lease, p.mask, p.gw, p.dhcp_lease, p.name_server, p.pool_type, l.white_static_ip".
 		", l.login, h.term_ip FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
 		" and a.port_id=l.port_id and a.pool_id=p.pool_id  and l.status=1 and l.inet_priority<=".$start_conf->{'DHCP_PRI'}.
 		" and l.communal=0"." and ( h.dhcp_relay_ip='".$RAD_REQUEST{'DHCP-Gateway-IP-Address'}."'".
@@ -239,7 +235,8 @@ sub post_auth {
 		#&radiusd::radlog(1, "stm_req exec SET Reply data rows - ".$stm_req->rows);
 		if  ( $stm_req->rows == 1 ) {
 		    while (my $ref_req = $stm_req->fetchrow_hashref()) {
-			if ( $ref_req->{'white_static_ip'} !=  $ref_req->{'real_ip'} * $ref_req->{'static_ip'} ) {
+			if ( ( $ref_req->{'white_static_ip'} and $ref_req->{'pool_type'} != 1 ) ||
+			   ( (not $ref_req->{'white_static_ip'}) and $ref_req->{'pool_type'} == 1 ) ) {
 			    $RAD_REPLY{'DHCP-Message-Type'} = 'DHCP-NAK';
 			    return RLM_MODULE_NOTFOUND;
 			}
