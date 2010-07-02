@@ -31,8 +31,8 @@ DROP TABLE IF EXISTS `ap_login_info`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ap_login_info` (
-  `login` varchar(30) CHARACTER SET latin1 NOT NULL,
-  `hw_mac` varchar(17) CHARACTER SET latin1 NOT NULL,
+  `login` varchar(30) NOT NULL,
+  `hw_mac` varchar(17) NOT NULL,
   `start_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `last_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `port_id` int(11) NOT NULL DEFAULT '0',
@@ -66,7 +66,7 @@ CREATE TABLE `bundle_jobs` (
   `archiv` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`job_id`) USING BTREE,
   UNIQUE KEY `ch_id` (`port_id`,`ltype_id`,`archiv`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=331 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=438 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -357,13 +357,12 @@ DROP TABLE IF EXISTS `dhcp_pools`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `dhcp_pools` (
   `pool_id` int(11) NOT NULL,
-  `head_id` int(11) NOT NULL DEFAULT '1',
+  `head_id` int(11) NOT NULL DEFAULT '3',
   `pool_name` varchar(50) DEFAULT NULL,
+  `pool_type` int(11) NOT NULL DEFAULT '0',
   `subnet` varchar(18) DEFAULT NULL,
-  `real_ip` tinyint(1) NOT NULL DEFAULT '0',
   `gw` varchar(15) DEFAULT NULL,
   `mask` varchar(15) NOT NULL,
-  `static_ip` tinyint(1) NOT NULL DEFAULT '0',
   `dhcp_lease` int(11) NOT NULL DEFAULT '3600',
   `name_server` varchar(15) NOT NULL DEFAULT '77.239.208.17',
   PRIMARY KEY (`pool_id`)
@@ -789,7 +788,7 @@ CREATE TABLE `hosts` (
   UNIQUE KEY `sw_unit` (`street_id`,`dom`,`podezd`,`unit`) USING BTREE,
   KEY `swmodel` (`model_id`),
   KEY `house` (`street_id`,`dom`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=345 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=355 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1068,7 +1067,7 @@ CREATE TABLE `log` (
   `time` datetime NOT NULL,
   `changes` varchar(4096) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=53939 DEFAULT CHARSET=koi8r;
+) ENGINE=InnoDB AUTO_INCREMENT=56385 DEFAULT CHARSET=koi8r;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1364,6 +1363,20 @@ DELIMITER ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
+-- Table structure for table `pool_types`
+--
+
+DROP TABLE IF EXISTS `pool_types`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `pool_types` (
+  `pool_type` int(11) NOT NULL,
+  `name_type` varchar(50) NOT NULL,
+  PRIMARY KEY (`pool_type`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `port_vlantag`
 --
 
@@ -1571,12 +1584,12 @@ CREATE TABLE `swports` (
   `duplex` tinyint(1) DEFAULT NULL,
   PRIMARY KEY (`port_id`) USING BTREE,
   UNIQUE KEY `id` (`port_id`),
-  UNIQUE KEY `AP` (`sw_id`,`portpref`,`port`,`vlan_id`) USING BTREE,
+  UNIQUE KEY `AP` (`sw_id`,`portpref`,`port`,`vlan_id`,`type`) USING BTREE,
   KEY `link_type` (`ltype_id`) USING BTREE,
   KEY `head` (`head_id`),
   KEY `PHY` (`phy_id`),
   CONSTRAINT `switch` FOREIGN KEY (`sw_id`) REFERENCES `hosts` (`sw_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5343 DEFAULT CHARSET=koi8r CHECKSUM=1;
+) ENGINE=InnoDB AUTO_INCREMENT=5372 DEFAULT CHARSET=koi8r CHECKSUM=1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1954,4 +1967,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2010-06-09  1:05:02
+-- Dump completed on 2010-07-02 13:00:24
