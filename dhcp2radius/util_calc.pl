@@ -8,6 +8,7 @@ use lib $Bin.'/../lib';
 use SWConf;
 use SWFunc;
 
+my $onlydhcpuse = 0;
 my $onlyfiz = 1;
 $onlyfiz = 0 if ( defined($ARGV[0]) and $ARGV[0] eq 'all' );
 
@@ -35,7 +36,8 @@ my $range = 0;
 my $first_str = 1;
 
 my $Query = "SELECT distinct vlan_id FROM head_link WHERE communal=0 and head_id=3";
-$Query .= " and inet_priority=1" if $onlyfiz ;
+$Query .= " and dhcp_use=1" if $onlydhcpuse;
+$Query .= " and inet_priority=1" if $onlyfiz;
 $Query .= " order by vlan_id";
 
 my $stm1 = $dbm->prepare($Query);
