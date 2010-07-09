@@ -8,7 +8,7 @@ use Data::Dumper;
 my $ver = "0.4";
 
 my $debug=0;
-#$debug=1;
+$debug=1;
 
 $ENV{'NLS_LANG'}='RUSSIAN_AMERICA.AL32UTF8';
 my $ipcalc ='/usr/bin/ipcalc';
@@ -27,13 +27,13 @@ my %conf = (
 	'MYSQL_host'	=> '192.168.29.20',
 	'MYSQL_base'	=> 'vlancontrol',
 	'MYSQL_user'	=> 'datasync',
-	'MYSQL_pass'	=> 'mysql_password',
+	'MYSQL_pass'	=> 'Dyrikwas1',
 
 	'ORA_host'	=> 'fst',
 	'ORA_port'	=> '1521',
 	'ORA_sid'	=> 'fst10',
 	'ORA_usn'	=> 'fastcom',
-	'ORA_psw'	=> 'fst_password',
+	'ORA_psw'	=> 'fastcom',
 );
 
 ### MYSQL Connect
@@ -67,7 +67,9 @@ my %ora_srv_rev = (
     '3'	=>	'CANCEL',
 );
 
-my $stm = $dbm->prepare("SELECT l.ip_subnet, l.port_id, l.login, l.status, l.hw_mac, l.inet_shape, p.ltype_id, p.communal, p.us_speed, p.ds_speed FROM head_link l, swports p WHERE l.port_id=p.port_id");
+my $stm = $dbm->prepare("SELECT l.ip_subnet, l.port_id, l.login, l.status, l.hw_mac, l.inet_shape, l.dhcp_use, p.ltype_id, \
+p.communal, p.us_speed, p.ds_speed FROM head_link l, swports p WHERE l.port_id=p.port_id");
+
 $stm->execute();
 while (my $refm = $stm->fetchrow_hashref()) {
     $AP{$refm->{'port_id'}} =
@@ -79,6 +81,7 @@ while (my $refm = $stm->fetchrow_hashref()) {
 	us_speed   => $refm->{'us_speed'},
 	ds_speed   => $refm->{'ds_speed'},
 	inet_shape => $refm->{'inet_shape'},
+	dhcp_use   => $refm->{'dhcp_use'},
     };
 
     if (defined($refm->{'ip_subnet'}) and $refm->{'ip_subnet'} =~ /^77\.239\.21[01]\.\d{1,3}\/30$/) {
@@ -94,15 +97,17 @@ while (my $refm = $stm->fetchrow_hashref()) {
 $stm->finish;
 
 #        'PPPOE_JL'   'DENY'   'SERVICE' '3918'  'rosa'    '21'      '10000'      '100000'   '100000'   '... communal:0'
-my ($ip, $ltype_name, $state,  $service,  $ap_id, $login, $ltype_id, $inet_shape, $us_speed, $ds_speed, $props);
+my ($ip, $ltype_name, $state,  $service,  $ap_id, $login, $dhcp_use, $ltype_id, $inet_shape, $us_speed, $ds_speed, $props);
 
-my $sth = $dbh->prepare("select ob.objecttype_code, ep.state, ob.process, ep.entry_point, ob.identifer, decode(ob.objecttype_code, \
-'PPPOE', 21, 'PPPOE_JL', 21, 'VLAN', 22, 'IP_UNNUM', 23, 'LLINE', 24, null) link_type, ct_p_srvpar_control.get_parvalue4date4outer(ob.id, \
-'DL_ABON', 'RATE') rate,ct_p_srvpar_control.get_parvalue4date4outer(ob.id, 'DL_ABON', 'RATE_PORT_US') rate_port_us, \
-ct_p_srvpar_control.get_parvalue4date4outer(ob.id, 'DL_ABON', 'RATE_PORT_DS') rate_port_ds, ep.props from it_t_entry_point ep, \
-ct_t_object ob where ep.controbj_id=ob.id order by  ep.state, ob.process, ob.objecttype_code, ep.entry_point, ob.identifer") || die $dbh->errstr;
+my $sth = $dbh->prepare("select ob.objecttype_code, ep.state, ob.process, ep.entry_point, ob.identifer, decode(cto.tarifplane_code, \
+'EXACT', 'N', 'Y') dhcp_use, decode(ob.objecttype_code, 'PPPOE', 21, 'PPPOE_JL', 21, 'VLAN', 22, 'IP_UNNUM', 23, 'LLINE', 24, null) \
+link_type, ct_p_srvpar_control.get_parvalue4date4outer(ob.id, 'DL_ABON', 'RATE') rate,ct_p_srvpar_control.get_parvalue4date4outer(ob.id, \
+'DL_ABON', 'RATE_PORT_US') rate_port_us, ct_p_srvpar_control.get_parvalue4date4outer(ob.id, 'DL_ABON', 'RATE_PORT_DS') rate_port_ds, \
+ep.props from it_t_entry_point ep, ct_t_object ob, ct_t_tarcontobj cto where ep.controbj_id=ob.id and ob.id=cto.controbj_id and \
+cto.hist_to>sysdate order by  ep.state, ob.process, ob.objecttype_code, ep.entry_point, ob.identifer") || die $dbh->errstr;
+
 $sth->execute();
-while (($ltype_name, $state, $service,  $ap_id, $login, $ltype_id, $inet_shape, $us_speed, $ds_speed, $props )=$sth->fetchrow_array) {
+while (($ltype_name, $state, $service,  $ap_id, $login, $dhcp_use, $ltype_id, $inet_shape, $us_speed, $ds_speed, $props )=$sth->fetchrow_array) {
     if ( ( defined($props) and $props =~ /communal\:1/ ) or ( defined($login) and $login =~ /^comtest\d+$/) ) {
 	next;
     }
@@ -119,6 +124,7 @@ while (($ltype_name, $state, $service,  $ap_id, $login, $ltype_id, $inet_shape, 
 		inet_shape	=> $inet_shape,
 		us_speed	=> $us_speed,
 		ds_speed	=> $ds_speed,
+		dhcp_use	=> $dhcp_use,
 	};
 	$AP_id{$login} = $ap_id;
     }
@@ -129,7 +135,7 @@ while (($ltype_name, $state, $service,  $ap_id, $login, $ltype_id, $inet_shape, 
     if ( defined($AP{$ap_id}{'login'}) ) {
 	my $Q_up = '';
 	if ( ($ORA{$ap_id}{'state'} eq 'DENY' or $ORA{$ap_id}{'service'} == 3 ) and $ltype_id != 24 ) {
-	    $Q_up = "DELETE from head_link WHERE port_id=".$ap_id;
+	    $Q_up = "DELETE from head_link WHERE port_id=".$ap_id." and login='".$AP{$ap_id}{'login'}."'";
 	} elsif ($ORA{$ap_id}{'state'} eq 'ALLOW' ) {
 	    if ($ORA{$ap_id}{'service'} != $AP{$ap_id}{'status'} ) {
 		if ($ORA{$ap_id}{'ltype_id'} == 24 ) {
@@ -143,6 +149,10 @@ while (($ltype_name, $state, $service,  $ap_id, $login, $ltype_id, $inet_shape, 
 	    }
 	    if ($ORA{$ap_id}{'login'} ne $AP{$ap_id}{'login'} ) {
 		    $Q_up .= " login='".$ORA{$ap_id}{'login'}."',";
+	    }
+	    if ($ORA{$ap_id}{'dhcp_use'} eq "N" and $AP{$ap_id}{'dhcp_use'} ) {
+		    #print STDERR $ORA{$ap_id}{'login'}." blocked dhcp\n";
+		    $Q_up .= " dhcp_use=0,";
 	    }
 	    #if ($ORA{$ap_id}{'us_speed'} != $AP{$ap_id}{'us_speed'} ) {
 	    #    $Q_up .= " us_speed=".$ORA{$ap_id}{'us_speed'}.","; 

@@ -23,12 +23,12 @@ our %conf = (
     'CYCLE_SLEEP'       => 30,
     'FIRST_ZONEVLAN'    => 4094,
     'DEF_COMUNITY'      => 'Comunity123',
-    'CHECK_PPPOE_UP'    => 1,
+    'CHECK_PPPOE_UP'    => 0,
 
     'DHCP_USE'          => 1,
     'DHCP_PRI'          => 1,
     'DHCP_WINDOW'       => 3600,
-    'DHCP_POOLTYPE'     => 3,
+    'DHCP_POOLTYPE'     => 2,
 
     'DHCP_ACCOUNT'      => 1,
     'DHCP_NAS_IP'       => '192.168.100.20',
