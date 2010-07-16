@@ -809,8 +809,19 @@ sub ES_switch_params {
 
             if( $bandwidth_control )
             {
-                $port_info{flow_ctl}->{ds_speed} = $port_info{"bandwidth-limit ingress"}||$port_info{"bandwidth-limit cir"}||$port_info{"bandwidth-limit pir"}||-1;
-                $port_info{flow_ctl}->{us_speed} = $port_info{"bandwidth-limit egress"}||-1;
+                if( grep{exists $port_info{$_} && $port_info{$_} == undef} "bandwidth-limit ingress", "bandwidth-limit cir", "bandwidth-limit pir" )
+                {
+                    $port_info{flow_ctl}->{ds_speed} = 64;
+                }else{
+                    $port_info{flow_ctl}->{ds_speed} = $port_info{"bandwidth-limit ingress"}||$port_info{"bandwidth-limit cir"}||$port_info{"bandwidth-limit pir"}||-1;
+                }
+
+                if( exists $port_info{"bandwidth-limit egress"} && $port_info{"bandwidth-limit egress"} == undef )
+                {
+                    $port_info{flow_ctl}->{us_speed} = 64;
+                }else{
+                    $port_info{flow_ctl}->{us_speed} = $port_info{"bandwidth-limit egress"}||-1;
+                }
             }else{
                 $port_info{flow_ctl} = { ds_speed => -1, us_speed => -1 };
                 delete @port_info{"bandwidth-limit egress", "bandwidth-limit ingress", "bandwidth-limit pir", "bandwidth-limit cir"};
@@ -851,8 +862,9 @@ sub ES_switch_params {
                 flow_ctl    => $port_info{flow_ctl},
                 up          => $up,
                 maxhwaddr   => $port_info{"port-security"}||-1,
-                pvid        => $port_info{pvid},
+                pvid        => $port_info{pvid}||1,
             };
+        push @{$vlans{$ports{$port}{pvid}}{untagged}}, $port;
     }
 
     for my $vid ( keys %vlans )
