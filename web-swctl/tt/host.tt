@@ -18,6 +18,7 @@
 <tr><td>  manage            </td><td> [% sw.manage               %] </td></tr>
 <tr><td>  lib               </td><td> [% sw.lib                  %] </td></tr>
 <tr><td>  bw_free           </td><td> [% sw.bw_free              %] </td></tr>
+<tr><td>  snmp_ap_fix       </td><td> [% sw.snmp_ap_fix          %] </td></tr>
 <tr><td>  sysDescr          </td><td> [% sw.sysDescr             %] </td></tr>
 [% END %]
 
@@ -61,7 +62,7 @@
    </tr>
    <tr>
     <td class=data width="50%">
-        <a href="/swctl/?mode=mac&amp;action=view&amp;sw_id=[%sw.sw_id%]" target=_blank>MAC-table</a>
+        [%IF sw.snmp_ap_fix %] <a href="/swctl/?mode=mac&amp;action=view&amp;sw_id=[%sw.sw_id%]" target=_blank>MAC-table</a> [%END%]
     </td>
     <td class=data>
         <a href="http://netstat.tech.tmcity.ru/nagios/cgi-bin/status.cgi?host=[% sw.hostname %]" target=_blank>Show&nbsp;snmp&nbsp;info</a>
@@ -117,7 +118,7 @@
 <td></td>
 <td> port            </td>
 <td> type            </td>
-<td> phy_type        </td>
+<td>[%IF admin%]<a href="javascript:toggleDisplay_all(/_dh$/)">phy_type</a>[%ELSE%]phy_type[%END%]</td>
 <td>[%IF admin%]<a href="javascript:toggleDisplay_all(/_net$/)">link_type</a>[%ELSE%]link_type[%END%]</td>
 <td> status          </td>
 <td> com             </td>
@@ -138,19 +139,26 @@
 </tr>
 
 [% FOREACH port IN ports %]
-<tr [% IF port.free %] class="body" [% ELSE %] [% IF port.broken %] class="broken_port" [% ELSE %] class="data" [% END %] [% END %] >
+<tr
+    [% IF port.port_id %]
+        [% IF port.free %] class="body" [% ELSE %] [% IF port.broken %] class="broken_port" [% ELSE %] class="data" [% END %] [% END %]
+    [% ELSE %]
+        class="empty_port"
+    [% END %] >
 <td id="[%port.portpref%][%port.port%]">
 [%port.port_id%]
-[%IF admin%]
-<a href="/swctl/?mode=port&amp;action=edit&amp;port_id=[%port.port_id%]">edit</a> | <a href="javascript:conf_del('Port &quot;[% port.portpref %][% port.port %]&quot;?','/swctl/?mode=port&amp;action=del&amp;do=1&amp;sw_id=[%sw.sw_id%]&amp;port_id=[%port.port_id%]');">del</a>
+[%IF port.port_id%]
+    [%IF admin%]
+    <a href="/swctl/?mode=port&amp;action=edit&amp;port_id=[%port.port_id%]">edit</a> | <a href="javascript:conf_del('Port &quot;[% port.portpref %][% port.port %]&quot;?','/swctl/?mode=port&amp;action=del&amp;do=1&amp;sw_id=[%sw.sw_id%]&amp;port_id=[%port.port_id%]');">del</a>
+    [%END%]
 [%END%]
 </td>
 <td [% IF port.highlight %] class=bbheader3 [% END %] >[% port.portpref %][% port.port %]</td>
-<td>[% port.type           %]</td>
-<td><nobr>[% port.phy_type %]</nobr></td>
+<td><a title="[% port.type_real %]">[% port.type %]</a></td>
+<td><nobr>[% port.phy_type %] [% IF port.dhcp %]<a href="javascript:toggleDisplay('p[% port.port_id %]_dh')">s/h</a>[% END %]</nobr></td>
 <td>[% port.ltype_name %][%IF port.free_but_used %] <font color=red>free</font>[%END%] [% IF port.nets %]<a href="javascript:toggleDisplay('p[% port.port_id %]_net')">s/h</a>[% END %]</td>
 <td>[% port.status         %]</td>
-<td>[%IF port.communal %]<font color=red>on</font>[%ELSE%]0[%END%]</td>
+<td>[% IF port.port_id %][%IF port.communal %]<font color=red>on</font>[%ELSE%]0[%END%][%END%]</td>
 <td>[% port.ds_speed       %]</td>
 <td>[% port.us_speed       %]</td>
 <td><a title="[%port.vlan_desc.info%][%IF port.vlan_desc.desc%] [[%port.vlan_desc.desc%]][%END%]">[% port.vlan_id %]</a> [% IF port.vlans %]<a href="javascript:toggleDisplay('p[% port.port_id %]_vlan')">s/h</a>[% END %]</td>
@@ -283,6 +291,47 @@
                 <td>[% net.inet_priority %]</td>
                 <td>[% net.dhcp_use %]</td>
                 <td>[% net.desc      %]</td>
+            </tr>
+            [% END %]
+        </table>
+        </td>
+    </tr>
+    [% END %]
+
+    [% IF port.dhcp %]
+    <tr><td colspan=19>
+        <table id="p[%port.port_id%]_dh" width="100%" style="display:none;" align=center class=data border=1>
+        <tr class="bbheader3"> <td id="p[%port.port_id%]_dh_w" colspan=13>--DHCP--</td></tr>
+        <tr class="bbheader3">
+            <td> pool                 </td>
+            <td> start_use            </td>
+            <td> start_lease          </td>
+            <td> end_lease            </td>
+            <td> gw                   </td>
+            <td> ns                   </td>
+            <td> subnet               </td>
+            <td> ip                   </td>
+            <td> mask                 </td>
+            <td> static_ip            </td>
+            <td> real_ip              </td>
+            <td> dhcp_vendor          </td>
+            <td> mac                  </td>
+        </tr>
+            [% FOREACH dhcp IN port.dhcp %]
+            <tr class="data">
+                <td>[% dhcp.pool_id %]-[% dhcp.pool_name %]</td>
+                <td>[% dhcp.start_use  %]</td>
+                <td>[% dhcp.start_lease  %]</td>
+                <td>[% dhcp.end_lease  %]</td>
+                <td>[% dhcp.gw         %]</td>
+                <td>[% dhcp.name_server%]</td>
+                <td>[% dhcp.subnet     %]</td>
+                <td>[% dhcp.ip         %]</td>
+                <td>[% dhcp.mask       %]</td>
+                <td>[% dhcp.static_ip  %]</td>
+                <td>[% dhcp.real_ip    %]</td>
+                <td>[% dhcp.dhcp_vendor%]</td>
+                <td><a title="[% dhcp.oui %]">[% dhcp.hw_mac %]</a></td>
             </tr>
             [% END %]
         </table>

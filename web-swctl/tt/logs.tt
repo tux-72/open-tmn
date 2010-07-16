@@ -13,7 +13,7 @@
     [% FOREACH line IN logs %]
     <tr valign=top>
         <td>[% line.time %]</td>
-        <td>[% line.table  %]</td>
+        <td>[%IF line.link%]<a href="[%line.link%]" target=_blank>[% line.table  %]</a>[%ELSE%][% line.table %][%END%]</td>
         <td>[% line.event   %]</td>
         <td>[% line.changes %]</td>
     </tr>

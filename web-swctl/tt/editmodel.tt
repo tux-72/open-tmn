@@ -23,6 +23,7 @@
 <tr><td> old_admin     </td><td><input name="old_admin" value="[% model.old_admin    %]"></td> </tr>
 <tr><td> old_pass      </td><td><input name="old_pass" value="[% model.old_pass     %]"></td> </tr>
 <tr><td> sysDescr      </td><td><input name="sysDescr" value="[% model.sysDescr     %]"></td> </tr>
+<tr><td> snmp_ap_fix   </td><td><input name="snmp_ap_fix" type="checkbox" [% IF model.snmp_ap_fix %] checked [% END %]></td> </tr>
 [% IF model_id %] <input type=hidden name=model_id value=[% model_id %]> [% END %]
 <input type=hidden name=do value=1>
 <input type=hidden name=mode value=model>

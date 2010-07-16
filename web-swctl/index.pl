@@ -1,15 +1,13 @@
 #!/usr/bin/perl
 
-#TODO
-# add field "port_isolation" in hosts
 use warnings;
 use strict;
 use CGI qw/:standard/;
 use CGI::Carp 'fatalsToBrowser';
-use Template;
-use Data::Dumper;
 use FindBin;
 use Net::Netmask;
+use Template;
+use autouse 'Data::Dumper' => 'Dumper';
 
 
 $| = 1;
@@ -110,17 +108,24 @@ sub host_utilisation
     my $sw_id = shift;
     my $sth = $DB::dbh->prepare( "SELECT lastuserport, def_trunk FROM models m, hosts h WHERE m.model_id=h.model_id and sw_id = ?");
     $sth->execute( $sw_id );
+
     my $h = $sth->fetchrow_hashref();
     my $lastuserport = $h->{def_trunk} > $h->{lastuserport} ? $h->{def_trunk}."t" : $h->{lastuserport}."u";
     (my $int_lastuserport = $lastuserport) =~ s|\D||;
 
-    $sth = $DB::dbh->prepare( "SELECT count(*) AS used_ports FROM swports WHERE ltype_id not in (0,19,20) and type > 0 and sw_id = ?");
+    $sth = $DB::dbh->prepare( "SELECT count(*) AS used_ports FROM swports WHERE ltype_id not in (0,20) and type = 1 and sw_id = ?");
     $sth->execute( $sw_id );
     my $used_ports = $sth->fetchrow_hashref()->{used_ports};
-    return { value => "$used_ports/$lastuserport", color => $int_lastuserport - $used_ports > 3 ? ($used_ports < 3 ? "green" : "") : "red" };
+
+    $sth = $DB::dbh->prepare( "SELECT count(*) AS defect_ports FROM swports WHERE ltype_id = 19 and type = 1 and sw_id = ?");
+    $sth->execute( $sw_id );
+    my $defect_ports = $sth->fetchrow_hashref()->{defect_ports} || '';
+
+    $defect_ports = "(${defect_ports}d)" if $defect_ports;
+    return { value => "$used_ports$defect_ports/$lastuserport", color => $int_lastuserport - $used_ports > 3 ? ($used_ports < 3 ? "green" : "") : "red" };
 }
 
-unless( grep{!/^do$/ && param($_)} param() )
+unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} param() )
 {
     $sth = $DB::dbh->prepare( "SELECT model_id, model_name FROM models order by model_name");
     $sth->execute();
@@ -133,7 +138,7 @@ unless( grep{!/^do$/ && param($_)} param() )
     print "Content-type: text/html\n\n" if param("do");
     $c->{title} = "SWctl";
     $template->process("index.tt", $c) || die $template->error();
-}elsif( grep{param($_)}qw|search_ip search_port_desc search_tr_net search_sw_wo_reg_vlan search_sw_wo_up search_login search_ap search_hostname search_vlan search_street search_model search_hidden search_mac| ){
+}elsif( grep{param($_)}qw|search_ip search_port_desc search_tr_net search_sw_wo_reg_vlan search_sw_wo_up search_login search_ap search_hostname search_vlan search_street search_model search_hidden search_mac search_port_defect| ){
     my @p;
     my $sql =
         qq{ SELECT *, (SELECT hostname FROM hosts WHERE sw_id=h.parent) as parent_name
@@ -147,13 +152,14 @@ unless( grep{!/^do$/ && param($_)} param() )
             push @p, (param("search_vlan"))x2 if param("search_vlan");
     my $vlan_trunk_query = '';
     $vlan_trunk_query = " or sw_id in ( SELECT sw_id FROM swports swp WHERE swp.port_id in (SELECT port_id FROM port_vlantag WHERE vlan_id= ?) ) ",
-            push @p, param("search_vlan") if param("search_vlan_in_trunk");
+            push @p, param("search_vlan") if param("search_vlan_in_trunk") && $sql =~ /VLAN_TRUNK_QUERY/s;
     $sql =~ s/VLAN_TRUNK_QUERY/$vlan_trunk_query/s;
 
     $sql .= " and h.model_id = ? ", push @p, param("search_model") if param("search_model");
     $sql .= " and h.ip = ? ", push @p, param("search_ip") if param("search_ip");
     $sql .= " and h.sw_id in (SELECT sw_id FROM swports WHERE port_id = ?) ", push @p, param("search_ap") if param("search_ap");
     $sql .= " and h.sw_id in (SELECT sw_id FROM swports WHERE info like ?) ", push @p, "%".param("search_port_desc")."%" if param("search_port_desc");
+    $sql .= " and h.sw_id in (SELECT sw_id FROM swports WHERE ltype_id='19') " if param("search_port_defect");
 
     #This version of MySQL doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery
     my $ap_switches = '
@@ -231,10 +237,33 @@ unless( grep{!/^do$/ && param($_)} param() )
         push @{$c->{sw}}, $_
     }
 
-    if( ref $c->{sw} eq 'ARRAY' && @{$c->{sw}} == 1 )
+    $c->{stats}{$_} = 0 for qw|communal uplinks trunks system broken pppoe l2link l3real l3net4|;
+    if( ref $c->{sw} eq 'ARRAY' )
     {
-        print header( { -location => "$host/swctl/?mode=host&action=view&sw_id=".$c->{sw}[0]{sw_id} } );
-        exit;
+        if( @{$c->{sw}} == 1 )
+        {
+            (my $ap = param("search_ap")||'')=~s/\D+//g;
+            $ap ||= '';
+            print header( { -location => "$host/swctl/?mode=host&action=view&hl_ap=$ap&sw_id=".$c->{sw}[0]{sw_id} } );
+            exit;
+        }else{
+            my $sw_ids = join(",",map{$_->{sw_id}}@{$c->{sw}}) || 0;
+            $sth = $DB::dbh->prepare( "select ltype_id, communal from swports where type = 1 and sw_id in ( $sw_ids )" );
+            $sth->execute();
+
+            while( my $r = $sth->fetchrow_hashref() )
+            {
+                $c->{stats}{communal}++  if $r->{communal};
+                $c->{stats}{uplinks}++   if $r->{ltype_id} == 10;
+                $c->{stats}{trunks}++    if $r->{ltype_id} == 11;
+                $c->{stats}{system}++    if $r->{ltype_id} == 14;
+                $c->{stats}{broken}++    if $r->{ltype_id} == 19;
+                $c->{stats}{pppoe}++     if $r->{ltype_id} == 21;
+                $c->{stats}{l2link}++    if $r->{ltype_id} == 22;
+                $c->{stats}{l3real}++    if $r->{ltype_id} == 23;
+                $c->{stats}{l3net4}++    if $r->{ltype_id} == 24;
+            }
+        }
     }
 
     print "Content-type: text/html\n\n";
@@ -266,14 +295,26 @@ unless( grep{!/^do$/ && param($_)} param() )
 
         $sth = $DB::dbh->prepare( "
             SELECT
-                *, status, pt.phy_name as phy_type, ltype_name
+                snmp_idx,port_id,s.ltype_id,communal,sw_id,portpref,port,status,ds_speed,us_speed,info,start_date,vlan_id,
+                tag,unique_vlan,maxhwaddr,head_id,s.phy_id,autoneg,speed,duplex,ltype_name,phy_name,
+                l.desc,status,ltype_name,
+                pt.phy_name as phy_type, type as type_real, (CASE type WHEN 1 THEN 1 ELSE 0 END) as type
             FROM
                 swports s, link_types l, phy_types pt
-            WHERE sw_id=? and s.phy_id=pt.phy_id and l.ltype_id=s.ltype_id order by portpref, port, type " );
+            WHERE sw_id=? and s.phy_id=pt.phy_id and l.ltype_id=s.ltype_id order by portpref, port, type, type_real " );
         $sth->execute( param('sw_id') );
 
+        my $last_port = 9999;
+        my $last_portpref;
         while( $_ = $sth->fetchrow_hashref() )
         {
+            $last_port = 0, $last_portpref = $_->{portpref} if $_->{port} && ( $last_port > $_->{port} || ( ($last_portpref||'') ne ($_->{portpref}||'') && 1 == @{[($_->{portpref}||'')=~/(\/)/g]} ) );
+            if( $last_port + 1 <= $_->{port} )
+            {
+                $_->{portpref} ||= '';
+                $_->{portpref} !~ /-$/ && push @{$c->{ports}}, { portpref => $_->{portpref}, port => $last_port } while ++$last_port != $_->{port};
+            }
+            $_->{status} = { 0 => 'Down', 1 => 'Up' }->{$_->{status}};
             (my$hlport = param("hlport")||'') =~ s/(\d+)-(\d+)/join",",$1..$2/eg;
             my@hlports = split/,/, $hlport;
             for my $port ( $hlport, @hlports )
@@ -281,8 +322,10 @@ unless( grep{!/^do$/ && param($_)} param() )
                 last unless $port;
                 $_->{highlight}++ if $port eq ($_->{portpref}||'').$_->{port};
             }
-            $_->{free}++ if $_->{ltype_name} =~ /^free$/i || $_->{status} =~ /^disable$/i;
-            $_->{broken}++ if $_->{ltype_name} =~ /^defect$/i;
+            $_->{highlight}++ if param("hl_ap") && $_->{port_id} eq param("hl_ap");
+
+            $_->{free}++ if $_->{ltype_name} =~ /^free$/i || $_->{status} =~ /^down$/i;
+            $_->{broken}++, $_->{free} = 0 if $_->{ltype_name} =~ /^defect$/i;
 
             # vlan descr
             sub vlan_desc
@@ -311,9 +354,9 @@ unless( grep{!/^do$/ && param($_)} param() )
             $sth1->execute( $_->{'port_id'} );
             while( my $vlan = $sth1->fetchrow_hashref() ){$vlan->{vlan_desc} = &vlan_desc( $vlan->{vlan_id} ); push @{$_->{vlans}}, $vlan}
 
-            #port nets
             if( $c->{admin} )
             {
+                #port nets
                 $sth1 = $DB::dbh->prepare(
                 qq{
                     SELECT (select `desc` from heads hds where hds.head_id=hl.head_id) as head_desc, hl.* FROM head_link hl WHERE port_id = ?
@@ -325,7 +368,13 @@ unless( grep{!/^do$/ && param($_)} param() )
                     $net->{ip_subnet_enum} = join"; \n", new Net::Netmask( $net->{ip_subnet} )->enumerate if $net->{ip_subnet} && $net->{ip_subnet}=~/\//;
                     push @{$_->{nets}}, $net;
                 }
+
+                #dhcp
+                $sth1 = $DB::dbh->prepare( "SELECT * FROM dhcp_pools p, dhcp_addr a WHERE a.pool_id=p.pool_id and port_id=? ORDER by end_lease desc" );
+                $sth1->execute( $_->{'port_id'} );
+                while( my $dhcp = $sth1->fetchrow_hashref() ){ $dhcp->{login}=~s/</&lt;/g; $dhcp->{vlan_desc} = &vlan_desc( $dhcp->{vlan_id} ); $dhcp->{oui} = &oui::oui($dhcp->{hw_mac}); push @{$_->{dhcp}}, $dhcp }
             }
+
 
             #td
             $sth1 = $DB::dbh->prepare(
@@ -431,30 +480,33 @@ unless( grep{!/^do$/ && param($_)} param() )
                 }
 
                 #uplink
-                my $sql = "INSERT INTO `swports` SET
-                    `snmp_idx` = NULL,
-                    `port_id` = NULL,
-                    `ltype_id` = 10,
-                    `communal` = 0,
-                    `type` = 1,
-                    `sw_id` = '$new_sw_id',
-                    `portpref` = NULLIF( '$params->{uplink_portpref}', '' ),
-                    `port` = '$params->{uplink_port}',
-                    `status` = '1',
-                    `ds_speed` = '-1',
-                    `us_speed` = '-1',
-                    `info` = Concat( 'Uplink to ', (SELECT `hostname` FROM `hosts` WHERE sw_id = '$params->{parent}') ),
-                    `start_date` = NULL,
-                    `vlan_id` = '$params->{control_vlan}',
-                    `tag` = '0',
-                    `maxhwaddr` = '-1',
-                    `head_id` = NULL,
-                    `phy_id` = '1',
-                    `autoneg` = '1',
-                    `speed` = NULL,
-                    `duplex` = NULL
-                    ";
-                $DB::dbh->do( $sql ) or die $DB::dbh->errstr;
+                if( $params->{uplink_port} )
+                {
+                    my $sql = "INSERT INTO `swports` SET
+                        `snmp_idx` = NULL,
+                        `port_id` = NULL,
+                        `ltype_id` = 10,
+                        `communal` = 0,
+                        `type` = 1,
+                        `sw_id` = '$new_sw_id',
+                        `portpref` = NULLIF( '$params->{uplink_portpref}', '' ),
+                        `port` = '$params->{uplink_port}',
+                        `status` = '1',
+                        `ds_speed` = '-1',
+                        `us_speed` = '-1',
+                        `info` = Concat( 'Uplink to ', (SELECT `hostname` FROM `hosts` WHERE sw_id = '$params->{parent}') ),
+                        `start_date` = NULL,
+                        `vlan_id` = '$params->{control_vlan}',
+                        `tag` = '0',
+                        `maxhwaddr` = '-1',
+                        `head_id` = NULL,
+                        `phy_id` = '1',
+                        `autoneg` = '1',
+                        `speed` = NULL,
+                        `duplex` = NULL
+                        ";
+                    $DB::dbh->do( $sql ) or die $DB::dbh->errstr;
+                }
 
                 print header( { -location => "$host/swctl/?do=0&mode=host&action=view&sw_id=".$new_sw_id } );
             }elsif( param("action") eq 'edit' ){
@@ -502,10 +554,11 @@ unless( grep{!/^do$/ && param($_)} param() )
     use Net::SNMP;
     use oui;
 
-    $sth = $DB::dbh->prepare( "SELECT hostname, clients_vlan, lib, rocom, ip FROM models m, hosts h WHERE m.model_id=h.model_id and h.sw_id=?" );
+    $sth = $DB::dbh->prepare( "SELECT hostname, clients_vlan, lib, rocom, ip, snmp_ap_fix FROM models m, hosts h WHERE m.model_id=h.model_id and h.sw_id=?" );
     $sth->execute( param('sw_id') );
     my $host_info = $c->{sw} = $sth->fetchrow_hashref();
     $c->{title} = $c->{sw}{hostname}." MAC's";
+    &chk_acess(1) if !$c->{sw}{snmp_ap_fix};
 
     sub snmp_get
     {
@@ -756,7 +809,7 @@ unless( grep{!/^do$/ && param($_)} param() )
             push @{$c->{status_types}}, $_
         }
 
-        for( { id => 1, name => "Real" }, { id => 0, name => "Virtual" } )
+        for( { id => 1, name => "Real" }, map{ {id => $_, name => "$_ Virtual"} }2..9 )
         {
             set_sel($_,$in_base,'type','id');
             push @{$c->{port_types}}, $_
@@ -775,14 +828,14 @@ unless( grep{!/^do$/ && param($_)} param() )
         {
             my $params = $q->Vars;
 
-            $params->{$_} ||= 0 for qw|manage bw_free|;
+            $params->{$_} ||= 0 for qw|manage bw_free snmp_ap_fix|;
             $params->{$_} =~ s/^\s*on\s*$/1/i for keys %$params;
-            for( qw|lib| )
+            for( qw|lib old_pass old_admin rocom rwcom ena_pass image sysDescr| )
             {
                 $params->{$_} = undef if defined$params->{$_} && $params->{$_} =~ /^(null|0|\s*)$/i;
             }
 
-            my $rows = "model_name, template, extra, comment, image, lastuserport, def_trunk, manage, lib, admin_login, admin_pass, ena_pass, mon_login, mon_pass, bw_free, rocom, rwcom, old_admin, old_pass, sysDescr";
+            my $rows = "model_name, template, extra, comment, image, lastuserport, def_trunk, manage, lib, admin_login, admin_pass, ena_pass, mon_login, mon_pass, bw_free, rocom, rwcom, old_admin, old_pass, sysDescr, snmp_ap_fix";
             my @vals = split/\s*,\s*/, $rows;
             my $phs = join ',', ("?") x @vals;
 
@@ -890,9 +943,35 @@ unless( grep{!/^do$/ && param($_)} param() )
     print "done.";
 }elsif( param("mode") eq 'logs' ){
     &chk_acess(1);
-    $sth = $DB::dbh->prepare( "select `time`, `table`, `event`, group_concat(`changes` SEPARATOR ' <br>') as changes  from `log` group by `time`, `table`, `event` order by `time` desc, `table`, `event` limit 300" );
+    $sth = $DB::dbh->prepare( "select `time`, `table`, `event`, group_concat(`changes` SEPARATOR '|') as changes  from `log` group by `time`, `table`, `event` order by `time` desc, `table`, `event` limit 300" );
     $sth->execute();
-    while( $_ = $sth->fetchrow_hashref() ){ $_->{changes}=~s!(?:(?<=\s)|(?=^))(\S+)(?=\s*=\s*")!<b>$1</b>!g; push @{$c->{logs}}, $_ }
+    while( $_ = $sth->fetchrow_hashref() )
+    {
+        my @changes;
+        $_->{changes} = join' <br>', @changes = split/\|/, $_->{changes};
+
+        if( $_->{event} =~ /insert|update/ )
+        {
+            my %changes = map{
+                s/PK_//g;
+                my@a = split/\s*:\s*/;
+                if( @a == 2 )
+                {
+                    $a[1] =~ s/^.*to="(.*)"$/$1/ if $a[1]=~/to=/;
+                }else{
+                    @a = /^\s*(.*?)="(.*?)"$/;
+                }
+                @a
+            } @changes;
+
+            $_->{link}="$host/swctl/?mode=host&action=view&sw_id=".$changes{sw_id} if $_->{table} eq 'hosts';
+            $_->{link}="$host/swctl/?do=1&amp;search_ap=".$changes{port_id} if $_->{table} eq 'swports';
+            $_->{link}="$host/swctl/?do=1&amp;search_ap=".$changes{port_id} if $_->{table} eq 'port_vlantag';
+        }
+
+        $_->{changes} =~ s!(?:(?<=\s)|(?=^))(\S+)(?=\s*=\s*")!<b>$1</b>!g;
+        push @{$c->{logs}}, $_
+    }
     $c->{title} = 'Logs';
 
     $template->process("logs.tt", $c) || die $template->error();
