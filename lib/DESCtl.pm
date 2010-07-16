@@ -20,7 +20,7 @@ $VERSION = 1.17;
 @EXPORT = qw(	DES_pass_change DES_conf_first	DES_conf_save	DES_fix_macport
 		DES_port_up	DES_port_down	DES_port_defect	DES_port_free	DES_port_setparms
 		DES_port_portchannel    DES_port_trunk	DES_port_system
-		DES_vlan_trunk_add	DES_vlan_trunk_remove	DES_vlan_remove
+		DES_vlan_trunk_add	DES_vlan_trunk_remove	DES_vlan_remove DES_switch_params
 	    );
 
 my $debug=1;
@@ -552,6 +552,172 @@ sub DES_vlan_remove  {
     }
     $sw->close();
     return 1;
+}
+
+#&DES_switch_params( IP=>'192.168.128.29', LOGIN=>'admin',PASS=>'AbujDbyf', DEF_TRUNK=>28,ROCOM=>'DfA3tKlvNmEk7');
+sub DES_switch_params {
+#    IP LOGIN PASS DEF_TRUNK
+    my %arg = (
+        @_,
+    );
+
+    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    SWFunc::dlog( DBUG => 1, SUB => (caller(0))[3], MESS => "GET SWITCH INFO ".$arg{'IP'} );
+
+    my $data = '';
+    my $prompt = '';
+    $sw->timeout(180);
+
+    $sw->print("");
+    $sw->waitfor('/^\s*des[-:0-9\sg]+#\s*$/i');
+    $sw->buffer_empty;
+    $sw->print("show vlan\n");
+    ($data, undef) = $sw->waitfor('/(?<!flow)CTRL|des[-:0-9\sg]+#\s*$/i');
+    $sw->print("a");
+    (my $data1, undef) = $sw->waitfor('/des[-:0-9\sg]+#\s*$/i');
+    $data =~ s/\e[[:^print:]]*//g;
+    $sw->print("");
+    (my $data2, undef) = $sw->waitfor('/des[-:0-9\sg]+#\s*$/i');
+    $data = join '', $data, $data1, $data2;
+    $sw->print("");
+    $sw->waitfor('/^\s*des[-:0-9\sg]+#\s*$/i');
+
+    my %vlans;
+    my %ports;
+    for my $vlan_info ( grep!/^\s*$/s, split/\n(?=\s*VID\s*:\s*)/s, $data )
+    {
+        $vlan_info =~ s/^\s*((?:VID|VLAN Type)\s*:\s*\S+)\s*(.*)$/$1\n$2/mg;
+        my %vlan_info = map{/^\s*(.*?)\s*:\s*(.*?)\s*$/;lc$1,lc$2}split/\n+/, $vlan_info;
+        next unless $vlan_info{vid};
+
+        $vlan_info{$_} =~ s/(?:(?<=\D)|(?<=^))(\d+)\s*-\s*(\d+)(?=\D|$)/join',',$1..$2/ge for keys %vlan_info;
+        $vlan_info{'current untagged ports'} ||= $vlan_info{'untagged ports'};
+        $vlan_info{'current tagged ports'}   ||= $vlan_info{'tagged ports'};
+
+        $vlan_info{$_} = [ split/,/,$vlan_info{$_} ] for ( 'current untagged ports', 'forbidden ports', 'current tagged ports' );
+        $vlan_info{'forbidden ports'} = {map{$_=>1}@{$vlan_info{'forbidden ports'}}};
+        $vlan_info{$_} = [ grep!$vlan_info{'forbidden ports'}{$_}, @{$vlan_info{$_}} ] for ( 'current untagged ports', 'current tagged ports' );
+
+        $vlans{ $vlan_info{vid} } =
+            {
+                untagged    => $vlan_info{'current untagged ports'},
+                tagged      => $vlan_info{'current tagged ports'},
+                name        => $vlan_info{'vlan name'},
+            };
+    }
+
+    for my $port ( 1..{9,10,50,52}->{$arg{DEF_TRUNK}}||$arg{DEF_TRUNK} )
+    {
+        #print $port,$/;
+
+        $sw->buffer_empty;
+        $sw->print("show ports $port ");
+        do{
+            ($data, $prompt) = $sw->waitfor('/(?<!flow)CTRL|des[-:0-9\sg]+#\s*$/i');
+        }while( $data =~ /^[\r\n\s]*$/s || $data =~ /^[\r\n\s]*(?:des[-:0-9\sg]+#[\r\n\s]*)\s*$/si );
+        $sw->print("q"), $sw->waitfor('/CTRL|des[-:0-9\sg]+#\s*$/i') if $prompt =~ /ctrl/i;
+
+        my $info;
+        ($info = $data) =~ s/.*?\s*---[-\s]+[\r\n]+\s*(.*?)[\r\n]+(.*?)\s*[\r\n]+.*/$1 $2/s;
+        #print "portinfo=", $info,"end portinfo",$/;
+        my @port_info = split/\s+/,$info;
+
+        warn("got unknown data($port_info[0]) while parsing port $port\n"), next if $port_info[0] !~ /^\s*$port/ || $port_info[0] =~ /CTRL+C/;
+        my($autoneg,$speed,$duplex,$flow_ctl);
+        {
+            my @t = split/\//, $port_info[2];
+            $autoneg = int $t[0] =~ /^\s*auto/i;
+            $flow_ctl = $t[-1] =~ /^\s*ena/i;
+
+            unless( $autoneg )
+            {
+                ($speed = $t[0]) =~ s/\s*M//i;
+                $duplex = $t[1] =~ /^\s*full/i
+            }
+        }
+        my $adm_state = $port_info[1] =~ /^\s*enabled/i;
+        my $up = $port_info[3] !~ /LinkDown/i || 0;
+
+        $sw->buffer_empty;
+        $sw->print("show port_security ports $port ");
+        do{
+            ($data, $prompt) = $sw->waitfor('/CTRL|des[-:0-9\sg]+#\s*$/i');
+        }while( $data =~ /^[\r\n\s]*$/s || $data =~ /^[\r\n\s]*(?:des[-:0-9\sg]+#[\r\n\s]*)\s*$/si );
+        $sw->print("q"), $sw->waitfor('/CTRL|des[-:0-9\sg]+#\s*$/i') if $prompt =~ /ctrl/i;
+
+        my $maxhwaddr = '-1';
+        for(1){
+        if( $data !~ /can not be locked/is && $data !~ /possible completions/is && $data !~ /no lock information/is )
+        {
+            ($info = $data) =~ s/.*?\s*---[-\s]+[\r\n]+\s*(.*?)[\r\n]+(.*?)\s*[\r\n]+.*/$1 $2/s;
+            #print "portsec=", $info,"end portsec",$/;
+            @port_info = split/\s+/,$info;
+            unless( $port_info[0] =~ /^\s*$port/ )
+            {
+                warn("got unknown data($port_info[0]) while parsing port security $port\n");
+                $maxhwaddr = -1;
+                next;
+            }
+            $maxhwaddr = $port_info[1] =~ /^\s*Enable/i;
+            $maxhwaddr = $maxhwaddr? int($port_info[2]) : -1;
+        }}
+
+        if( $flow_ctl > 0 )
+        {
+            $flow_ctl = {};
+            $sw->buffer_empty;
+            $sw->print("show bandwidth_control $port");
+            do{
+                ($data, $prompt) = $sw->waitfor('/CTRL|des[-:0-9\sg]+#\s*$/i');
+            }while( $data =~ /^[\r\n\s]*$/s || $data =~ /^[\r\n\s]*(?:des[-:0-9\sg]+#[\r\n\s]*)\s*$/si );
+            $sw->print("q"), $sw->waitfor('/CTRL|des[-:0-9\sg]+#\s*$/i') if $prompt =~ /ctrl/i;
+
+            ($info = $data) =~ s/.*?\s*---[-\s]+[\r\n]+\s*(.*?)[\r\n]+/$1/s;
+            #print "bandwith=", $info,"end bandwith",$/;
+            @port_info = split/\s+/,$info;
+            for(1)
+            {
+                unless( $port_info[0] =~ /^\s*$port/ )
+                {
+                    warn("got unknown data($port_info[0]) while parsing port bandwith $port\n");
+                    $flow_ctl = { ds_speed => -1, us_speed => -1 };
+                    next;
+                }
+                $flow_ctl->{ds_speed} = int($port_info[1])||-1;
+                $flow_ctl->{us_speed} = int($port_info[2])||-1;
+                $flow_ctl->{$_} =~ s/^\s*no_limit\s*$/-1/i for qw|ds_speed us_speed|;
+            }
+        }else{
+            $flow_ctl = { ds_speed => -1, us_speed => -1 };
+        }
+
+        $ports{$port} =
+            {
+                adm_state   => $adm_state,
+                autoneg     => $autoneg,
+                speed       => $speed,
+                duplex      => $duplex,
+                flow_ctl    => $flow_ctl,
+                up          => $up,
+                maxhwaddr   => $maxhwaddr,
+            };
+    }
+
+    for my $vid ( keys %vlans )
+    {
+        for my $tag ( qw|untagged tagged| )
+        {
+            for my $port ( @{$vlans{$vid}{$tag}} )
+            {
+                #push @{$ports{$port}->{vlans}{$tag}}, $vid;
+                #$ports{$port}{vlans}{$vid}=$tag;
+                $ports{$port}{vlans}{$vid} = int $tag =~ /^tagg/;
+            }
+        }
+    }
+
+    $sw->close();
+    return { vlans => \%vlans, ports => \%ports }
 }
 
 1;

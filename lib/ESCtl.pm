@@ -19,7 +19,7 @@ $VERSION = 1.12;
 @EXPORT = qw(	ES_pass_change ES_conf_first	ES_conf_save	ES_fix_macport
 		ES_port_up	ES_port_down	ES_port_defect	ES_port_free	ES_port_setparms
 		ES_port_portchannel    ES_port_trunk	ES_port_system
-		ES_vlan_trunk_add	ES_vlan_trunk_remove ES_vlan_remove
+		ES_vlan_trunk_add	ES_vlan_trunk_remove ES_vlan_remove ES_switch_params
 	    );
 
 
@@ -723,6 +723,154 @@ sub ES_vlan_remove  {
 
     $sw->close();
     return 1;
+}
+
+sub ES_switch_params {
+#    IP LOGIN PASS DEF_TRUNK
+    my %arg = (
+        @_,
+    );
+
+    my $sw; return -1  if (&$login(\$sw, $arg{'IP'}, $arg{'LOGIN'}, $arg{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "GET SWITCH INFO ".$arg{'IP'} );
+
+    my $data = '';
+    my $prompt = '';
+    $sw->timeout(180);
+
+    $sw->print("");
+    $sw->waitfor('/[EG]S\s*-\s*\d+-?\w+?\s*#\s*(?:\x1b\x37)?$/i');
+    $sw->buffer_empty;
+    $sw->print("sh running-config");
+    (my $config, undef) = $sw->waitfor('/[EG]S\s*-\s*\d+-?\w+?\s*#\s*(?:\x1b\x37)?$/i');
+
+    #print $config;
+
+    my %vlans;
+    my %ports;
+    while( $config =~ /vlan\s*(\d+)\s*[\n\r](\D.*?)exit/gsi )
+    {
+        my($vid, $vlan_info) = ($1, $2);
+        next unless $vid;
+
+        my %vlan_info = map{/^\s*(.*?)\s+"?(.*?)"?\s*$/;lc$1,lc$2}grep!/^\s*$/, split/\n+/, $vlan_info;
+
+        $vlan_info{$_} =~ s/(?:(?<=\D)|(?<=^))(\d+)\s*-\s*(\d+)(?=\D|$)/join',',$1..$2/ge for keys %vlan_info;
+        $vlan_info{'current untagged ports'} ||= $vlan_info{'untagged'};
+
+        $vlan_info{$_} = [ split/,/,$vlan_info{$_} ] for ( 'current untagged ports', 'forbidden', 'current tagged ports', 'normal', 'fixed' );
+        my %tagged;
+        map{my$t=$_; $tagged{$t}++ if !grep/^$t$/,@{$vlan_info{'current untagged ports'}}} @{$vlan_info{noraml}}, @{$vlan_info{fixed}};
+        $vlan_info{'current tagged ports'} = [ sort{$a<=>$b}keys %tagged ];
+        $vlan_info{'forbidden ports'} = {map{$_=>1}@{$vlan_info{'forbidden'}}};
+        $vlan_info{$_} = [ grep!$vlan_info{'forbidden ports'}{$_}, @{$vlan_info{$_}} ] for ( 'current untagged ports', 'current tagged ports' );
+
+        $vlans{ $vid } =
+            {
+                untagged    => $vlan_info{'current untagged ports'},
+                tagged      => $vlan_info{'current tagged ports'},
+                name        => $vlan_info{'name'},
+            };
+    }
+
+    my $bandwidth_control = $config =~ /bandwidth-control/im;
+    my $port_security = $config =~ /^\s*port-security[\W\D\s]*$/im;
+    #print "port_security=$port_security; bandwidth_control=$bandwidth_control;\n";
+
+    for my $port ( 1..$arg{DEF_TRUNK} )
+    {
+        #print $port,$/;
+
+        my($info) = $config =~ /interface port-channel\s+$port\D(.*?)exit/si;
+        #print "portinfo=", $info,"end portinfo",$/;
+
+        my($autoneg,$speed,$duplex);
+        my %port_info;
+        {
+            for my $line ( grep!/^\s*$/, split/\n+/, $info )
+            {
+                $line =~ s/(\s+"?((?:auto|\d+(?:-(?:half|full))?))"?\s*)$//;
+                my $v = $2;
+                $line =~ s/^\s*(.*?)\s*$//;
+                my $p = $1;
+                lc for $p, $v;
+                push @{$port_info{$p}}, $v;
+            }
+            for my $p ( "bandwidth-limit egress", "bandwidth-limit ingress", "bmstorm-limit", "bandwidth-limit pir", "bandwidth-limit cir" )
+            {
+                if( $port_info{$p} && grep{!defined}@{$port_info{$p}} )
+                {
+                    $port_info{$p} = (grep/\d+/,@{$port_info{$p}})[0];
+                }else{
+                    delete $port_info{$p};
+                }
+            }
+            ref eq 'ARRAY' and @$_ == 1 and $_ = @$_[0] for values %port_info;
+
+            if( $bandwidth_control )
+            {
+                $port_info{flow_ctl}->{ds_speed} = $port_info{"bandwidth-limit ingress"}||$port_info{"bandwidth-limit cir"}||$port_info{"bandwidth-limit pir"}||-1;
+                $port_info{flow_ctl}->{us_speed} = $port_info{"bandwidth-limit egress"}||-1;
+            }else{
+                $port_info{flow_ctl} = { ds_speed => -1, us_speed => -1 };
+                delete @port_info{"bandwidth-limit egress", "bandwidth-limit ingress", "bandwidth-limit pir", "bandwidth-limit cir"};
+            }
+
+            $port_info{"port-security"} = $1 if $port_security && $config =~ /port-security\s+$port\s+address-limit\s+(\d+)/s;
+        }
+
+        unless( $autoneg = !defined$port_info{'speed-duplex'} )
+        {
+            ($speed) = $port_info{'speed-duplex'} =~ /^\D*(\d+)/;
+            ($duplex) = $port_info{'speed-duplex'} =~ /\-full/i;
+        }
+        my $adm_state = !exists$port_info{inactive};
+        my $up;
+
+        if( $adm_state )
+        {
+            $sw->print("");
+            $sw->waitfor('/[EG]S\s*-\s*\d+-?\w+?\s*#\s*(?:\x1b\x37)?$/i');
+            $sw->buffer_empty;
+            $sw->print("sh interfaces $port");
+            (my $config, undef) = $sw->waitfor('/(?:-+\s*more|[EG]S\s*-\s*\d+-?\w+?\s*#\s*(?:\x1b\x37)?$)/i');
+            $sw->print("q");
+            $sw->waitfor('/[EG]S\s*-\s*\d+-?\w+?\s*#\s*(?:\x1b\x37)?$/i');
+            my($status) = $config =~ /\bStatus\s*:\s*(FORWARDING|STOP)/is;
+            print "can't get link state on port $port\n" unless $status;
+            $up = $status =~ /forw/i;
+        }
+        #print "($autoneg,$speed,$duplex,$flow_ctl,$adm_state,$up)\n";
+
+        $ports{$port} =
+            {
+                adm_state   => $adm_state,
+                autoneg     => $autoneg,
+                speed       => $speed,
+                duplex      => $duplex,
+                flow_ctl    => $port_info{flow_ctl},
+                up          => $up,
+                maxhwaddr   => $port_info{"port-security"}||-1,
+                pvid        => $port_info{pvid},
+            };
+    }
+
+    for my $vid ( keys %vlans )
+    {
+        for my $tag ( qw|untagged tagged| )
+        {
+            for my $port ( @{$vlans{$vid}{$tag}} )
+            {
+                #push @{$ports{$port}->{vlans}{$tag}}, $vid;
+                #$ports{$port}{vlans}{$vid}=$tag;
+                $ports{$port}{vlans}{$ports{$port}{pvid}} = 0 if $ports{$port}{pvid} && $tag =~ /^untagg/;
+                next if $tag =~ /^untagg/ && $ports{$port}{pvid};
+                $ports{$port}{vlans}{$vid} = int $tag =~ /^tagg/;
+            }
+        }
+    }
+    $sw->close();
+    return { vlans => \%vlans, ports => \%ports }
 }
 
 1;
