@@ -35,11 +35,13 @@ my $prompt='/.*#.*/';
 my $prompt_nopriv='/.*[\>#].*/';
 my $prompt_conf ='/.*\(config\)#.*/';
 my $prompt_conf_if ='/.*\(config\-if\)#.*/';
+my $prompt_conf_if_range ='/.*\(config\-if-range\)#.*/';
 my $prompt_conf_vlan ='/.*\(config\-vlan\)#.*/';
 my $prompt_conf_ext_acl ='/.*\(config-ext-nacl\)#.*/';
 my $prompt_conf_cmap ='/.*\(config-cmap\)#.*/';
 my $prompt_conf_pmap ='/.*\(config-pmap\)#.*/';
 my $prompt_conf_pmapc ='/.*\(config-pmap-c\)#.*/';
+my $prompt_conf_line ='/.*\(config-line\)#.*/';
 
 # percent supression multicast and broadcast
 my $trunk_ctl_mcast	= 1;	my $trunk_ctl_bcast	= 10;
@@ -48,9 +50,115 @@ my $port_ctl_mcast	= 1;	my $port_ctl_bcast	= 2;
 ############ SUBS ##############
 
 sub CATIOSLT_conf_first {
+    # erase startup-config
+    # reload
+    # conf t
+    # int vlan1
+    # ip add 192.168.128.235 255.255.255.0
+    # no shut
+    # exit
+    # username admin access-class 1 privilege 15 password 7 072E2359442D1B1C11
+    # line vty 0 15
+    # login local
+    # exit
+
     my $arg = shift;
-    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => $LIB." Switch '".$arg->{'IP'}."' first configured MANUALLY!!!" );
-    return -1;
+    # login
+    my $sw; return -1  if (&$login(\$sw, $arg->{'IP'}, $arg->{'LOGIN'}, $arg->{'PASS'}) < 1 );
+    SWFunc::dlog ( DBUG => 1, SUB => (caller(0))[3], MESS => "First config switch '".$arg->{'IP'}."'" );
+
+    return -1  if (&$command(\$sw, $prompt_conf,	"conf t" ) < 1 );
+
+    if ($arg->{'IP'} =~ /^192\.168\.128\./) {
+        return -1  if (&$command(\$sw, $prompt_conf, "ip default-gateway 192.168.128.254") < 1 );
+    } elsif ($arg->{'IP'} =~ /^172\.20\./) {
+        return -1  if (&$command(\$sw, $prompt_conf, "ip default-gateway 172.20.20.254") < 1 );
+    }
+
+    return -1  if (&$command(\$sw, $prompt_conf,	"service timestamps debug uptime" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"service timestamps log datetime localtime" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"service password-encryption" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"clock timezone YKT 5" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"clock summer-time YEKSD recurring last Sun Mar 3:00 last Sun Oct 2:00" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"errdisable recovery cause all" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"no ip domain-lookup" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"vtp mode transparent" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"no spanning-tree optimize bpdu transmission" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"no spanning-tree vlan 1" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"ip telnet source-interface Vlan1" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"no ip http server" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"no ip http secure-server" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"logging 192.168.128.254" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"no cdp run" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"ntp logging" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"ntp server 172.20.20.254 prefer" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"ntp server 192.168.128.254" ) < 1 );
+
+    return -1  if (&$command(\$sw, $prompt_conf,	"access-list 10 permit 192.168.100.15" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"access-list 10 permit 192.168.100.25" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"access-list 10 permit 192.168.128.253" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"access-list 10 permit 192.168.128.254" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"access-list 10 permit 192.168.100.20" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"access-list 10 permit 192.168.29.80" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"access-list 10 permit 192.168.29.88" ) < 1 );
+
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"line con 0" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"exec-timeout 60 0" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"password 7 072E2359442D1B1C11" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"line vty 0 15" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"access-class 10 in" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"exec-timeout 600 0" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"password 7 06270D34466A0B0003" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"login local" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_line,	"transport input telnet" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+
+    return -1  if (&$command(\$sw, $prompt_conf,	"enable password 0 ".$arg->{'ENA_PASS'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"username ".$arg->{'LOGIN'}." access-class 1 privilege 15 password 0 ".$arg->{'PASS'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"username ".$arg->{'MONLOGIN'}." access-class 1 privilege 3 password 0 ".$arg->{'MONPASS'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"snmp-server community ".$arg->{'ROCOM'}." RO 10" ) < 1 );
+
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"vlan ".$arg->{'VLAN'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"state active" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_vlan,	"no shut" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"int range Fa0/1 - ".$arg->{'LASTPORT'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"switchport mode access" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"switchport access vlan ".$arg->{'VLAN'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"switchport protected" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"spanning-tree bpdufilter enable" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"storm-control action shutdown" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"storm-control broadcast level pps 128 64" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"storm-control multicast level pps 128 64" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if_range,	"no shut" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+
+    if( $arg->{'UPLINKPORT'} == 50 ){
+        $arg->{'UPLINKPORT'} = 'Gi0/2'
+    }elsif( $arg->{'UPLINKPORT'} == 24 ){
+        $arg->{'UPLINKPORT'} = 'Fa0/24'
+    }elsif( $arg->{'UPLINKPORT'} == 26 ){
+        $arg->{'UPLINKPORT'} = 'Gi0/2'
+    }else{
+        #
+    }
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"int ".$arg->{'UPLINKPORT'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk encapsulation dot1q" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport mode trunk" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"switchport trunk allowed vlan 1,".$arg->{'VLAN'} ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"spanning-tree bpdufilter enable" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"no switchport protected" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf_if,	"no shut" ) < 1 );
+    return -1  if (&$command(\$sw, $prompt_conf,	"exit" ) < 1 );
+
+    return -1  if (&$command(\$sw, $prompt,	"exit" ) < 1 );
+    #return -1  if (&$command(\$sw, $prompt,	"wr" ) < 1 );
+
+    $sw->close();
+    return 1;
 }
 
 sub CATIOSLT_pass_change {
