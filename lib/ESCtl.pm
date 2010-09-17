@@ -758,7 +758,7 @@ sub ES_switch_params {
         $vlan_info{$_} =~ s/(?:(?<=\D)|(?<=^))(\d+)\s*-\s*(\d+)(?=\D|$)/join',',$1..$2/ge for keys %vlan_info;
         $vlan_info{'current untagged ports'} ||= $vlan_info{'untagged'};
 
-        $vlan_info{$_} = [ split/,/,$vlan_info{$_} ] for ( 'current untagged ports', 'forbidden', 'current tagged ports', 'normal', 'fixed' );
+        $vlan_info{$_} = [ split/,/,($vlan_info{$_}||'') ] for ( 'current untagged ports', 'forbidden', 'current tagged ports', 'normal', 'fixed' );
         my %tagged;
         map{my$t=$_; $tagged{$t}++ if !grep/^$t$/,@{$vlan_info{'current untagged ports'}}} @{$vlan_info{noraml}}, @{$vlan_info{fixed}};
         $vlan_info{'current tagged ports'} = [ sort{$a<=>$b}keys %tagged ];
@@ -787,13 +787,13 @@ sub ES_switch_params {
         my($autoneg,$speed,$duplex);
         my %port_info;
         {
-            for my $line ( grep!/^\s*$/, split/\n+/, $info )
+            for my $line ( grep!/^\s*$/, split/\n+/, ($info||'') )
             {
                 $line =~ s/(\s+"?((?:auto|\d+(?:-(?:half|full))?))"?\s*)$//;
                 my $v = $2;
                 $line =~ s/^\s*(.*?)\s*$//;
                 my $p = $1;
-                lc for $p, $v;
+                #lc for $p, $v;
                 push @{$port_info{$p}}, $v;
             }
             for my $p ( "bandwidth-limit egress", "bandwidth-limit ingress", "bmstorm-limit", "bandwidth-limit pir", "bandwidth-limit cir" )
