@@ -27,16 +27,17 @@ use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter ();
 
 
-$VERSION = 1.8;
+$VERSION = 1.9;
 
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw();
 %EXPORT_TAGS = ();
 
-@EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl dlog rspaced lspaced
-	    DB_mysql_connect IOS_rsh GET_IP3 GET_pipeid PRI_calc
-	    SAVE_config VLAN_link DB_trunk_vlan DB_trunk_update GET_Terminfo GET_GW_parms 
+@EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl SW_VLAN_fix
+	    dlog rspaced lspaced IOS_rsh GET_IP3 GET_pipeid PRI_calc 
+	    DB_mysql_connect DB_trunk_vlan DB_trunk_update 
+	    SAVE_config VLAN_link GET_Terminfo GET_GW_parms 
 	    VLAN_VPN_get VLAN_get VLAN_remove SNMP_fix_macport
 );
 
@@ -70,7 +71,7 @@ while (my $ref01 = $stm01->fetchrow_hashref()) {
 }
 $stm01->finish();
 
-my %headinfo = ();
+our %headinfo = ();
 my $stm = $dbm->prepare( "SELECT t.linked_head, t.term_ip, t.zone_id, t.term_grey_ip2, h.ip, m.lib, m.mon_login, m.mon_pass FROM heads t, hosts h, models m ".
 " WHERE t.ltype_id<>".$link_type{'l3net4'}." and h.model_id=m.model_id and t.l2sw_id=h.sw_id and t.term_ip is not NULL order by head_id desc" );
 $stm->execute();
@@ -206,6 +207,17 @@ sub dlog {
     }
 }
 
+sub SW_VLAN_fix {
+	my $AP = shift;
+	####### Start FIX VLAN ID) ########### 
+	my %sw_arg = (
+	    LIB => $headinfo{'L2LIB_'.$AP->{'nas_ip'}}, ACT => 'fix_vlan', IP => $headinfo{'L2IP_'.$AP->{'nas_ip'}}, 
+	    LOGIN => $headinfo{'MONLOGIN_'.$AP->{'nas_ip'}},	PASS => $headinfo{'MONPASS_'.$AP->{'nas_ip'}}, MAC => $AP->{'hw_mac'},
+	);
+	$AP->{'vlan_id'} = SW_ctl ( \%sw_arg );
+}
+
+
 sub SW_AP_fix {
 
 	DB_mysql_connect(\$dbm);
@@ -329,7 +341,7 @@ sub SW_AP_fix {
 			$stm0->finish;
 		}
 		if ( $AP->{'id'}) {
-		    $AP->{'fix_ap_type'} = ( $AP->{'id'} == $AP->{'trust_id'} ? "trust " : "Left!!!" );
+		    $AP->{'fix_ap_type'} = ( ( not defined ($AP->{'trust_id'}) or  $AP->{'id'} == $AP->{'trust_id'} ) ? "trust " : "Left!!!" );
 		    $AP->{'fix_dlog'} = '('. $dbm->{'mysql_thread_id'}.') '.$AP->{'fix_vlan_type'}." '".$AP->{'vlan_id'}."' MAC '".$AP->{'hw_mac'}."' User: '".
 		    rspaced($AP->{'login'}."'",18)." AP ".$AP->{'fix_ap_type'}." '".$AP->{'id'}."' - '".$AP->{'name'}."'";
 		    if ( $AP->{'fix_ap_type'} eq "Left!!!" ) {

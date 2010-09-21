@@ -24,7 +24,8 @@ $VERSION = 1.3;
 		CATIOS_term_l3realnet_add CATIOS_term_l3realnet_remove CATIOS_term_l3realnet_down CATIOS_term_l3realnet_up
 	    );
 
-my $debug=1;
+my $debug=3;
+
 my $timeout=3;
 
 my $LIB='CATIOS';
