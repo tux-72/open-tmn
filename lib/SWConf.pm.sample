@@ -11,6 +11,19 @@ our %dbconf = (
     'MYSQL_base'        => 'vlancontrol',
     'MYSQL_user'        => 'swctl',
     'MYSQL_pass'        => 'swpassword',
+
+    'MSSQL_server'      => 'BILLING',
+    'MSSQL_base'        => 'inet',
+    'MSSQL_user'        => 'mssqluser',
+    'MSSQL_pass'        => 'mssqlpass',
+);
+
+our %aaa_conf = (
+    'FAKE_QUOTE'        => 600,
+    'FAKE_DNS'          => '77.239.208.22',
+    'DNS_IP1'           => '77.239.208.17',
+    'DNS_IP2'           => '77.239.208.5',
+    'mail_server'       => '192.168.100.21',
 );
 
 our %conf = (
