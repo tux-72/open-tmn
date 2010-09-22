@@ -35,15 +35,16 @@ $VERSION = 1.9;
 %EXPORT_TAGS = ();
 
 @EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl SW_VLAN_fix
-	    dlog rspaced lspaced IOS_rsh GET_IP3 GET_pipeid PRI_calc 
-	    DB_mysql_connect DB_trunk_vlan DB_trunk_update 
-	    SAVE_config VLAN_link GET_Terminfo GET_GW_parms 
+	    dlog rspaced lspaced IOS_rsh GET_IP3 GET_pipeid PRI_calc GET_ppp_parm
+	    DB_mysql_connect DB_trunk_vlan DB_trunk_update DB_MSsql_connect
+	    SAVE_config VLAN_link GET_Terminfo GET_GW_parms
 	    VLAN_VPN_get VLAN_get VLAN_remove SNMP_fix_macport
 );
 
 my $start_conf	= \%SWConf::conf;
 my $conflog	= \%SWConf::conflog;
 my $dbi		= \%SWConf::dbconf;
+my $nas_conf	= \%SWConf::aaa_conf;
 
 #use Data::Dumper;
 
@@ -52,10 +53,14 @@ my $k2w = cset_factory 20866, 1251;
 
 my $Querry_start = '';
 my $Querry_end = '';
-my $res; 
-my $dbm; 
+my $res;
+my $dbm;
+my $dbms;
 
 DB_mysql_connect(\$dbm);
+
+DB_MSsql_connect(\$dbms);
+
 
 my $LIB_ACT ='';
 
@@ -104,6 +109,18 @@ sub DB_mysql_connect {
 	#or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr" );
 	${$sqlconnect}->do("SET NAMES 'koi8r'") or die return -1;
 	#dlog ( DBUG => 2, SUB => (caller(0))[3],  MESS => "Mysql connect ID = ".${$sqlconnect}->{'mysql_thread_id'} );
+	return 1;
+}
+
+sub DB_MSsql_connect {
+	my $mssqlconnect = shift;
+	${$mssqlconnect} = DBI->connect_cached("DBI:Sybase:server=".$dbi->{'MSSQL_server'}.";language=russian", $dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'})
+	#${$mssqlconnect} = DBI->connect_cached("DBI:Sybase:server=".$dbi->{'MSSQL_server'},$dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'})
+	#${$mssqlconnect} = DBI->connect_cached("DBI:Sybase:server=".$dbi->{'MSSQL_server'}.";database=".$dbi->{'MSSQL_base'},$dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'})
+	or die "Unable to connect MSSQL server ".$dbi->{'MSSQL_server'}."$DBI::errstr";
+	#or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MSSQL DB host ".$dbi->{'MSSQL_host'}."$DBI::errstr" );
+	${$mssqlconnect}->do("set dateformat dmy") or die return -1;
+	#dlog ( DBUG => 2, SUB => (caller(0))[3],  MESS => "MSsql connect ID = ".${$mssqlconnect}->{'mssql_thread_id'} );
 	return 1;
 }
 
@@ -218,6 +235,163 @@ sub SW_VLAN_fix {
 }
 
 
+sub GET_ppp_parm {
+
+	#######  UserAuth ########### 
+	my $AP = shift;
+	my $RAD_REPLY = shift;
+
+	DB_MSsql_connect(\$dbms);
+
+	####### UserCheckMAC ########### 
+	if ( $AP->{'login_service'} == 0 ) {
+	    my $Q_Check_MAC = "exec UserCheckMAC '".$AP->{'login'}."', '".$AP->{'hw_mac'}."', ".$AP->{'id'}.", '".
+	    &$k2w($AP->{'name'})."', ".$AP->{'bw_ctl'}.", ".$AP->{'cisco_num'}.", ".$AP->{'swid'};
+
+	    my $sth = $dbms->prepare($Q_Check_MAC);
+	    $sth->execute;
+	    my $ref_ms = $sth->fetchrow_hashref();
+	    $sth->finish;
+	    # FlagAccess = 1 | TextError = | DSSpeed = -1 | USSpeed = -1
+	    $AP->{'trusted'} = $ref_ms->{'FlagAccess'};
+
+	    if ( $AP->{'trusted'} == -1 ) {
+		$RAD_REPLY->{'Reply-Message'} = $ref_ms->{'TextError'} if defined($ref_ms->{'TextError'});
+		return;
+	    }
+	#    foreach my $key ( sort keys %{$ref_ms} ) {
+	#	print STDERR $key." = ".$ref_ms->{$key}."\n";
+	#    }
+	#    $sth->finish;
+	}
+
+	####### UserAuth ########### 
+	if ( $AP->{'login_service'} == 1 or $AP->{'trusted'} ) {
+	    my $Q_UserAuth = "exec UserAuth '".$AP->{'login'}."', ".$AP->{'login_service'};
+
+	    my $sth1 = $dbms->prepare($Q_UserAuth);
+	    $sth1->execute;
+	    my $ref_ms1 = $sth1->fetchrow_hashref();
+	#    foreach my $key ( sort keys %{$ref_ms1} ) {
+	#	print STDERR $key." = ".$ref_ms1->{$key}."\n";
+	#    }
+	    $sth1->finish;
+	    # CardNumber = 1 | DSSpeed = -1 | IP1 = 10 | IP2 = 13 | IP3 = 100 | IP4 = 1 | IdTariff = 6 | InetSpeed = 10000 
+	    #  NumberPassword = 1 | Quote = 86400 | Status = 1 | TextError = | USSpeed = -1
+
+	    if ( $AP->{'login_service'} == 0 ) {
+		$RAD_REPLY->{'Service-Type'} = "Framed-User";
+		$RAD_REPLY->{'Framed-Protocol'} = "PPP";
+
+	      if ( not defined($ref_ms1->{'Quote'}) ) {
+		    $AP->{'trusted'} = -1;
+		    $RAD_REPLY->{'Reply-Message'} = $ref_ms1->{'TextError'} if defined($ref_ms1->{'TextError'});
+		    return;
+	      } elsif ( $ref_ms1->{'Quote'} < 0 ) {
+		$RAD_REPLY->{'Session-Timeout'} = $nas_conf->{'FAKE_QUOTE'};
+		$RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'FAKE_DNS'}." ".$nas_conf->{'FAKE_DNS'};
+	      } else {
+		$AP->{'login_id'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
+		$RAD_REPLY->{'Framed-IP-Address'} = $ref_ms1->{'IP1'}.".".$ref_ms1->{'IP2'}.".".$ref_ms1->{'IP3'}.".".$ref_ms1->{'IP4'};
+		$RAD_REPLY->{'Session-Timeout'} = $ref_ms1->{'Quote'};
+
+		if ( $RAD_REPLY->{'Framed-IP-Address'} =~ /^10\.13\.2[45]\d\.\d+/ ) {
+		    $RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'FAKE_DNS'}." ".$nas_conf->{'FAKE_DNS'};
+		} else {
+		    $RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'DNS_IP1'}." ".$nas_conf->{'DNS_IP2'};
+		}
+	      }
+	    } else {
+		return;
+	    }
+
+	#    $sth1->finish;
+	}
+
+=head
+################## OLD code
+	    
+	}
+	my @c = $sth->fetchrow_array or last;
+	if ($debug or 1 == 1) {
+	    print STDERR "===>> COM_AUTH[$$]: SQL UserCheckMAC reply for '".$user."'";
+	    foreach $p (0..9) {
+		defined($c[$p]) and print STDERR " '$c[$p]'" or print STDERR " 'NULL'";
+	    }
+	    print STDERR "\n";
+	}
+	$sth->finish;
+
+        $AP{'trust'} = $c[0] if defined($c[0]);
+
+		################# ACCESS POINT END SEARCH #################
+
+		my $Request = expand_string($NAS_SQL_Request{$nas_ip}, $user);
+		$debug and print STDERR "========>> COM_AUTH[$$]: SQL Request: $Request\n";
+		my $sth = $dbh->prepare($Request);
+		last unless defined($sth);
+
+		$sth->execute or last;
+                my @d = $sth->fetchrow_array or last;
+               foreach $p (0..$NAS_SQL_Reply_Count{$nas_ip}) {
+                        $doit = 0 unless defined($d[$p]);
+                }
+                if (not $doit or $debug ) {
+                    print STDERR "========>> COM_AUTH[$$]: SQL reply for '$user'";
+                    foreach $p (0..11) {
+                        defined($d[$p]) and print STDERR " '".&$w2k($d[$p])."'";
+                        not defined($d[$p]) and print STDERR " 'NULL'";
+                    }
+                    print STDERR "\n";
+                }
+		$sth->finish;
+
+		# IF USERAUTH true
+		$doit and (($p = $pass{$d[4],$d[5]}) and do {
+		    print STDERR "=========>> COM_AUTH[$$]: pass = '$p'\n" if $debug;
+		    #my $IP1 = $NAS_IP2{$d[1]};
+		    if ($d[0]+0 == 10) {
+			$ip = $d[0].".".$NAS_IP2{$nas_ip}.".".$d[2].".".$d[3];
+		    } else {
+			$ip = $d[0].".".$d[1].".".$d[2].".".$d[3];
+		    }
+		    my $ip3 = $d[2];
+		    $quota = $d[6];
+		    my $Reply; my $Timeout = 86400;
+		    #my $sts = 1;
+
+		if ($quota < 0) {
+			$Timeout = 600; 
+			#$sts = 13;
+			$Reply = expand_string($NAS_Fake_Reply{$nas_ip}, $user, $p, $ip, $Timeout);
+		} else {
+			$int_r = "1";
+			if ($quota > 0) {
+				$Timeout = $quota;
+			}
+			if ($hdrs{'NAS-IP-Address'}){
+				my $user_ip = $hdrs{'NAS-IP-Address'};
+				if (($user_ip ne $ip) &&
+				    ($user_ip !~ /^77\.239\.208\.10?/) &&
+				    ($user_ip !~ /^192\.168\./) &&
+				    ($user_ip !~ /^10\.2\./) &&
+				    ($ip !~ /^127\./)) {
+					print STDERR "===>> COM_AUTH[$$]: IP fraud: '".$user_ip."' instead of '".$ip."' on '".$nas_ip."'\n";
+					$int_r = "0";
+				}
+			}
+			if ($ip3 >= 240) {
+				$Reply = expand_string($NAS_Fake_Reply{$nas_ip}, $user, $p, $ip, $Timeout);
+			} else {
+				$Reply = expand_string($NAS_Reply{$nas_ip}, $user, $p, $ip, $Timeout, $int_r);
+			}
+=cut
+##################
+
+	$AP->{'card'} = '1.1';
+}
+
+
 sub SW_AP_fix {
 
 	DB_mysql_connect(\$dbm);
@@ -235,6 +409,7 @@ sub SW_AP_fix {
 	#my $AP = $arg{'AP_INFO'};
 	$AP->{'vlan_zone'} = $headinfo{'ZONE_'.$AP->{'nas_ip'}};
 	$AP->{'fix_vlan_type'} = " UNKNOWN ";
+	$AP->{'fix_ap_type'} = "";
 
 	############# GET Switch IP's
 	my $stm0 = $dbm->prepare("SELECT h.automanage, h.bw_ctl, h.sw_id, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit, m.lib, m.rocom, m.snmp_ap_fix, ".
@@ -254,7 +429,7 @@ sub SW_AP_fix {
 			);
 			### Fix locate MAC in switch
 			( $AP->{'portpref'}, $AP->{'port'}, $AP->{'portindex'} ) = SW_ctl ( \%sw_arg );
-			    print STDERR $AP->{'portpref'}.", ".$AP->{'port'}.", ".$AP->{'portindex'}."\n" if $debug;
+			    #print STDERR ($AP->{'portpref'}||"").", ".$AP->{'port'}.", ".$AP->{'portindex'}."\n" if $debug;
 
 			if ($AP->{'port'}>0 or $stm0->rows == 1) {
 				$AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
@@ -341,7 +516,8 @@ sub SW_AP_fix {
 			$stm0->finish;
 		}
 		if ( $AP->{'id'}) {
-		    $AP->{'fix_ap_type'} = ( ( not defined ($AP->{'trust_id'}) or  $AP->{'id'} == $AP->{'trust_id'} ) ? "trust " : "Left!!!" );
+		    
+		    $AP->{'fix_ap_type'} = ( $AP->{'id'} == $AP->{'trust_id'} ? "trust " : "Left!!!" ) if defined ($AP->{'trust_id'}) ;
 		    $AP->{'fix_dlog'} = '('. $dbm->{'mysql_thread_id'}.') '.$AP->{'fix_vlan_type'}." '".$AP->{'vlan_id'}."' MAC '".$AP->{'hw_mac'}."' User: '".
 		    rspaced($AP->{'login'}."'",18)." AP ".$AP->{'fix_ap_type'}." '".$AP->{'id'}."' - '".$AP->{'name'}."'";
 		    if ( $AP->{'fix_ap_type'} eq "Left!!!" ) {
@@ -1165,7 +1341,7 @@ sub SNMP_fix_macport {
         SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => "Error in SNMP get port index for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
         $port = -1;
     }
-    print STDERR "NSNMP fix portindex = ".$port."\n" if $debug;
+    #print STDERR "NSNMP fix portindex = ".$port."\n" if $debug;
     $index = $port;
 
     if ($getname and $index > 0 ) {

@@ -16,8 +16,10 @@ use Data::Dumper;
 
 my $debug=1;
 
-my $start_conf  = \%SWConf::conf;
-my $dbm;
+my $nas_conf  = \%SWConf::aaa_conf;
+
+#my $dbm;
+#my $dbms;
 
 # This is hash wich hold original request from radius
 #my %RAD_REQUEST;
@@ -65,8 +67,10 @@ sub authorize {
 
 	my %AP = (
 		'callsub'	=> 'PPPoE2RADIUS',
+		'login_service'	=> 0,
 		'vlan_id'	=> 0,
 #		'hw_mac'	=> '00:17:31:56:7f:d9',
+		'trusted'	=> 0,
 		'id'		=> 0,
 		'new_lease'	=> 0,
 		'set'		=> 0,
@@ -77,11 +81,11 @@ sub authorize {
 		'name'		=> '',
 		'swid'		=> 0,
 		'bw_ctl'	=> 0,
-		#'trust_id'	=> 4370,
-#		'nas_ip'	=> $RAD_REQUEST{'NAS-IP-Address'},
+		'nas_ip'	=> $RAD_REQUEST{'NAS-IP-Address'},
 		'nas_ip'	=> '192.168.100.12',
 		'login'		=> $RAD_REQUEST{'User-Name'},
 	);
+
 	# Cisco-AVPair = "client-mac-address=0017.3156.7fd9"
 	#    &radiusd::radlog(1,  "CISCO AVPair  = ".  $RAD_REQUEST{'Cisco-AVPair'} );
 	if ( defined($RAD_REQUEST{'Cisco-AVPair'}) and $RAD_REQUEST{'Cisco-AVPair'} =~ /client\-mac\-address\=(\w\w)(\w\w)\.(\w\w)(\w\w)\.(\w\w)(\w\w)/ ) {
@@ -93,36 +97,44 @@ sub authorize {
 	} else {
 	    &radiusd::radlog(1,  "HW_MAC not Fix in RADIUS Pair" );
 	}
+	#########
+	####################### FOR DEBUGGING ############################
+	if ( $RAD_REQUEST{'User-Name'} eq 'comtest1' and $debug ) {
+	    $AP{'nas_ip'}	= '192.168.100.12' ;
+	    $RAD_REPLY{'Framed-IP-Address'} = "10.13.100.1";
+	    $RAD_REQUEST{'User-Name'} = '1.1';
+	}
+	####################### FOR DEBUGGING ############################
+	########
 
-	####### Start FIX VLAN ID) ###########
-	print Dumper %AP;
-
-	SW_VLAN_fix( \%AP );
-	&radiusd::radlog(1,  "Fix VLAN = ".$AP{'vlan_id'} );
-
-
-	SW_AP_fix( \%AP );
-	if ( $AP{'id'} == $AP{'trust_id'} ) {
-	    &radiusd::radlog(1, "Verify AP_id ".$AP{'id'}." trusted!\n") if $debug;
+	if ( $RAD_REQUEST{'NAS-IP-Address'} eq $nas_conf->{'mail_server'} ) {
+	    $AP{'login_service'} = 1;
 	} else {
-	    &radiusd::radlog(1, "Verify AP_id ".$AP{'id'}." not trusted!\n") if $debug;
+	    $AP{'cisco_num'} = 1;
+	    #$RAD_REPLY{'Framed-IP-Address'} = '10.13.100.1';
 	}
 
-        $RAD_REPLY{'Service-Type'} = "Framed-User";
-        $RAD_REPLY{'Framed-Protocol'} = "PPP";
-        $RAD_REPLY{'Framed-IP-Address'} = "10.11.100.1";
-        #$RAD_REPLY{''} = "";
+	####### Fixing VLAN ID ###########
+	SW_VLAN_fix( \%AP );
+	&radiusd::radlog(1, "User VLAN = ".$AP{'vlan_id'} );
 
-        $RAD_REQUEST{'User-Name'} = '1.1' if $RAD_REQUEST{'User-Name'} == 'comtest1';
+	#print Dumper %AP;
+	####### Fixing AP ID ###########
+	SW_AP_fix( \%AP );
+	&radiusd::radlog(1, "User AP_id = ".$AP{'id'} );
 
-        ###### Get parms from Billing
-        #$RAD_REQUEST{'User-Name'} =  GET_pppparm( \%AP );
-        #$RAD_REQUEST{'User-Name'} = $AP{'cardnum'};
-        #$RAD_REPLY{'Framed-IP-Address'} = $AP{'ppp_ip'}";
+	###### Get parms from Billing
+	#$AP{'login'} = 'comtest111';
+	GET_ppp_parm( \%AP, \%RAD_REPLY );
 
-       #&test_call;
+	print Dumper %RAD_REPLY;
 
-       return RLM_MODULE_OK;
+	if ( $AP{'trusted'} < 0 ) {
+	    return RLM_MODULE_REJECT;
+	} else {
+	    $RAD_REQUEST{'User-Name'} = $AP{'login_id'};
+	    return RLM_MODULE_OK;
+	}
 }
 
 # Function to handle authenticate
