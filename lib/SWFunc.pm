@@ -291,7 +291,7 @@ sub ACC_update {
 	my @d = ();
 	#$date = strftime "%d.%m.%Y %H:%M:%S", localtime($date);
 	$date = strftime "%d.%m.%Y %H:%M:%S", localtime(time);
-	&radiusd::radlog(1, "---------- DATE = $date -----------");
+	&radiusd::radlog(1, "---------- DATE = $date, TIME = $time -----------");
 
 	if ($status != 3) {
 		my $sth = $dbms->prepare("select status from preparetime where username='$name' and interfacenumber=$iface");
@@ -325,13 +325,7 @@ sub send_pod  {
     my $r = new Authen::Radius(Host => $param->{'nas_ip'}.":".$param->{'nas_port'}, Secret => $param->{'nas_secret'}, Debug => 0);
     $r->add_attributes (
       { Name => 'User-Name', Value => $param->{'login'} }
-      #{ Name => 'Acct-Session-Id', Value => $cmd[4] }
-      #{ Name => 'Calling-Station-Id', Value => $cmd[5] }
-      #{ Name => 'h323-conf-id', Value =>  $cmd[6]},
-      #{ Name => 'Session-Key', Value => $cmd[7] },	
     );
-
-    #$r->send_packet(DISCONNECT_REQUEST) and $type = $r->recv_packet();
 
     $r->send_packet(DISCONNECT_REQUEST);
     $res = $r->recv_packet();
