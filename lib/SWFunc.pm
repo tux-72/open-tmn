@@ -13,6 +13,9 @@ use cyrillic qw(cset_factory);
 use DBI();
 use NSNMP::Simple;
 
+use Authen::Radius;
+Authen::Radius->load_dictionary();
+
 use DESCtl;
 use C73Ctl;
 use CATIOSCtl;
@@ -37,7 +40,7 @@ $VERSION = 1.9;
 @EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl SW_VLAN_fix
 	    dlog rspaced lspaced IOS_rsh GET_IP3 GET_pipeid PRI_calc GET_ppp_parm
 	    DB_mysql_connect DB_trunk_vlan DB_trunk_update DB_MSsql_connect
-	    SAVE_config VLAN_link GET_Terminfo GET_GW_parms
+	    SAVE_config VLAN_link GET_Terminfo GET_GW_parms ACC_update
 	    VLAN_VPN_get VLAN_get VLAN_remove SNMP_fix_macport
 );
 
@@ -235,29 +238,203 @@ sub SW_VLAN_fix {
 }
 
 
+######################################### FREERADIUS SUBS for rlm_perl #######################################
+
+sub ACC_update {
+
+	my $RAD_REQUEST = shift;
+	DB_MSsql_connect(\$dbms);
+	&radiusd::radlog(1, "---------------- PERL ACCOUNTING ---------------------");
+	my $ip1; my $ip2; my $ip3; my $ip4;
+	my $name = "";
+	my $iface = 0;
+	my $port = 0;
+	my $date = "";
+	my $time = 0;
+	my $status = 2;
+
+	if ( $RAD_REQUEST->{'NAS-IP-Address'} ne $nas_conf->{'pppoe_server'} ) {
+               return -1;
+	};
+
+	if ($RAD_REQUEST->{'Framed-IP-Address'} && ($RAD_REQUEST->{'Framed-IP-Address'} =~ /^\s*(\d+)\.(\d+)\.(\d+)\.(\d+)\s*$/) ) {
+		$ip1 = $1;
+		$ip2 = $2;
+		$ip3 = $3;
+		$ip4 = $4;
+	} else {
+		$ip1 = $ip2 = $ip3 = $ip4 = 0;
+	}
+
+
+	$RAD_REQUEST->{'User-Name'} and $name = $RAD_REQUEST->{'User-Name'};
+	$RAD_REQUEST->{'Acct-Session-Id'} and $iface = $RAD_REQUEST->{'Acct-Session-Id'};
+	$RAD_REQUEST->{'NAS-Port'} and $port = $RAD_REQUEST->{'NAS-Port'};
+	#$hdrs{'Timestamp'} and $date = $hdrs{'Timestamp'};
+	$RAD_REQUEST->{'Acct-Session-Time'} and $time = $RAD_REQUEST->{'Acct-Session-Time'};
+	$RAD_REQUEST->{'Acct-Delay-Time'} and ($time > $RAD_REQUEST->{'Acct-Delay-Time'}) and do {
+	    $time -= $RAD_REQUEST->{'Acct-Delay-Time'};
+	};
+	$RAD_REQUEST->{'Acct-Status-Type'} and $status = $RAD_REQUEST->{'Acct-Status-Type'};
+
+	$name =~ /^\s*"?(.*?)"?\s*$/ and $name = $1;
+	$name =~ /^\s*(\S*?)\s*$/ and $name = $1;
+
+	$iface =~ /^\s*"?(.*?)"?\s*$/ and $iface = $1;
+	$iface =~ /^\s*(\S*?)\s*$/ and $iface = $1;
+	$iface = hex $iface;
+
+	$status = 2 if $status eq "Start";		# 1
+	$status = 2 if $status eq "Interim-Update"; 	# 3
+	$status = 3 if $status eq "Stop";		# 2
+
+	my @d = ();
+	#$date = strftime "%d.%m.%Y %H:%M:%S", localtime($date);
+	$date = strftime "%d.%m.%Y %H:%M:%S", localtime(time);
+	&radiusd::radlog(1, "---------- DATE = $date -----------");
+
+	if ($status != 3) {
+		my $sth = $dbms->prepare("select status from preparetime where username='$name' and interfacenumber=$iface");
+		$sth->execute;
+		@d = $sth->fetchrow_array;
+		$sth->finish;
+		if (defined($d[0]) && ($d[0] == 4)) {
+			#&radiusd::radlog(1, "---------------- send POD ---------------------");
+			## reset session
+			my %pod_parm = ('nas_ip'	=> $RAD_REQUEST->{'NAS-IP-Address'},
+					'nas_port'		=> $nas_conf->{'pod_port'},
+					'nas_secret'	=> $nas_conf->{'pod_secret'},
+					'login'		=> $RAD_REQUEST->{'User-Name'},
+			);
+			send_pod (\%pod_parm );
+		}
+
+	}
+	$dbms->do("exec WorkPrepareTime $ip1, $ip2, $ip3, $ip4, '$name', $iface, '$date', $time, $status");
+	return 1;
+}
+
+sub send_pod  {
+
+    my $param = shift;
+    # nas_ip nas_port nas_secret login
+
+    my ( $res, $a, $err, $strerr );
+    my $res_attr = "attr:";
+
+    my $r = new Authen::Radius(Host => $param->{'nas_ip'}.":".$param->{'nas_port'}, Secret => $param->{'nas_secret'}, Debug => 0);
+    $r->add_attributes (
+      { Name => 'User-Name', Value => $param->{'login'} }
+      #{ Name => 'Acct-Session-Id', Value => $cmd[4] }
+      #{ Name => 'Calling-Station-Id', Value => $cmd[5] }
+      #{ Name => 'h323-conf-id', Value =>  $cmd[6]},
+      #{ Name => 'Session-Key', Value => $cmd[7] },	
+    );
+
+    #$r->send_packet(DISCONNECT_REQUEST) and $type = $r->recv_packet();
+
+    $r->send_packet(DISCONNECT_REQUEST);
+    $res = $r->recv_packet();
+
+    $err = $r->get_error;
+    $strerr = $r->strerror;
+
+    &radiusd::radlog(1, "POD error = $err $strerr" );
+
+    for $a ($r->get_attributes()) {
+	$res_attr .= ",".$a->{'Name'}."='".$a->{'Value'}."'";
+	if($a->{'Name'} eq 'Error-Cause' &&  $a->{'Value'} eq 'Session-Context-Not-Found') {
+	    $res = 41;
+	}
+    }
+    &radiusd::radlog(1, "strerr:".$strerr.";".$res_attr );
+}
+
+
+
 sub GET_ppp_parm {
 
 	#######  UserAuth ########### 
-	my $AP = shift;
+	my $RAD_REQUEST = shift;
+	#my $AP = shift;
 	my $RAD_REPLY = shift;
 
 	DB_MSsql_connect(\$dbms);
 
+	my %AP = (
+		'callsub'	=> 'PPPoE2RADIUS',
+		'login_service'	=> 0,
+		'vlan_id'	=> 0,
+#		'hw_mac'	=> '00:17:31:56:7f:d9',
+		'trusted'	=> 0,
+		'id'		=> 0,
+		'new_lease'	=> 0,
+		'set'		=> 0,
+		'vlan_zone'	=> 1,
+		'update_db'	=> 0,
+		'DB_portinfo'	=> 0,
+		'vlan_id'	=> 0,
+		'name'		=> '',
+		'swid'		=> 0,
+		'bw_ctl'	=> 0,
+		'nas_ip'	=> $RAD_REQUEST->{'NAS-IP-Address'},
+		#'nas_ip'	=> '192.168.100.12',
+		'login'		=> $RAD_REQUEST->{'User-Name'},
+	);
+
+	if ( defined($RAD_REQUEST->{'Cisco-AVPair'}) and $RAD_REQUEST->{'Cisco-AVPair'} =~ /client\-mac\-address\=(\w\w)(\w\w)\.(\w\w)(\w\w)\.(\w\w)(\w\w)/ ) {
+	    $AP{'hw_mac'} = lc("$1:$2:$3:$4:$5:$6");
+	    &radiusd::radlog(1,  "HW_MAC = ". $AP{'hw_mac'} );
+	    if (($AP{'hw_mac'} eq "0") || ($AP{'hw_mac'} eq "00:00:00:00:00:00")) {
+		&radiusd::radlog(1, "User '".$RAD_REQUEST->{'User-Name'}."' MAC '".$AP{'hw_mac'}."' is Wrong!!!\n\n") if $debug;
+	    }
+	} else {
+	    &radiusd::radlog(1,  "HW_MAC not Fix in RADIUS Pair" );
+	}
+	#########
+	####################### FOR DEBUGGING ############################
+	if ( $RAD_REQUEST->{'User-Name'} eq 'comtest1' and $debug ) {
+	    $AP{'nas_ip'}	= '192.168.100.12' ;
+	    #$RAD_REPLY{'Framed-IP-Address'} = "10.13.100.1";
+	    #$RAD_REQUEST->{'User-Name'} = '1.1';
+	}
+	####################### FOR DEBUGGING ############################
+	########
+
+	if ( $RAD_REQUEST->{'NAS-IP-Address'} eq $nas_conf->{'mail_server'} ) {
+	    $AP{'login_service'} = 1;
+	} else {
+	    $AP{'cisco_num'} = 1;
+	    #$RAD_REPLY{'Framed-IP-Address'} = '10.13.100.1';
+	}
+
+	####### Fixing VLAN ID ###########
+	SW_VLAN_fix( \%AP );
+	&radiusd::radlog(1, "User VLAN = ".$AP{'vlan_id'} );
+
+	#print Dumper %AP;
+	####### Fixing AP ID ###########
+	SW_AP_fix( \%AP );
+	&radiusd::radlog(1, "User AP_id = ".$AP{'id'} );
+
+	###### Get parms from Billing
+	#$RAD_REQUEST->{'User-Name'} = 'comtest111';
+
 	####### UserCheckMAC ########### 
-	if ( $AP->{'login_service'} == 0 ) {
-	    my $Q_Check_MAC = "exec UserCheckMAC '".$AP->{'login'}."', '".$AP->{'hw_mac'}."', ".$AP->{'id'}.", '".
-	    &$k2w($AP->{'name'})."', ".$AP->{'bw_ctl'}.", ".$AP->{'cisco_num'}.", ".$AP->{'swid'};
+	if ( $AP{'login_service'} == 0 ) {
+	    my $Q_Check_MAC = "exec UserCheckMAC '".$RAD_REQUEST->{'User-Name'}."', '".$AP{'hw_mac'}."', ".$AP{'id'}.", '".
+	    &$k2w($AP{'name'})."', ".$AP{'bw_ctl'}.", ".$AP{'cisco_num'}.", ".$AP{'swid'};
 
 	    my $sth = $dbms->prepare($Q_Check_MAC);
 	    $sth->execute;
 	    my $ref_ms = $sth->fetchrow_hashref();
 	    $sth->finish;
 	    # FlagAccess = 1 | TextError = | DSSpeed = -1 | USSpeed = -1
-	    $AP->{'trusted'} = $ref_ms->{'FlagAccess'};
+	    $AP{'trusted'} = $ref_ms->{'FlagAccess'};
 
-	    if ( $AP->{'trusted'} == -1 ) {
+	    if ( $AP{'trusted'} == -1 ) {
 		$RAD_REPLY->{'Reply-Message'} = $ref_ms->{'TextError'} if defined($ref_ms->{'TextError'});
-		return;
+		return $AP{'trusted'};
 	    }
 	#    foreach my $key ( sort keys %{$ref_ms} ) {
 	#	print STDERR $key." = ".$ref_ms->{$key}."\n";
@@ -266,8 +443,8 @@ sub GET_ppp_parm {
 	}
 
 	####### UserAuth ########### 
-	if ( $AP->{'login_service'} == 1 or $AP->{'trusted'} ) {
-	    my $Q_UserAuth = "exec UserAuth '".$AP->{'login'}."', ".$AP->{'login_service'};
+	if ( $AP{'login_service'} == 1 or $AP{'trusted'} ) {
+	    my $Q_UserAuth = "exec UserAuth '".$RAD_REQUEST->{'User-Name'}."', ".$AP{'login_service'};
 
 	    my $sth1 = $dbms->prepare($Q_UserAuth);
 	    $sth1->execute;
@@ -279,19 +456,20 @@ sub GET_ppp_parm {
 	    # CardNumber = 1 | DSSpeed = -1 | IP1 = 10 | IP2 = 13 | IP3 = 100 | IP4 = 1 | IdTariff = 6 | InetSpeed = 10000 
 	    #  NumberPassword = 1 | Quote = 86400 | Status = 1 | TextError = | USSpeed = -1
 
-	    if ( $AP->{'login_service'} == 0 ) {
+	    if ( $AP{'login_service'} == 0 ) {
 		$RAD_REPLY->{'Service-Type'} = "Framed-User";
 		$RAD_REPLY->{'Framed-Protocol'} = "PPP";
 
 	      if ( not defined($ref_ms1->{'Quote'}) ) {
-		    $AP->{'trusted'} = -1;
+		    $AP{'trusted'} = -1;
 		    $RAD_REPLY->{'Reply-Message'} = $ref_ms1->{'TextError'} if defined($ref_ms1->{'TextError'});
-		    return;
+		    return $AP{'trusted'};
 	      } elsif ( $ref_ms1->{'Quote'} < 0 ) {
 		$RAD_REPLY->{'Session-Timeout'} = $nas_conf->{'FAKE_QUOTE'};
 		$RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'FAKE_DNS'}." ".$nas_conf->{'FAKE_DNS'};
 	      } else {
-		$AP->{'login_id'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
+		#$AP{'login_id'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
+		$RAD_REQUEST->{'User-Name'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
 		$RAD_REPLY->{'Framed-IP-Address'} = $ref_ms1->{'IP1'}.".".$ref_ms1->{'IP2'}.".".$ref_ms1->{'IP3'}.".".$ref_ms1->{'IP4'};
 		$RAD_REPLY->{'Session-Timeout'} = $ref_ms1->{'Quote'};
 
@@ -302,93 +480,12 @@ sub GET_ppp_parm {
 		}
 	      }
 	    } else {
-		return;
+		return $AP{'trusted'};
 	    }
 
 	#    $sth1->finish;
 	}
 
-=head
-################## OLD code
-	    
-	}
-	my @c = $sth->fetchrow_array or last;
-	if ($debug or 1 == 1) {
-	    print STDERR "===>> COM_AUTH[$$]: SQL UserCheckMAC reply for '".$user."'";
-	    foreach $p (0..9) {
-		defined($c[$p]) and print STDERR " '$c[$p]'" or print STDERR " 'NULL'";
-	    }
-	    print STDERR "\n";
-	}
-	$sth->finish;
-
-        $AP{'trust'} = $c[0] if defined($c[0]);
-
-		################# ACCESS POINT END SEARCH #################
-
-		my $Request = expand_string($NAS_SQL_Request{$nas_ip}, $user);
-		$debug and print STDERR "========>> COM_AUTH[$$]: SQL Request: $Request\n";
-		my $sth = $dbh->prepare($Request);
-		last unless defined($sth);
-
-		$sth->execute or last;
-                my @d = $sth->fetchrow_array or last;
-               foreach $p (0..$NAS_SQL_Reply_Count{$nas_ip}) {
-                        $doit = 0 unless defined($d[$p]);
-                }
-                if (not $doit or $debug ) {
-                    print STDERR "========>> COM_AUTH[$$]: SQL reply for '$user'";
-                    foreach $p (0..11) {
-                        defined($d[$p]) and print STDERR " '".&$w2k($d[$p])."'";
-                        not defined($d[$p]) and print STDERR " 'NULL'";
-                    }
-                    print STDERR "\n";
-                }
-		$sth->finish;
-
-		# IF USERAUTH true
-		$doit and (($p = $pass{$d[4],$d[5]}) and do {
-		    print STDERR "=========>> COM_AUTH[$$]: pass = '$p'\n" if $debug;
-		    #my $IP1 = $NAS_IP2{$d[1]};
-		    if ($d[0]+0 == 10) {
-			$ip = $d[0].".".$NAS_IP2{$nas_ip}.".".$d[2].".".$d[3];
-		    } else {
-			$ip = $d[0].".".$d[1].".".$d[2].".".$d[3];
-		    }
-		    my $ip3 = $d[2];
-		    $quota = $d[6];
-		    my $Reply; my $Timeout = 86400;
-		    #my $sts = 1;
-
-		if ($quota < 0) {
-			$Timeout = 600; 
-			#$sts = 13;
-			$Reply = expand_string($NAS_Fake_Reply{$nas_ip}, $user, $p, $ip, $Timeout);
-		} else {
-			$int_r = "1";
-			if ($quota > 0) {
-				$Timeout = $quota;
-			}
-			if ($hdrs{'NAS-IP-Address'}){
-				my $user_ip = $hdrs{'NAS-IP-Address'};
-				if (($user_ip ne $ip) &&
-				    ($user_ip !~ /^77\.239\.208\.10?/) &&
-				    ($user_ip !~ /^192\.168\./) &&
-				    ($user_ip !~ /^10\.2\./) &&
-				    ($ip !~ /^127\./)) {
-					print STDERR "===>> COM_AUTH[$$]: IP fraud: '".$user_ip."' instead of '".$ip."' on '".$nas_ip."'\n";
-					$int_r = "0";
-				}
-			}
-			if ($ip3 >= 240) {
-				$Reply = expand_string($NAS_Fake_Reply{$nas_ip}, $user, $p, $ip, $Timeout);
-			} else {
-				$Reply = expand_string($NAS_Reply{$nas_ip}, $user, $p, $ip, $Timeout, $int_r);
-			}
-=cut
-##################
-
-	$AP->{'card'} = '1.1';
 }
 
 
