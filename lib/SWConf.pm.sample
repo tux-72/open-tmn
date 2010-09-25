@@ -24,6 +24,9 @@ our %aaa_conf = (
     'DNS_IP1'           => '77.239.208.17',
     'DNS_IP2'           => '77.239.208.5',
     'mail_server'       => '192.168.100.21',
+    'pppoe_server'      => '192.168.100.30',
+    'pod_port'          => 1700,
+    'pod_secret'        => 'secret',
 );
 
 our %conf = (
