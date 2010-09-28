@@ -40,7 +40,7 @@ $VERSION = 1.9;
 @EXPORT = qw( SW_AP_get SW_AP_fix SW_AP_tune SW_AP_free SW_AP_linkstate SW_ctl SW_VLAN_fix
 	    dlog rspaced lspaced IOS_rsh GET_IP3 GET_pipeid PRI_calc GET_ppp_parm
 	    DB_mysql_connect DB_trunk_vlan DB_trunk_update DB_MSsql_connect
-	    SAVE_config VLAN_link GET_Terminfo GET_GW_parms ACC_update
+	    SAVE_config VLAN_link GET_Terminfo GET_GW_parms ACC_update PA_db_update
 	    VLAN_VPN_get VLAN_get VLAN_remove SNMP_fix_macport
 );
 
@@ -49,7 +49,7 @@ my $conflog	= \%SWConf::conflog;
 my $dbi		= \%SWConf::dbconf;
 my $nas_conf	= \%SWConf::aaa_conf;
 
-#use Data::Dumper;
+use Data::Dumper;
 
 my $w2k = cset_factory 1251, 20866;
 my $k2w = cset_factory 20866, 1251;
@@ -117,8 +117,8 @@ sub DB_mysql_connect {
 
 sub DB_MSsql_connect {
 	my $mssqlconnect = shift;
-	${$mssqlconnect} = DBI->connect_cached("DBI:Sybase:server=".$dbi->{'MSSQL_server'}.";language=russian", $dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'})
-	#${$mssqlconnect} = DBI->connect_cached("DBI:Sybase:server=".$dbi->{'MSSQL_server'},$dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'})
+	${$mssqlconnect} = DBI->connect_cached("DBI:Sybase:server=".$dbi->{'MSSQL_server'}.
+	";language=russian;database=".$dbi->{'MSSQL_base'},$dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'})
 	#${$mssqlconnect} = DBI->connect_cached("DBI:Sybase:server=".$dbi->{'MSSQL_server'}.";database=".$dbi->{'MSSQL_base'},$dbi->{'MSSQL_user'},$dbi->{'MSSQL_pass'})
 	or die "Unable to connect MSSQL server ".$dbi->{'MSSQL_server'}."$DBI::errstr";
 	#or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MSSQL DB host ".$dbi->{'MSSQL_host'}."$DBI::errstr" );
@@ -235,387 +235,6 @@ sub SW_VLAN_fix {
 	    LOGIN => $headinfo{'MONLOGIN_'.$AP->{'nas_ip'}},	PASS => $headinfo{'MONPASS_'.$AP->{'nas_ip'}}, MAC => $AP->{'hw_mac'},
 	);
 	$AP->{'vlan_id'} = SW_ctl ( \%sw_arg );
-}
-
-
-######################################### FREERADIUS SUBS for rlm_perl #######################################
-
-sub ACC_update {
-
-	my $RAD_REQUEST = shift;
-	DB_MSsql_connect(\$dbms);
-	&radiusd::radlog(1, "---------------- PERL ACCOUNTING ---------------------");
-	my $ip1; my $ip2; my $ip3; my $ip4;
-	my $name = "";
-	my $iface = 0;
-	my $port = 0;
-	my $date = "";
-	my $time = 0;
-	my $status = 2;
-
-	if ( $RAD_REQUEST->{'NAS-IP-Address'} ne $nas_conf->{'pppoe_server'} ) {
-               return -1;
-	};
-
-	if ($RAD_REQUEST->{'Framed-IP-Address'} && ($RAD_REQUEST->{'Framed-IP-Address'} =~ /^\s*(\d+)\.(\d+)\.(\d+)\.(\d+)\s*$/) ) {
-		$ip1 = $1;
-		$ip2 = $2;
-		$ip3 = $3;
-		$ip4 = $4;
-	} else {
-		$ip1 = $ip2 = $ip3 = $ip4 = 0;
-	}
-
-
-	$RAD_REQUEST->{'User-Name'} and $name = $RAD_REQUEST->{'User-Name'};
-	$RAD_REQUEST->{'Acct-Session-Id'} and $iface = $RAD_REQUEST->{'Acct-Session-Id'};
-	$RAD_REQUEST->{'NAS-Port'} and $port = $RAD_REQUEST->{'NAS-Port'};
-	#$hdrs{'Timestamp'} and $date = $hdrs{'Timestamp'};
-	$RAD_REQUEST->{'Acct-Session-Time'} and $time = $RAD_REQUEST->{'Acct-Session-Time'};
-	$RAD_REQUEST->{'Acct-Delay-Time'} and ($time > $RAD_REQUEST->{'Acct-Delay-Time'}) and do {
-	    $time -= $RAD_REQUEST->{'Acct-Delay-Time'};
-	};
-	$RAD_REQUEST->{'Acct-Status-Type'} and $status = $RAD_REQUEST->{'Acct-Status-Type'};
-
-	$name =~ /^\s*"?(.*?)"?\s*$/ and $name = $1;
-	$name =~ /^\s*(\S*?)\s*$/ and $name = $1;
-
-	$iface =~ /^\s*"?(.*?)"?\s*$/ and $iface = $1;
-	$iface =~ /^\s*(\S*?)\s*$/ and $iface = $1;
-	$iface = hex $iface;
-
-	$status = 2 if $status eq "Start";		# 1
-	$status = 2 if $status eq "Interim-Update"; 	# 3
-	$status = 3 if $status eq "Stop";		# 2
-
-	my @d = ();
-	#$date = strftime "%d.%m.%Y %H:%M:%S", localtime($date);
-	$date = strftime "%d.%m.%Y %H:%M:%S", localtime(time);
-	&radiusd::radlog(1, "---------- DATE = $date, TIME = $time -----------");
-
-	if ($status != 3) {
-		my $sth = $dbms->prepare("select status from preparetime where username='$name' and interfacenumber=$iface");
-		$sth->execute;
-		@d = $sth->fetchrow_array;
-		$sth->finish;
-		if (defined($d[0]) && ($d[0] == 4)) {
-			#&radiusd::radlog(1, "---------------- send POD ---------------------");
-			## reset session
-			my %pod_parm = ('nas_ip'	=> $RAD_REQUEST->{'NAS-IP-Address'},
-					'nas_port'		=> $nas_conf->{'pod_port'},
-					'nas_secret'	=> $nas_conf->{'pod_secret'},
-					'login'		=> $RAD_REQUEST->{'User-Name'},
-			);
-			send_pod (\%pod_parm );
-		}
-
-	}
-	$dbms->do("exec WorkPrepareTime $ip1, $ip2, $ip3, $ip4, '$name', $iface, '$date', $time, $status");
-	return 1;
-}
-
-sub send_pod  {
-
-    my $param = shift;
-    # nas_ip nas_port nas_secret login
-
-    my ( $res, $a, $err, $strerr );
-    my $res_attr = "attr:";
-
-    my $r = new Authen::Radius(Host => $param->{'nas_ip'}.":".$param->{'nas_port'}, Secret => $param->{'nas_secret'}, Debug => 0);
-    $r->add_attributes (
-      { Name => 'User-Name', Value => $param->{'login'} }
-    );
-
-    $r->send_packet(DISCONNECT_REQUEST);
-    $res = $r->recv_packet();
-
-    $err = $r->get_error;
-    $strerr = $r->strerror;
-
-    &radiusd::radlog(1, "POD error = $err $strerr" );
-
-    for $a ($r->get_attributes()) {
-	$res_attr .= ",".$a->{'Name'}."='".$a->{'Value'}."'";
-	if($a->{'Name'} eq 'Error-Cause' &&  $a->{'Value'} eq 'Session-Context-Not-Found') {
-	    $res = 41;
-	}
-    }
-    &radiusd::radlog(1, "strerr:".$strerr.";".$res_attr );
-}
-
-
-
-sub GET_ppp_parm {
-
-	#######  UserAuth ########### 
-	my $RAD_REQUEST = shift;
-	#my $AP = shift;
-	my $RAD_REPLY = shift;
-
-	DB_MSsql_connect(\$dbms);
-
-	my %AP = (
-		'callsub'	=> 'PPPoE2RADIUS',
-		'login_service'	=> 0,
-		'vlan_id'	=> 0,
-#		'hw_mac'	=> '00:17:31:56:7f:d9',
-		'trusted'	=> 0,
-		'id'		=> 0,
-		'new_lease'	=> 0,
-		'set'		=> 0,
-		'vlan_zone'	=> 1,
-		'update_db'	=> 0,
-		'DB_portinfo'	=> 0,
-		'vlan_id'	=> 0,
-		'name'		=> '',
-		'swid'		=> 0,
-		'bw_ctl'	=> 0,
-		'nas_ip'	=> $RAD_REQUEST->{'NAS-IP-Address'},
-		#'nas_ip'	=> '192.168.100.12',
-		'login'		=> $RAD_REQUEST->{'User-Name'},
-	);
-
-	if ( defined($RAD_REQUEST->{'Cisco-AVPair'}) and $RAD_REQUEST->{'Cisco-AVPair'} =~ /client\-mac\-address\=(\w\w)(\w\w)\.(\w\w)(\w\w)\.(\w\w)(\w\w)/ ) {
-	    $AP{'hw_mac'} = lc("$1:$2:$3:$4:$5:$6");
-	    &radiusd::radlog(1,  "HW_MAC = ". $AP{'hw_mac'} );
-	    if (($AP{'hw_mac'} eq "0") || ($AP{'hw_mac'} eq "00:00:00:00:00:00")) {
-		&radiusd::radlog(1, "User '".$RAD_REQUEST->{'User-Name'}."' MAC '".$AP{'hw_mac'}."' is Wrong!!!\n\n") if $debug;
-	    }
-	} else {
-	    &radiusd::radlog(1,  "HW_MAC not Fix in RADIUS Pair" );
-	}
-	#########
-	####################### FOR DEBUGGING ############################
-	if ( $RAD_REQUEST->{'User-Name'} eq 'comtest1' and $debug ) {
-	    $AP{'nas_ip'}	= '192.168.100.12' ;
-	    #$RAD_REPLY{'Framed-IP-Address'} = "10.13.100.1";
-	    #$RAD_REQUEST->{'User-Name'} = '1.1';
-	}
-	####################### FOR DEBUGGING ############################
-	########
-
-	if ( $RAD_REQUEST->{'NAS-IP-Address'} eq $nas_conf->{'mail_server'} ) {
-	    $AP{'login_service'} = 1;
-	} else {
-	    $AP{'cisco_num'} = 1;
-	    #$RAD_REPLY{'Framed-IP-Address'} = '10.13.100.1';
-	}
-
-	####### Fixing VLAN ID ###########
-	SW_VLAN_fix( \%AP );
-	&radiusd::radlog(1, "User VLAN = ".$AP{'vlan_id'} );
-
-	#print Dumper %AP;
-	####### Fixing AP ID ###########
-	SW_AP_fix( \%AP );
-	&radiusd::radlog(1, "User AP_id = ".$AP{'id'} );
-
-	###### Get parms from Billing
-	#$RAD_REQUEST->{'User-Name'} = 'comtest111';
-
-	####### UserCheckMAC ########### 
-	if ( $AP{'login_service'} == 0 ) {
-	    my $Q_Check_MAC = "exec UserCheckMAC '".$RAD_REQUEST->{'User-Name'}."', '".$AP{'hw_mac'}."', ".$AP{'id'}.", '".
-	    &$k2w($AP{'name'})."', ".$AP{'bw_ctl'}.", ".$AP{'cisco_num'}.", ".$AP{'swid'};
-
-	    my $sth = $dbms->prepare($Q_Check_MAC);
-	    $sth->execute;
-	    my $ref_ms = $sth->fetchrow_hashref();
-	    $sth->finish;
-	    # FlagAccess = 1 | TextError = | DSSpeed = -1 | USSpeed = -1
-	    $AP{'trusted'} = $ref_ms->{'FlagAccess'};
-
-	    if ( $AP{'trusted'} == -1 ) {
-		$RAD_REPLY->{'Reply-Message'} = $ref_ms->{'TextError'} if defined($ref_ms->{'TextError'});
-		return $AP{'trusted'};
-	    }
-	#    foreach my $key ( sort keys %{$ref_ms} ) {
-	#	print STDERR $key." = ".$ref_ms->{$key}."\n";
-	#    }
-	#    $sth->finish;
-	}
-
-	####### UserAuth ########### 
-	if ( $AP{'login_service'} == 1 or $AP{'trusted'} ) {
-	    my $Q_UserAuth = "exec UserAuth '".$RAD_REQUEST->{'User-Name'}."', ".$AP{'login_service'};
-
-	    my $sth1 = $dbms->prepare($Q_UserAuth);
-	    $sth1->execute;
-	    my $ref_ms1 = $sth1->fetchrow_hashref();
-	#    foreach my $key ( sort keys %{$ref_ms1} ) {
-	#	print STDERR $key." = ".$ref_ms1->{$key}."\n";
-	#    }
-	    $sth1->finish;
-	    # CardNumber = 1 | DSSpeed = -1 | IP1 = 10 | IP2 = 13 | IP3 = 100 | IP4 = 1 | IdTariff = 6 | InetSpeed = 10000 
-	    #  NumberPassword = 1 | Quote = 86400 | Status = 1 | TextError = | USSpeed = -1
-
-	    if ( $AP{'login_service'} == 0 ) {
-		$RAD_REPLY->{'Service-Type'} = "Framed-User";
-		$RAD_REPLY->{'Framed-Protocol'} = "PPP";
-
-	      if ( not defined($ref_ms1->{'Quote'}) ) {
-		    $AP{'trusted'} = -1;
-		    $RAD_REPLY->{'Reply-Message'} = $ref_ms1->{'TextError'} if defined($ref_ms1->{'TextError'});
-		    return $AP{'trusted'};
-	      } elsif ( $ref_ms1->{'Quote'} < 0 ) {
-		$RAD_REPLY->{'Session-Timeout'} = $nas_conf->{'FAKE_QUOTE'};
-		$RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'FAKE_DNS'}." ".$nas_conf->{'FAKE_DNS'};
-	      } else {
-		#$AP{'login_id'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
-		$RAD_REQUEST->{'User-Name'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
-		$RAD_REPLY->{'Framed-IP-Address'} = $ref_ms1->{'IP1'}.".".$ref_ms1->{'IP2'}.".".$ref_ms1->{'IP3'}.".".$ref_ms1->{'IP4'};
-		$RAD_REPLY->{'Session-Timeout'} = $ref_ms1->{'Quote'};
-
-		if ( $RAD_REPLY->{'Framed-IP-Address'} =~ /^10\.13\.2[45]\d\.\d+/ ) {
-		    $RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'FAKE_DNS'}." ".$nas_conf->{'FAKE_DNS'};
-		} else {
-		    $RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'DNS_IP1'}." ".$nas_conf->{'DNS_IP2'};
-		}
-	      }
-	    } else {
-		return $AP{'trusted'};
-	    }
-
-	#    $sth1->finish;
-	}
-
-}
-
-
-sub SW_AP_fix {
-
-	DB_mysql_connect(\$dbm);
-	my $Query10 = ''; my $Query0 = ''; my $Query1 = ''; my %sw_arg = (); my $cli_vlan=0;
-	my $AP = shift;
-	#my %arg = (
-	#    @_,         # список пар аргументов
-	#);
-	# AP_INFO LOGIN LTYPE VLAN NAS_IP HW_MAC
-	if ( not defined($headinfo{'ZONE_'.$AP->{'nas_ip'}}) ) {
-	    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "NAS '".$AP->{'nas_ip'}."'ZONE not exist, AP not fixed..." );
-	    return -1;
-	}
-
-	#my $AP = $arg{'AP_INFO'};
-	$AP->{'vlan_zone'} = $headinfo{'ZONE_'.$AP->{'nas_ip'}};
-	$AP->{'fix_vlan_type'} = " UNKNOWN ";
-	$AP->{'fix_ap_type'} = "";
-
-	############# GET Switch IP's
-	my $stm0 = $dbm->prepare("SELECT h.automanage, h.bw_ctl, h.sw_id, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit, m.lib, m.rocom, m.snmp_ap_fix, ".
-	"m.mon_login, m.mon_pass FROM hosts h, streets st, models m WHERE h.model_id=m.model_id and h.street_id=st.street_id and m.lib is not NULL and h.clients_vlan=".
-	$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'}." and h.visible>0" );
-	$stm0->execute();
-		if ($stm0->rows>1) { dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "More by one switch in Clients VLAN '".$AP->{'vlan_id'}."'!!!" ); }
-
-		while (my $ref = $stm0->fetchrow_hashref() and not $AP->{'id'}) {
-			$cli_vlan=1;
-			$AP->{'automanage'}=1 if ($ref->{'automanage'});
-			$AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'});
-
-			%sw_arg = (
-			    LIB => $ref->{'lib'}, ACT => 'fix_macport', IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'},
-			    MAC => $AP->{'hw_mac'}, VLAN => $AP->{'vlan_id'}, ROCOM => $ref->{'rocom'}, USE_SNMP => $ref->{'snmp_ap_fix'},
-			);
-			### Fix locate MAC in switch
-			( $AP->{'portpref'}, $AP->{'port'}, $AP->{'portindex'} ) = SW_ctl ( \%sw_arg );
-			    #print STDERR ($AP->{'portpref'}||"").", ".$AP->{'port'}.", ".$AP->{'portindex'}."\n" if $debug;
-
-			if ($AP->{'port'}>0 or $stm0->rows == 1) {
-				$AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
-                                $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
-				$AP->{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
-				$AP->{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
-			}
-			if ($AP->{'port'}>0) {
-				if ( defined($AP->{'portpref'}) and 'x'.$AP->{'portpref'} ne 'x' ) {
-				    $Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
-				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
-				    $Query1 = "INSERT into swports  SET  status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref='".$AP->{'portpref'}."', port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
-				} else {
-				    $Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
-				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
-				    $Query1 = "INSERT into swports  SET status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref=NULL, port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
-				}
-				$Query1 .= ", snmp_idx=".$AP->{'portindex'} if ( defined($AP->{'portindex'}) and $AP->{'portindex'} != $AP->{'port'} );
-
-				my $stm10 = $dbm->prepare($Query10);
-				$stm10->execute();
-				if (not $stm10->rows) {
-					$dbm->do($Query1);
-					dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "Insert New PORT record in swports" );
-				}
-				$stm10->finish;
-				my $stm1 = $dbm->prepare($Query0);
-				$stm1->execute();
-			    	while (my $refp = $stm1->fetchrow_hashref()) {
-					$AP->{'link_type'} = $link_type{'free'};
-					$AP->{'link_type'} = $refp->{'ltype_id'} if defined($refp->{'ltype_id'});
-					$AP->{'id'} = $refp->{'port_id'};
-					$AP->{'communal'} = $refp->{'communal'};
-					$AP->{'ds'} = $refp->{'ds_speed'} if defined($refp->{'ds_speed'});
-					$AP->{'us'} = $refp->{'us_speed'} if defined($refp->{'us_speed'});
-					#NEW Parameters    
-					$AP->{'portvlan'} = $refp->{'vlan_id'} if defined($refp->{'vlan_id'});
-
-				}
-                                        $AP->{'name'} .= ", порт ".( defined($AP->{'portpref'}) ? $AP->{'portpref'} : '' ).$AP->{'port'};
-					$stm1->finish;
-			}
-			$AP->{'fix_vlan_type'} = " CLI_VLAN";
-		}
-		$stm0->finish;
-		if ( ( not $AP->{'id'}) and ( not $cli_vlan ) ) {
-			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => "FIND PORT VLAN '".$AP->{'vlan_id'}."' User: '".$AP->{'login'}."', MAC:'".$AP->{'hw_mac'}."'" );
-			$AP->{'DB_portinfo'}=1;
-			$stm0 = $dbm->prepare( "SELECT h.automanage, h.bw_ctl, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit,".
-			" p.sw_id, p.port_id, p.ltype_id, p.communal, p.portpref, p.port, p.ds_speed, p.us_speed, ".
-			" p.vlan_id, p.autoneg, p.speed, p.duplex, p.maxhwaddr FROM hosts h, streets st, swports p ".
-			" WHERE h.street_id=st.street_id and p.sw_id=h.sw_id and p.vlan_id=".$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'} );
-			$stm0->execute();
-			while (my $ref = $stm0->fetchrow_hashref()) {
-			    $AP->{'port'} = $ref->{'port'} if not defined($ref->{'portpref'});
-			    $AP->{'port'} = $ref->{'portpref'}.$ref->{'port'} if defined($ref->{'portpref'});
-                            $AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
-
-                            $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
-                            $AP->{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
-                            $AP->{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
-                            $AP->{'name'} .= ", порт ".$AP->{'port'};
-
-			    $AP->{'link_type'} = $link_type{'free'};
-			    $AP->{'link_type'} = $ref->{'ltype_id'} if defined($ref->{'ltype_id'});
-
-			    $AP->{'automanage'}=1 if ($ref->{'automanage'} == 1);
-			    $AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
-
-			    $AP->{'ds'} = $ref->{'ds_speed'} if defined($ref->{'ds_speed'});
-			    $AP->{'us'} = $ref->{'us_speed'} if defined($ref->{'us_speed'});
-			    #NEW Parameters
-			    $AP->{'portvlan'} = $ref->{'vlan_id'} if defined($ref->{'vlan_id'});
-
-			    if ($AP->{'id'}) {
-				dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "MULTI TD's!!! = '".$AP->{'id'}."' and '".$ref->{'port_id'}."'" );
-				$AP->{'id'} = 0; $AP->{'swid'} = 0; $AP->{'podezd'}=0; $AP->{'name'}=''; $AP->{'port'}=0;
-				last;
-			    }
-			    $AP->{'id'} = $ref->{'port_id'};
-			    $AP->{'communal'} = $ref->{'communal'};
-			    $AP->{'fix_vlan_type'} = "PORT_VLAN";
-			}
-			$stm0->finish;
-		}
-		if ( $AP->{'id'}) {
-		    
-		    $AP->{'fix_ap_type'} = ( $AP->{'id'} == $AP->{'trust_id'} ? "trust " : "Left!!!" ) if defined ($AP->{'trust_id'}) ;
-		    $AP->{'fix_dlog'} = '('. $dbm->{'mysql_thread_id'}.') '.$AP->{'fix_vlan_type'}." '".$AP->{'vlan_id'}."' MAC '".$AP->{'hw_mac'}."' User: '".
-		    rspaced($AP->{'login'}."'",18)." AP ".$AP->{'fix_ap_type'}." '".$AP->{'id'}."' - '".$AP->{'name'}."'";
-		    if ( $AP->{'fix_ap_type'} eq "Left!!!" ) {
-			$AP->{'fix_dlog'} .= " ( trust AP = '".$AP->{'trust_id'}."' )";
-		    }
-		    dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $AP->{'fix_dlog'} );
-		}
 }
 
 sub SW_AP_get {
@@ -870,6 +489,7 @@ sub SW_AP_get {
 
 	return ($Fres+0, $Fvalue);
 }
+
 
 
 sub SW_AP_free {
@@ -1515,6 +1135,525 @@ sub SNMP_fix_macport_name {
         }
     }
     return ($pref, $port, $idx);
+}
+
+
+######################################### FREERADIUS SUBS for rlm_perl #######################################
+
+sub ACC_update {
+
+	my $RAD_REQUEST = shift;
+	DB_MSsql_connect(\$dbms);
+	&radiusd::radlog(1, "---------------- PERL ACCOUNTING ---------------------");
+	my $ip1; my $ip2; my $ip3; my $ip4;
+	my $name = "";
+	my $iface = 0;
+	my $port = 0;
+	my $date = "";
+	my $time = 0;
+	my $status = 2;
+
+	if ( $RAD_REQUEST->{'NAS-IP-Address'} ne $nas_conf->{'pppoe_server'} ) {
+               return -1;
+	};
+
+	if ($RAD_REQUEST->{'Framed-IP-Address'} && ($RAD_REQUEST->{'Framed-IP-Address'} =~ /^\s*(\d+)\.(\d+)\.(\d+)\.(\d+)\s*$/) ) {
+		$ip1 = $1;
+		$ip2 = $2;
+		$ip3 = $3;
+		$ip4 = $4;
+	} else {
+		$ip1 = $ip2 = $ip3 = $ip4 = 0;
+	}
+
+
+	$RAD_REQUEST->{'User-Name'} and $name = $RAD_REQUEST->{'User-Name'};
+	$RAD_REQUEST->{'Acct-Session-Id'} and $iface = $RAD_REQUEST->{'Acct-Session-Id'};
+	$RAD_REQUEST->{'NAS-Port'} and $port = $RAD_REQUEST->{'NAS-Port'};
+	#$hdrs{'Timestamp'} and $date = $hdrs{'Timestamp'};
+	$RAD_REQUEST->{'Acct-Session-Time'} and $time = $RAD_REQUEST->{'Acct-Session-Time'};
+	$RAD_REQUEST->{'Acct-Delay-Time'} and ($time > $RAD_REQUEST->{'Acct-Delay-Time'}) and do {
+	    $time -= $RAD_REQUEST->{'Acct-Delay-Time'};
+	};
+	$RAD_REQUEST->{'Acct-Status-Type'} and $status = $RAD_REQUEST->{'Acct-Status-Type'};
+
+	$name =~ /^\s*"?(.*?)"?\s*$/ and $name = $1;
+	$name =~ /^\s*(\S*?)\s*$/ and $name = $1;
+
+	$iface =~ /^\s*"?(.*?)"?\s*$/ and $iface = $1;
+	$iface =~ /^\s*(\S*?)\s*$/ and $iface = $1;
+	$iface = hex $iface;
+
+	$status = 2 if $status eq "Start";		# 1
+	$status = 2 if $status eq "Interim-Update"; 	# 3
+	$status = 3 if $status eq "Stop";		# 2
+
+	my @d = ();
+	#$date = strftime "%d.%m.%Y %H:%M:%S", localtime($date);
+	$date = strftime "%d.%m.%Y %H:%M:%S", localtime(time);
+	&radiusd::radlog(1, "---------- DATE = $date, TIME = $time -----------");
+
+	if ($status != 3) {
+		my $sth = $dbms->prepare("select status from preparetime where username='$name' and interfacenumber=$iface");
+		$sth->execute;
+		@d = $sth->fetchrow_array;
+		$sth->finish;
+		if (defined($d[0]) && ($d[0] == 4)) {
+			#&radiusd::radlog(1, "---------------- send POD ---------------------");
+			## reset session
+			my %pod_parm = ('nas_ip'	=> $RAD_REQUEST->{'NAS-IP-Address'},
+					'nas_port'		=> $nas_conf->{'pod_port'},
+					'nas_secret'	=> $nas_conf->{'pod_secret'},
+					'login'		=> $RAD_REQUEST->{'User-Name'},
+			);
+			send_pod (\%pod_parm );
+		}
+
+	}
+	$dbms->do("exec WorkPrepareTime $ip1, $ip2, $ip3, $ip4, '$name', $iface, '$date', $time, $status");
+	return 1;
+}
+
+sub send_pod  {
+
+    my $param = shift;
+    # nas_ip nas_port nas_secret login
+
+    my ( $res, $a, $err, $strerr );
+    my $res_attr = "attr:";
+
+    my $r = new Authen::Radius(Host => $param->{'nas_ip'}.":".$param->{'nas_port'}, Secret => $param->{'nas_secret'}, Debug => 0);
+    $r->add_attributes (
+      { Name => 'User-Name', Value => $param->{'login'} }
+    );
+
+    $r->send_packet(DISCONNECT_REQUEST);
+    $res = $r->recv_packet();
+
+    $err = $r->get_error;
+    $strerr = $r->strerror;
+
+    &radiusd::radlog(1, "POD error = $err $strerr" );
+
+    for $a ($r->get_attributes()) {
+	$res_attr .= ",".$a->{'Name'}."='".$a->{'Value'}."'";
+	if($a->{'Name'} eq 'Error-Cause' &&  $a->{'Value'} eq 'Session-Context-Not-Found') {
+	    $res = 41;
+	}
+    }
+    &radiusd::radlog(1, "strerr:".$strerr.";".$res_attr );
+}
+
+
+
+sub SW_AP_fix {
+
+	DB_mysql_connect(\$dbm);
+	my $Query10 = ''; my $Query0 = ''; my $Query1 = ''; my %sw_arg = (); my $cli_vlan=0;
+	my $AP = shift;
+	#my %arg = (
+	#    @_,         # список пар аргументов
+	#);
+	# AP_INFO LOGIN LTYPE VLAN NAS_IP HW_MAC
+	if ( not defined($headinfo{'ZONE_'.$AP->{'nas_ip'}}) ) {
+	    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "NAS '".$AP->{'nas_ip'}."'ZONE not exist, AP not fixed..." );
+	    return -1;
+	}
+
+	#my $AP = $arg{'AP_INFO'};
+	$AP->{'vlan_zone'} = $headinfo{'ZONE_'.$AP->{'nas_ip'}};
+	$AP->{'fix_vlan_type'} = " UNKNOWN ";
+	$AP->{'fix_ap_type'} = "";
+
+	############# GET Switch IP's
+	my $stm0 = $dbm->prepare("SELECT h.automanage, h.bw_ctl, h.sw_id, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit, m.lib, m.rocom, m.snmp_ap_fix, ".
+	"m.mon_login, m.mon_pass FROM hosts h, streets st, models m WHERE h.model_id=m.model_id and h.street_id=st.street_id and m.lib is not NULL and h.clients_vlan=".
+	$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'}." and h.visible>0" );
+	$stm0->execute();
+		if ($stm0->rows>1) { dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "More by one switch in Clients VLAN '".$AP->{'vlan_id'}."'!!!" ); }
+
+		while (my $ref = $stm0->fetchrow_hashref() and not $AP->{'id'}) {
+			$cli_vlan=1;
+			$AP->{'automanage'}=1 if ($ref->{'automanage'});
+			$AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'});
+
+			%sw_arg = (
+			    LIB => $ref->{'lib'}, ACT => 'fix_macport', IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'},
+			    MAC => $AP->{'hw_mac'}, VLAN => $AP->{'vlan_id'}, ROCOM => $ref->{'rocom'}, USE_SNMP => $ref->{'snmp_ap_fix'},
+			);
+			### Fix locate MAC in switch
+			( $AP->{'portpref'}, $AP->{'port'}, $AP->{'portindex'} ) = SW_ctl ( \%sw_arg );
+			    #print STDERR ($AP->{'portpref'}||"").", ".$AP->{'port'}.", ".$AP->{'portindex'}."\n" if $debug;
+
+			if ($AP->{'port'}>0 or $stm0->rows == 1) {
+				$AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
+                                $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
+				$AP->{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
+				$AP->{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
+			}
+			if ($AP->{'port'}>0) {
+				if ( defined($AP->{'portpref'}) and 'x'.$AP->{'portpref'} ne 'x' ) {
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
+				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query1 = "INSERT into swports  SET  status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref='".$AP->{'portpref'}."', port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
+				} else {
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
+				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query1 = "INSERT into swports  SET status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref=NULL, port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
+				}
+				$Query1 .= ", snmp_idx=".$AP->{'portindex'} if ( defined($AP->{'portindex'}) and $AP->{'portindex'} != $AP->{'port'} );
+
+				my $stm10 = $dbm->prepare($Query10);
+				$stm10->execute();
+				if (not $stm10->rows) {
+					$dbm->do($Query1);
+					dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "Insert New PORT record in swports" );
+				}
+				$stm10->finish;
+				my $stm1 = $dbm->prepare($Query0);
+				$stm1->execute();
+			    	while (my $refp = $stm1->fetchrow_hashref()) {
+					$AP->{'link_type'} = $link_type{'free'};
+					$AP->{'link_type'} = $refp->{'ltype_id'} if defined($refp->{'ltype_id'});
+					$AP->{'id'} = $refp->{'port_id'};
+					$AP->{'communal'} = $refp->{'communal'};
+					$AP->{'ds'} = $refp->{'ds_speed'} if defined($refp->{'ds_speed'});
+					$AP->{'us'} = $refp->{'us_speed'} if defined($refp->{'us_speed'});
+					#NEW Parameters    
+					$AP->{'portvlan'} = $refp->{'vlan_id'} if defined($refp->{'vlan_id'});
+
+				}
+                                        $AP->{'name'} .= ", порт ".( defined($AP->{'portpref'}) ? $AP->{'portpref'} : '' ).$AP->{'port'};
+					$stm1->finish;
+			}
+			$AP->{'fix_vlan_type'} = " CLI_VLAN";
+		}
+		$stm0->finish;
+		if ( ( not $AP->{'id'}) and ( not $cli_vlan ) ) {
+			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => "FIND PORT VLAN '".$AP->{'vlan_id'}."' User: '".$AP->{'login'}."', MAC:'".$AP->{'hw_mac'}."'" );
+			$AP->{'DB_portinfo'}=1;
+			$stm0 = $dbm->prepare( "SELECT h.automanage, h.bw_ctl, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit,".
+			" p.sw_id, p.port_id, p.ltype_id, p.communal, p.portpref, p.port, p.ds_speed, p.us_speed, ".
+			" p.vlan_id, p.autoneg, p.speed, p.duplex, p.maxhwaddr FROM hosts h, streets st, swports p ".
+			" WHERE h.street_id=st.street_id and p.sw_id=h.sw_id and p.vlan_id=".$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'} );
+			$stm0->execute();
+			while (my $ref = $stm0->fetchrow_hashref()) {
+			    $AP->{'port'} = $ref->{'port'} if not defined($ref->{'portpref'});
+			    $AP->{'port'} = $ref->{'portpref'}.$ref->{'port'} if defined($ref->{'portpref'});
+                            $AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
+
+                            $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
+                            $AP->{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
+                            $AP->{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
+                            $AP->{'name'} .= ", порт ".$AP->{'port'};
+
+			    $AP->{'link_type'} = $link_type{'free'};
+			    $AP->{'link_type'} = $ref->{'ltype_id'} if defined($ref->{'ltype_id'});
+
+			    $AP->{'automanage'}=1 if ($ref->{'automanage'} == 1);
+			    $AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
+
+			    $AP->{'ds'} = $ref->{'ds_speed'} if defined($ref->{'ds_speed'});
+			    $AP->{'us'} = $ref->{'us_speed'} if defined($ref->{'us_speed'});
+			    #NEW Parameters
+			    $AP->{'portvlan'} = $ref->{'vlan_id'} if defined($ref->{'vlan_id'});
+
+			    if ($AP->{'id'}) {
+				dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "MULTI TD's!!! = '".$AP->{'id'}."' and '".$ref->{'port_id'}."'" );
+				$AP->{'id'} = 0; $AP->{'swid'} = 0; $AP->{'podezd'}=0; $AP->{'name'}=''; $AP->{'port'}=0;
+				last;
+			    }
+			    $AP->{'id'} = $ref->{'port_id'};
+			    $AP->{'communal'} = $ref->{'communal'};
+			    $AP->{'fix_vlan_type'} = "PORT_VLAN";
+			}
+			$stm0->finish;
+		}
+		if ( $AP->{'id'}) {
+		    
+		    $AP->{'fix_ap_type'} = ( $AP->{'id'} == $AP->{'trust_id'} ? "trust " : "Left!!!" ) if defined ($AP->{'trust_id'}) ;
+		    $AP->{'fix_dlog'} = '('. $dbm->{'mysql_thread_id'}.') '.$AP->{'fix_vlan_type'}." '".$AP->{'vlan_id'}."' MAC '".$AP->{'hw_mac'}."' User: '".
+		    rspaced($AP->{'login'}."'",18)." AP ".$AP->{'fix_ap_type'}." '".$AP->{'id'}."' - '".$AP->{'name'}."'";
+		    if ( $AP->{'fix_ap_type'} eq "Left!!!" ) {
+			$AP->{'fix_dlog'} .= " ( trust AP = '".$AP->{'trust_id'}."' )";
+		    }
+		    dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $AP->{'fix_dlog'} );
+		}
+}
+
+sub GET_ppp_parm {
+
+	#######  UserAuth ########### 
+	my $RAD_REQUEST = shift;
+	my $RAD_REPLY = shift;
+	my $Q_upd_db = shift;
+
+	DB_MSsql_connect(\$dbms);
+	DB_mysql_connect(\$dbm);
+
+	my %AP = (
+		'callsub'	=> 'PPPoE2RADIUS',
+		'login_service'	=> 0,
+		'vlan_id'	=> 0,
+		'trust'		=> 0,
+		'id'		=> 0,
+		'new_lease'	=> 0,
+		'set'		=> 0,
+		'vlan_zone'	=> 1,
+		'update_db'	=> 0,
+		'DB_portinfo'	=> 0,
+		'vlan_id'	=> 0,
+		'name'		=> '',
+		'swid'		=> 0,
+		'bw_ctl'	=> 0,
+		'nas_ip'	=> $RAD_REQUEST->{'NAS-IP-Address'},
+		'login'		=> $RAD_REQUEST->{'User-Name'},
+	);
+	$Q_upd_db->{'User-Name'} = $RAD_REQUEST->{'User-Name'};
+
+
+	if ( not exists($RAD_REQUEST->{'Framed-Protocol'}) and defined($RAD_REQUEST->{'NAS-Identifier'}) 
+	and $RAD_REQUEST->{'NAS-Identifier'} eq $nas_conf->{'mail_server'} ) {
+	    print Dumper $RAD_REQUEST;
+	    $AP{'login_service'} = 1;
+	    $AP{'trust'} = 1;
+	} else {
+	    $AP{'cisco_num'} = 1;
+	}
+
+	if ( $AP{'login_service'} == 0 ) {
+	    if ( defined($RAD_REQUEST->{'Cisco-AVPair'}) and $RAD_REQUEST->{'Cisco-AVPair'} =~ /client\-mac\-address\=(\w\w)(\w\w)\.(\w\w)(\w\w)\.(\w\w)(\w\w)/ ) {
+		$AP{'hw_mac'}  = lc("$1:$2:$3:$4:$5:$6");
+		$AP{'mac_src'} = lc("$1$2$3$4$5$6");
+		&radiusd::radlog(1,  "HW_MAC = ". $AP{'hw_mac'} );
+		if (($AP{'hw_mac'} eq "0") || ($AP{'hw_mac'} eq "00:00:00:00:00:00")) {
+		    &radiusd::radlog(1, "User '".$RAD_REQUEST->{'User-Name'}."' MAC '".$AP{'hw_mac'}."' is Wrong!!!\n\n") if $debug;
+		}
+	    } else {
+		&radiusd::radlog(1,  "HW_MAC not Fix in RADIUS Pair" );
+		return -1;
+	    }
+	    ####### Fixing VLAN ID ###########
+	    SW_VLAN_fix( \%AP );
+	    &radiusd::radlog(1, "User VLAN = ".$AP{'vlan_id'} );
+
+	    #print Dumper %AP;
+	    ####### Fixing AP ID ###########
+	    SW_AP_fix( \%AP );
+	    &radiusd::radlog(1, "User AP_id = ".$AP{'id'} );
+
+	    ###### Get parms from Billing
+
+	    ####### UserCheckMAC ########### 
+	    my $Q_Check_MAC = "exec UserCheckMAC '".$RAD_REQUEST->{'User-Name'}."', '".$AP{'hw_mac'}."', ".$AP{'id'}.", '".
+	    &$k2w($AP{'name'})."', ".(! $AP{'communal'}).", ".$AP{'cisco_num'}.", ".$AP{'swid'};
+#	    &$k2w($AP{'name'})."', ".$AP{'bw_ctl'}.", ".$AP{'cisco_num'}.", ".$AP{'swid'};
+
+	    my $sth = $dbms->prepare($Q_Check_MAC);
+	    $sth->execute;
+	    my $ref_ms = $sth->fetchrow_hashref();
+	    $sth->finish;
+	    $AP{'trust'} = $ref_ms->{'FlagAccess'};
+	    if ( $AP{'trust'} < 0 ) {
+		$RAD_REPLY->{'Reply-Message'} = $ref_ms->{'TextError'} if defined($ref_ms->{'TextError'});
+		return $AP{'trust'};
+	    }
+	#    foreach my $key ( sort keys %{$ref_ms} ) {
+	#	print STDERR $key." = ".$ref_ms->{$key}."\n";
+	#    }
+	#     FlagAccess = 1 | TextError = | DSSpeed = -1 | USSpeed = -1
+	}
+
+	####### UserAuth ########### 
+	if ( $AP{'login_service'} > 0 or $AP{'trust'} ) {
+	    my $Q_UserAuth = "exec UserAuth '".$RAD_REQUEST->{'User-Name'}."', ".$AP{'login_service'};
+
+	    my $sth1 = $dbms->prepare($Q_UserAuth);
+	    $sth1->execute;
+	    my $ref_ms1 = $sth1->fetchrow_hashref();
+	    $sth1->finish;
+	#    foreach my $key ( sort keys %{$ref_ms1} ) {
+	#	print STDERR $key." = ".$ref_ms1->{$key}."\n";
+	#    }
+	    # CardNumber = 1 | DSSpeed = -1 | IP1 = 10 | IP2 = 13 | IP3 = 100 | IP4 = 1 | IdTariff = 6 | InetSpeed = 10000 
+	    #  NumberPassword = 1 | Quote = 86400 | Status = 1 | TextError = | USSpeed = -1 | TypeConnect | Category
+
+	    if ( $AP{'login_service'} > 0 ) {
+		$RAD_REQUEST->{'User-Name'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
+		$AP{'trust'} = 1;
+	    } elsif ( $AP{'login_service'} == 0 ) {
+		$ref_ms1->{'TypeConnect'} = 21 if not defined($ref_ms1->{'TypeConnect'});
+		$ref_ms1->{'Category'} = 2 if not defined($ref_ms1->{'Category'});
+		$RAD_REPLY->{'Service-Type'} = "Framed-User";
+		$RAD_REPLY->{'Framed-Protocol'} = "PPP";
+
+	      if ( not defined($ref_ms1->{'Quote'}) ) {
+		    $RAD_REPLY->{'Reply-Message'} = $ref_ms1->{'TextError'} if defined($ref_ms1->{'TextError'});
+		    return -1;
+	      } elsif ( $ref_ms1->{'Quote'} < 0 ) {
+		$RAD_REPLY->{'Session-Timeout'} = $nas_conf->{'FAKE_QUOTE'};
+		$RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'FAKE_DNS'}." ".$nas_conf->{'FAKE_DNS'};
+	      } else {
+		$RAD_REQUEST->{'User-Name'} = $ref_ms1->{'CardNumber'}.".".$ref_ms1->{'NumberPassword'};
+		$RAD_REPLY->{'Framed-IP-Address'} = $ref_ms1->{'IP1'}.".".$ref_ms1->{'IP2'}.".".$ref_ms1->{'IP3'}.".".$ref_ms1->{'IP4'};
+		$RAD_REPLY->{'Session-Timeout'} = $ref_ms1->{'Quote'};
+
+		if ( $RAD_REPLY->{'Framed-IP-Address'} =~ /^10\.13\.2[45]\d\.\d+/ ) {
+		    $RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'FAKE_DNS'}." ".$nas_conf->{'FAKE_DNS'};
+		} else {
+		    $RAD_REPLY->{'Cisco-AVPair'} = "ip:dns-servers=".$nas_conf->{'DNS_IP1'}." ".$nas_conf->{'DNS_IP2'};
+		}
+		####################### GET ACCESS POINT ####################
+		my $Query = ''; my $Q_upd = ''; my $PreQuery = '';
+		my $date = strftime "%Y%m%d%H%M%S", localtime(time);
+		my $job_parms = ''; $AP{'set'} = 0;
+
+		################### Если выяснили AP_ID ######################
+		if ( $AP{'trust'} > 0 and ( not $RAD_REPLY->{'Framed-IP-Address'} =~ /^10\.13\.2[45]\d\.\d{1,3}$/ ) and ( not $ref_ms1->{'Quote'} < 0 )) {
+		# CardNumber = 1 | DSSpeed = -1 | IP1 = 10 | IP2 = 13 | IP3 = 100 | IP4 = 1 | IdTariff = 6 | InetSpeed = 10000 
+		#  NumberPassword = 1 | Quote = 86400 | Status = 1 | TextError = | USSpeed = -1 | TypeConnect | Category
+			#print Dumper %AP if $debug;
+			if ( ( $AP{'link_type'} != $ref_ms1->{'TypeConnect'}
+			|| ( 'x'.$ref_ms1->{'USSpeed'} ne 'x' and $AP{'us'} != $ref_ms1->{'USSpeed'} )
+			|| ( 'x'.$ref_ms1->{'DSSpeed'} ne 'x' and $AP{'ds'} != $ref_ms1->{'DSSpeed'} )
+			) and ! $AP{'communal'} ) {
+			    $AP{'set'} = 1;
+			}
+			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS =>
+			"AP_set = '".$AP{'set'}."', AP_DS = '".$ref_ms1->{'DSSpeed'}."', AP_US = '".$ref_ms1->{'USSpeed'}."'" );
+
+			$Query = "INSERT INTO ap_login_info SET login='".$AP{'login'}."', start_date='".$date."', hw_mac='".$AP{'hw_mac'}."',  port_id='".$AP{'id'}."'";
+			$Q_upd = " ap_name='".$AP{'name'}."', sw_id='".$AP{'swid'}."', last_date='".$date."', vlan_id='".$AP{'vlan_id'}."'".
+			", ip_addr='".$RAD_REPLY->{'Framed-IP-Address'}."'";
+
+			$dbm->do( $Query.",".$Q_upd.", trust=0  ON DUPLICATE KEY UPDATE ".$Q_upd );
+			$Q_upd_db->{'Q_ap_login_info'} = $Query.",".$Q_upd.", trust=1 ON DUPLICATE KEY UPDATE ".$Q_upd.", trust=1" ;
+
+			## HEAD_LINK inserting data
+			if ( $AP{'trust'} and $ref_ms1->{'TypeConnect'} == $link_type{'pppoe'} ) {
+			    if ( $RAD_REPLY->{'Framed-IP-Address'} =~ /^10\./ ) { 
+				$AP{'pri'} = $ref_ms1->{'Category'}||3;
+			    } else {
+				$AP{'pri'} = 3;
+			    }
+			    $Query = "INSERT INTO head_link SET port_id=".$AP{'id'}.", status=1, white_static_ip=0, dhcp_use=".$start_conf->{'DHCP_USE'}.", ";
+			    $Q_upd = " vlan_id=".$AP{'vlan_id'}.", login='".$AP{'login'}."', hw_mac='".$AP{'hw_mac'}."', communal=".$AP{'communal'}.
+			    ", inet_shape=".$ref_ms1->{'InetSpeed'}.", inet_priority=".$AP{'pri'}.", stamp=NULL, ip_subnet='".$RAD_REPLY->{'Framed-IP-Address'}."'".
+			    ", head_id=".$headinfo{'LHEAD_'.$AP{'nas_ip'}}.", pppoe_up=1";
+			    $Query .= $Q_upd." ON DUPLICATE KEY UPDATE ".$Q_upd;
+			    $Q_upd_db->{'Q_head_link'} = $Query ;
+			}
+			######################## SET JOB PARAMETERS #######################
+			if ( $AP{'set'} and $AP{'automanage'} ) {
+			    dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Access Point parm change" );
+			    $AP{'update_db'}=1;
+			    $Query = "INSERT INTO bundle_jobs SET port_id=".$AP{'id'};
+			    $job_parms  = 'login:'.$AP{'login'}.';hw_mac:'.$AP{'mac_src'}.';';
+			    $job_parms .= 'inet_rate:'.$ref_ms1->{'InetSpeed'}.';'   if defined($ref_ms1->{'InetSpeed'});
+			    $job_parms .= 'ds_speed:'.$ref_ms1->{'DSSpeed'}.';'      if defined($ref_ms1->{'DSSpeed'});
+			    $job_parms .= 'us_speed:'.$ref_ms1->{'USSpeed'}.';'      if defined($ref_ms1->{'USSpeed'});
+
+			    ########  VPN  VLAN  ########
+			    if ( $ref_ms1->{'TypeConnect'} == $link_type{'l2link'} ) {
+				#$Query .= ", ltype_id=".$ref_ms1->{'TypeConnect'};
+				if ( "x".$ref_ms1->{'vlan_id'} eq "x" ) {
+				    # PORT_ID LINK_TYPE ZONE
+				    ( $ref_ms1->{'vlan_id'}, $AP{'head_id'} ) = VLAN_get ( PORT_ID => $AP{'id'}, 
+				    LINK_TYPE => $ref_ms1->{'TypeConnect'}, ZONE => $AP{'vlan_zone'} );
+				    if ( $ref_ms1->{'vlan_id'} > 1 ) {
+					$job_parms .= 'vlan_id:'.$ref_ms1->{'vlan_id'}.';';
+				    }
+				} else {
+				    $job_parms .= 'vlan_id:'.$ref_ms1->{'vlan_id'}.';';
+				}
+			    }
+			    ######## Transport Net ############
+			    if ( defined($RAD_REPLY->{'Framed-IP-Address'}) and $ref_ms1->{'TypeConnect'} == $link_type{'l3net4'} ) {
+				if ( "x".$ref_ms1->{'vlan_id'} eq "x" ) {
+				    $job_parms .= 'ip_subnet:'.(GET_IP3($RAD_REPLY->{'Framed-IP-Address'}.'/30')).'/30;' ;
+				    # PORT_ID LINK_TYPE ZONE
+				    ( $ref_ms1->{'vlan_id'}, $AP{'head_id'} ) = VLAN_get ( PORT_ID => $AP{'id'}, 
+				    LINK_TYPE => $link_type{'l3net4'}, ZONE => $AP{'vlan_zone'} );
+				    if ( $ref_ms1->{'vlan_id'} > 1 ) {
+					$job_parms .= 'vlan_id:'.$ref_ms1->{'vlan_id'}.';';
+				    }
+				}
+			    }
+
+			    # Проверка изменений link_type
+			    ## Если порт был свободен и задействуется под PPPoE
+			    if ( $AP{'link_type'} == $link_type{'free'} and $ref_ms1->{'TypeConnect'} == $start_conf->{'CLI_VLAN_LINKTYPE'} ) {
+				$Query .= ", ltype_id=".$ref_ms1->{'TypeConnect'};
+				$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
+			    ## Иначе если порт был свободен и задействуется под другие типы подключений  
+			    } elsif ( $AP{'link_type'} == $link_type{'free'} ) {
+				$Query .= ", ltype_id=".$ref_ms1->{'TypeConnect'};
+				$job_parms .= 'vlan_id:'.$ref_ms1->{'vlan_id'}.';' if ( $ref_ms1->{'vlan_id'} > 1 );
+			    ## Иначе если порт занят под такой же тип подключения
+			    } elsif ( $AP{'link_type'} > $start_conf->{'STARTLINKCONF'} and $ref_ms1->{'TypeConnect'}+0 == $AP{'link_type'}+0 ) {
+				$Query .= ", ltype_id=".$link_type{'setparms'};
+				$job_parms .= 'vlan_id:'.$AP{'vlan_id'}.';';
+			    ## Иначе если порт ЗАНЯТ! и задействуется под другой тип подключения
+			    } elsif ( $AP{'link_type'} > $start_conf->{'STARTLINKCONF'} and $ref_ms1->{'TypeConnect'}+0 != $AP{'link_type'}+0  ) {
+				$PreQuery .= "INSERT INTO bundle_jobs SET port_id=".$AP{'id'}.", ltype_id=".$link_type{'free'}.' ON DUPLICATE KEY UPDATE date_insert=NULL';
+
+				$Query .= ", ltype_id=".$ref_ms1->{'TypeConnect'};
+				$job_parms .= 'vlan_id:'.$ref_ms1->{'vlan_id'}.';' if ( defined($ref_ms1->{'vlan_id'}) and $ref_ms1->{'vlan_id'} > 1 );
+			    } else {
+				$AP{'update_db'}=0;
+			    }
+
+			    if ( $AP{'update_db'} ) {
+				if ("x".$PreQuery ne "x" ) {
+				    $Q_upd_db->{'Q_pre_bundle_jobs'} = $PreQuery;
+				}
+				$Query .= ", parm='".$job_parms."', archiv=0 ON DUPLICATE KEY UPDATE date_insert=NULL, parm='".$job_parms."'";
+				dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS => "Update port DB parameters info" );
+				$Q_upd_db->{'Q_bundle_jobs'} = $Query;
+			    } else {
+				dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGDISP', 
+				MESS => "Error: Different link_types, possible PORT type is FREE?" );
+			    }
+			}
+
+			if ( not $AP{'trust'} ) {
+			    dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGDISP', MESS => "'".$AP{'login'}."' access point not agree !!!" );
+			}
+			dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGDISP', MESS =>
+			"QUERY: Login  = '".$AP{'login'}."', MAC = '".$AP{'hw_mac'}."', NAS_IP = ".$AP{'nas_ip'}."\n".
+			" Login = '".$AP{'login'}."', AP_ID = '".$AP{'id'}."', '".$AP{'name'}.", ZONE = ".$AP{'vlan_zone'}.", VLAN = ".$AP{'vlan_id'}."'\n");
+		}
+	      }
+	    }
+	}
+	return $AP{'trust'};
+
+}
+
+sub PA_db_update {
+	my $UPD = shift;
+	my $RAD_REQUEST = shift;
+
+	DB_mysql_connect(\$dbm);
+	if ( defined($UPD->{'Q_ap_login_info'}) )    { $dbm->do($UPD->{'Q_ap_login_info'})
+	or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $UPD->{'Q_ap_login_info'}." \n$DBI::errstr" ); }
+	if ( defined($UPD->{'Q_head_link'}) )        { $dbm->do($UPD->{'Q_head_link'})
+	or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $UPD->{'Q_head_link'}." \n$DBI::errstr" ); }
+	if ( defined($UPD->{'Q_pre_bundle_jobs'}) )  { $dbm->do($UPD->{'Q_pre_bundle_jobs'})
+	or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $UPD->{'Q_pre_bundle_jobs'}." \n$DBI::errstr" ); }
+	if ( defined($UPD->{'Q_bundle_jobs'}) )      { $dbm->do($UPD->{'Q_bundle_jobs'})
+	or dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $UPD->{'Q_bundle_jobs'}." \n$DBI::errstr" ); }
+
+	#print Dumper $RAD_REQUEST;
+	if ( defined($RAD_REQUEST->{'NAS-Identifier'}) and $RAD_REQUEST->{'NAS-Identifier'} eq $nas_conf->{'mail_server'} and
+	defined($RAD_REQUEST->{'Cleartext-Password'}) and defined ($RAD_REQUEST->{'User-Password'}) and not defined($RAD_REQUEST->{'Framed-Protocol'}) ) {
+	    if ( $RAD_REQUEST->{'Cleartext-Password'} ne $RAD_REQUEST->{'User-Password'} ) {
+		return -1;
+	    }
+	} elsif ( defined($RAD_REQUEST->{'Cleartext-Password'}) and defined ($RAD_REQUEST->{'User-Password'}) and defined($RAD_REQUEST->{'Framed-Protocol'}) ) {
+		return -1;
+	}
+	return 1;
 }
 
 1;

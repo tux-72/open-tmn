@@ -11,6 +11,10 @@ use lib $Bin.'/../lib';
 use SWConf;
 use SWFunc;
 
+my $debug = 1;
+
+my %AP_dbq = ();
+
 # This is hash wich hold original request from radius
 #my %RAD_REQUEST;
 # In this hash you add values that will be returned to NAS.
@@ -33,9 +37,6 @@ use SWFunc;
 	use constant	RLM_MODULE_NUMCODES=>  9;#  /* How many return codes there are */
 
 
-sub post_auth {
-
-}
 
 sub log_request_attributes {
 	# This shouldn't be done in production environments!
@@ -49,11 +50,11 @@ sub log_request_attributes {
 
 ######################## PPPoE AUTH #############################
 
-# Function to handle authorize
-sub authorize {
+sub post_auth {
        # For debugging purposes only
-#       &log_request_attributes;
-	my $res = GET_ppp_parm( \%RAD_REQUEST, \%RAD_REPLY );
+       #&log_request_attributes;
+        $RAD_REQUEST{'User-Name'} = $AP_dbq{'User-Name'};
+        my $res = PA_db_update( \%AP_dbq, \%RAD_REQUEST );
 
 	if ( $res < 0 ) {
 	    return RLM_MODULE_REJECT;
@@ -61,9 +62,24 @@ sub authorize {
 	return RLM_MODULE_OK;
 }
 
+# Function to handle authorize
+sub authorize {
+       # For debugging purposes only
+	### TEST only!!!###################################
+	$RAD_REQUEST{'NAS-IP-Address'} = '192.168.100.12' if ($RAD_REQUEST{'NAS-IP-Address'} eq '192.168.100.30' and $debug );
+	###################################################
+
+	my $res = GET_ppp_parm( \%RAD_REQUEST, \%RAD_REPLY, \%AP_dbq );
+
+	if ( $res < 0 ) {
+	    return RLM_MODULE_REJECT;
+	}
+	return RLM_MODULE_OK;
+#	return RLM_MODULE_REJECT;
+}
+
 # Function to handle authenticate
 sub authenticate {
-       # For debugging purposes only
 #       &log_request_attributes;
         #$RAD_REQUEST{'Chap-Password'} = "JocNacoigHar";
         #$RAD_REPLY{'Cleartext-Password'} = "JocNacoigHar";
