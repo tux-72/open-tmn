@@ -51,22 +51,28 @@ sub log_request_attributes {
 ######################## PPPoE AUTH #############################
 
 sub post_auth {
-       # For debugging purposes only
-       #&log_request_attributes;
-        $RAD_REQUEST{'User-Name'} = $AP_dbq{'User-Name'};
-        my $res = PA_db_update( \%AP_dbq, \%RAD_REQUEST );
-
-	if ( $res < 0 ) {
-	    return RLM_MODULE_REJECT;
+	my $res = -1;
+	if ( defined($RAD_REQUEST{'DHCP-Message-Type'}) ) {
+	    $res = DHCP_post_auth ( \%RAD_REQUEST, \%RAD_REPLY );
+	    return $res;
+	} elsif ( defined($RAD_REQUEST{'Framed-Protocol'}) and $RAD_REQUEST{'Framed-Protocol'} eq 'PPP' )  {
+	    $RAD_REQUEST{'User-Name'} = $AP_dbq{'User-Name'};
+	    $res = PPP_post_auth ( \%AP_dbq, \%RAD_REQUEST );
+	    if ( $res < 0 ) {
+		return RLM_MODULE_REJECT;
+	    }
 	}
 	return RLM_MODULE_OK;
 }
 
 # Function to handle authorize
 sub authorize {
-       # For debugging purposes only
+
+    if ( defined($RAD_REQUEST{'DHCP-Message-Type'}) ) {
+	return RLM_MODULE_OK; 
+    } else {
 	### TEST only!!!###################################
-	$RAD_REQUEST{'NAS-IP-Address'} = '192.168.100.12' if ($RAD_REQUEST{'NAS-IP-Address'} eq '192.168.100.30' and $debug );
+	$RAD_REQUEST{'NAS-IP-Address'} = '192.168.100.12' if ( $RAD_REQUEST{'NAS-IP-Address'} eq '192.168.100.30' and $debug );
 	###################################################
 
 	my $res = GET_ppp_parm( \%RAD_REQUEST, \%RAD_REPLY, \%AP_dbq );
@@ -75,7 +81,7 @@ sub authorize {
 	    return RLM_MODULE_REJECT;
 	}
 	return RLM_MODULE_OK;
-#	return RLM_MODULE_REJECT;
+    }
 }
 
 # Function to handle authenticate
