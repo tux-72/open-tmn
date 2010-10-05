@@ -11,7 +11,7 @@ use lib $Bin.'/../lib';
 use SWConf;
 use SWFunc;
 
-my $debug = 1;
+my $debug = 2;
 
 my %AP_dbq = ();
 
@@ -72,7 +72,7 @@ sub authorize {
 	return RLM_MODULE_OK; 
     } else {
 	### TEST only!!!###################################
-	$RAD_REQUEST{'NAS-IP-Address'} = '192.168.100.12' if ( $RAD_REQUEST{'NAS-IP-Address'} eq '192.168.100.30' and $debug );
+	$RAD_REQUEST{'NAS-IP-Address'} = '192.168.100.12' if ( $RAD_REQUEST{'NAS-IP-Address'} eq '192.168.100.30' and $debug > 1 );
 	###################################################
 
 	my $res = GET_ppp_parm( \%RAD_REQUEST, \%RAD_REPLY, \%AP_dbq );

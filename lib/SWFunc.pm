@@ -1071,9 +1071,9 @@ sub SNMP_fix_macport {
                 $port = $2;
             } else {
                 SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
-                print STDERR "Unknown portname type '$portname'\n";
+                #print STDERR "Unknown portname type '$portname'\n";
             }
-            print STDERR "NSNMP fix portname = '".$portname."', pref = '".$pref."', port = '".$port."'\n" if $debug;
+            #print STDERR "NSNMP fix portname = '".$portname."', pref = '".$pref."', port = '".$port."'\n" if $debug > 1;
         } else {
             SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Error in SNMP get port name for index '$port'. MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
             $port = -1;
@@ -1125,9 +1125,9 @@ sub SNMP_fix_macport_name {
                     $port = $2;
                 } else {
                     SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
-                    print STDERR "Unknown portname type '$portname'\n" if $debug;
+                    #print STDERR "Unknown portname type '$portname'\n" if $debug;
                 }
-                print STDERR "NSNMP fix portname = '".$portname."', pref = '".$pref."', port = '".$port."'\n" if $debug;
+                #print STDERR "NSNMP fix portname = '".$portname."', pref = '".$pref."', port = '".$port."'\n" if $debug > 1 ;
             } else {
                 SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Error in CISCO SNMP get idx for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
                 $port = -1;
@@ -1427,7 +1427,7 @@ sub GET_ppp_parm {
 		$AP{'mac_src'} = lc("$1$2$3$4$5$6");
 		&radiusd::radlog(1,  "HW_MAC = ". $AP{'hw_mac'} );
 		if (($AP{'hw_mac'} eq "0") || ($AP{'hw_mac'} eq "00:00:00:00:00:00")) {
-		    &radiusd::radlog(1, "User '".$RAD_REQUEST->{'User-Name'}."' MAC '".$AP{'hw_mac'}."' is Wrong!!!\n\n") if $debug;
+		    &radiusd::radlog(1, "User '".$RAD_REQUEST->{'User-Name'}."' MAC '".$AP{'hw_mac'}."' is Wrong!!!\n\n");
 		}
 	    } else {
 		&radiusd::radlog(1,  "HW_MAC not Fix in RADIUS Pair" );
@@ -1740,7 +1740,7 @@ sub DHCP_post_auth {
 		  #SW_AP_fix( AP_INFO => \%AP, NAS_IP => $ref_port->{'term_ip'}, LOGIN => $ref_port->{'login'}, VLAN => $AP{'vlan'}, HW_MAC => $AP{'hw_mac'} );
 		  SW_AP_fix( \%AP );
 		  if ( $AP{'id'} == $ref_port->{'port_id'} ) {
-		    &radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug;
+		    &radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug > 1;
 		    if ((not $ref_port->{'dhcp_use'}) || ($ref_port->{'pppoe_up'} and $nas_conf->{'CHECK_PPPOE_UP'} )) {
 			$RAD_REPLY->{'DHCP-Message-Type'} = 0;
  			return RLM_MODULE_NOTFOUND;
@@ -1819,7 +1819,7 @@ sub DHCP_post_auth {
 		    if  (not $stm_disc->rows ) { &radiusd::radlog(1, 'All IP used in available DHCP scopes... :-('); }
 		    $stm_disc->finish;
 		  } else {
-		    &radiusd::radlog(1, "AP for MAC = ".$AP{'hw_mac'}." and VLAN = ".$AP{'vlan'}." not fixed :-( ...\n") if $debug;
+		    &radiusd::radlog(1, "AP for MAC = ".$AP{'hw_mac'}." and VLAN = ".$AP{'vlan'}." not fixed :-( ...\n");
 		    $RAD_REPLY->{'DHCP-Message-Type'} = 0;
 		    $res = RLM_MODULE_NOTFOUND;
 		  }
@@ -1837,8 +1837,8 @@ sub DHCP_post_auth {
 		} else {
 		    $cli_addr = $RAD_REQUEST->{'DHCP-Client-IP-Address'};
 		}
-		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug;
-		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST->{'DHCP-Transaction-Id'}."'") if $debug;
+		&radiusd::radlog(1, "CLI_IP = '".$cli_addr."'") if $debug > 1;
+		&radiusd::radlog(1, "ID_session ='".$RAD_REQUEST->{'DHCP-Transaction-Id'}."'") if $debug > 1;
 
 		my $Q_Request = "SELECT a.session, a.ip, a.port_id, UNIX_TIMESTAMP(a.start_lease) as start_lease, p.mask, p.gw, p.dhcp_lease, p.name_server, p.pool_type, l.white_static_ip".
 		", l.login, h.term_ip FROM dhcp_addr a, dhcp_pools p, head_link l, heads h WHERE l.head_id=h.head_id and l.login=a.login and l.hw_mac=a.hw_mac".
@@ -1868,7 +1868,7 @@ sub DHCP_post_auth {
 				$RAD_REPLY->{'DHCP-Message-Type'} = 'DHCP-NAK';
 				return RLM_MODULE_NOTFOUND;
 			    } else {
-				&radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug;
+				&radiusd::radlog(1, "Verify trusted AP_id ".$AP{'id'}." PASS!\n") if $debug > 1;
 			    }
 			}
 			#&radiusd::radlog(1, "SET Reply data");

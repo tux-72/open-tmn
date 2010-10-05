@@ -34,7 +34,7 @@ our %aaa_conf = (
     'DHCP_WINDOW'       => 3600,
     'DHCP_POOLTYPE'     => 2,
 
-    'DHCP_ACCOUNT'      => 1,
+    'DHCP_ACCOUNT'      => 0,
     'DHCP_NAS_IP'       => '192.168.100.20',
     'DHCP_ACC_HOST'     => '192.168.100.100',
     'DHCP_ACC_PORT'     => 1813,

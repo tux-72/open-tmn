@@ -18,7 +18,7 @@ my $VER = 0.8;
 
 my $debug = 1;
 
-my $LOGDIR = '/var/log/dispatcher';
+my $LOGDIR = '/var/log/swctl';
 my $logfile = $LOGDIR.'/ap_ctl.log';
 
 
