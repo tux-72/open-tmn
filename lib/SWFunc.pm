@@ -1668,7 +1668,11 @@ sub DHCP_post_auth {
 	DB_mysql_connect(\$dbm);
 
 	#DHCP-Relay-Agent-Information = 0x0106000405dc0303020b010931302e33322e302e31
-	my $vlan=oct('0x'.substr($RAD_REQUEST->{'DHCP-Relay-Agent-Information'},10,4)) if defined($RAD_REQUEST->{'DHCP-Relay-Agent-Information'});
+	#DHCP-Agent-Circuit-Id =        0x000401f40b01
+	#DHCP-Agent-Remote-Id =                             0x010931302e33322e302e31
+	#my $vlan=oct('0x'.substr($RAD_REQUEST->{'DHCP-Relay-Agent-Information'},10,4)) if defined($RAD_REQUEST->{'DHCP-Relay-Agent-Information'});
+	my $vlan=oct('0x'.substr($RAD_REQUEST->{'DHCP-Agent-Circuit-Id'},6,4)) if defined($RAD_REQUEST->{'DHCP-Agent-Circuit-Id'});
+
 	&radiusd::radlog(1, "New ".$RAD_REQUEST->{'DHCP-Message-Type'}." VLAN = $vlan, MAC = ".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'} );
 
 	my %AP = (
@@ -1682,7 +1686,7 @@ sub DHCP_post_auth {
 
 	if ( $RAD_REQUEST->{'DHCP-Message-Type'} eq 'DHCP-Release' ) {
 		my $Q_Request = "SELECT a.session, a.port_id, UNIX_TIMESTAMP(a.start_lease) as start_lease, l.login  FROM dhcp_addr a, head_link l WHERE l.login=a.login and l.hw_mac=a.hw_mac".
-		" and a.ip='".$RAD_REQUEST->{'DHCP-Client-IP-Address'}."' and a.agent_info='".$RAD_REQUEST->{'DHCP-Relay-Agent-Information'}."'".
+		" and a.ip='".$RAD_REQUEST->{'DHCP-Client-IP-Address'}."' and a.agent_info='".$RAD_REQUEST->{'DHCP-Agent-Circuit-Id'}."'".
 		" and a.hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
 
@@ -1693,8 +1697,8 @@ sub DHCP_post_auth {
 		    my $ref_rel = $stm_rel->fetchrow_hashref;
 		    #################################################
 		    $dbm->do("UPDATE dhcp_addr SET end_lease=now() WHERE ip='".$RAD_REQUEST->{'DHCP-Client-IP-Address'}.
-		    "' and hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST->{'DHCP-Relay-Agent-Information'}."'".
-		    " and login=".$ref_rel->{'login'} );
+		    "' and hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."' and agent_info='".$RAD_REQUEST->{'DHCP-Agent-Circuit-Id'}."'".
+		    " and login='".$ref_rel->{'login'}."'" );
 		    $res = RLM_MODULE_OK;
 		    if ($nas_conf->{'DHCP_ACCOUNT'}) {
 			################## ACCOUNTING ###################
@@ -1712,10 +1716,7 @@ sub DHCP_post_auth {
 			    'Framed-IP-Address'             => $RAD_REQUEST->{'DHCP-Client-IP-Address'},
 			    'Acct-Terminate-Cause'          => 'User-Request',
 			    'Acct-Session-Time'             => ( time - $ref_rel->{'start_lease'}),
-			    'Request-Number'                => $RAD_REQUEST->{'DHCP-Transaction-Id'},
-			    #'DHCP-Hardware-Type'            => $RAD_REQUEST->{'DHCP-Hardware-Type'},
-			    #'DHCP-Client-Hardware-Address'  => $RAD_REQUEST->{'DHCP-Client-Hardware-Address'},
-			    #'DHCP-Relay-Agent-Information'  => $RAD_REQUEST->{'DHCP-Relay-Agent-Information'},
+			    'Connect-Info'                  => $RAD_REQUEST->{'DHCP-Client-Hardware-Address'},
 			);
 			send_accounting (\%acc_attr);
 		    }
@@ -1723,7 +1724,7 @@ sub DHCP_post_auth {
 		$stm_rel->finish;
 
 	} elsif  ( $RAD_REQUEST->{'DHCP-Message-Type'} eq 'DHCP-Discover' ) {
-	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Relay-Agent-Information и типу абонента
+	    ## Выясняем предварительное разрешение использования IP-Unnumbered подключения по данным DHCP-Agent-Circuit-Id и типу абонента
 	    my $Q_check_macport = "SELECT l.port_id, l.head_id, l.white_static_ip, l.status, l.login, l.dhcp_use, h.term_ip, l.pppoe_up ".
 	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority<=".$nas_conf->{'DHCP_PRI'}." and l.communal=0 ".
 	    " and ( h.dhcp_relay_ip='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."' or h.dhcp_relay_ip2='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."' )".
@@ -1806,10 +1807,12 @@ sub DHCP_post_auth {
 			if ( defined($ref_disc->{'gw'}) ) {
 			    $RAD_REPLY->{'DHCP-Router-Address'}    = $ref_disc->{'gw'};
 			}
-			my $Q_Disc_up = "UPDATE dhcp_addr SET agent_info='".$RAD_REQUEST->{'DHCP-Relay-Agent-Information'}."', login='".$ref_port->{'login'}."'".
+			my $Q_Disc_up = "UPDATE dhcp_addr SET agent_info='".$RAD_REQUEST->{'DHCP-Agent-Circuit-Id'}."', login='".$ref_port->{'login'}."'".
 			", port_id=".$ref_port->{'port_id'}.", vlan_id=".$vlan.", hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."', start_lease=now() ".
 			( $AP{'new_lease'} ? ", start_use=now()" : "" ).", end_lease=ADDDATE(now(), INTERVAL ".$ref_disc->{'dhcp_lease'}." SECOND)".
-			", dhcp_vendor='".$RAD_REQUEST->{'DHCP-Vendor-Class-Identifier'}."' WHERE ip='".$ref_disc->{'ip'}."'";
+			", dhcp_vendor='".($RAD_REQUEST->{'DHCP-Vendor-Class-Identifier'}||'')."' WHERE ip='".$ref_disc->{'ip'}."'";
+#
+#			print Dumper $Q_Disc_up;
 			$rows_up = $dbm->do($Q_Disc_up);
 			$res = RLM_MODULE_OK if $rows_up == 1;
 		    }
@@ -1842,7 +1845,7 @@ sub DHCP_post_auth {
 		" and a.port_id=l.port_id and a.pool_id=p.pool_id  and l.status=1 and l.inet_priority<=".$nas_conf->{'DHCP_PRI'}.
 		" and l.communal=0"." and ( h.dhcp_relay_ip='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."'".
 		" or h.dhcp_relay_ip2='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."' )".
-		" and l.dhcp_use=1 and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST->{'DHCP-Relay-Agent-Information'}."'".
+		" and l.dhcp_use=1 and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST->{'DHCP-Agent-Circuit-Id'}."'".
 		" and a.hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."'";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
 
@@ -1878,8 +1881,8 @@ sub DHCP_post_auth {
 			}
 
 			my $Q_Request_up =  "UPDATE dhcp_addr SET end_lease=ADDDATE(now(), INTERVAL ".$ref_req->{'dhcp_lease'}.
-			" SECOND ), session='".$RAD_REQUEST->{'DHCP-Transaction-Id'}."', dhcp_vendor='".$RAD_REQUEST->{'DHCP-Vendor-Class-Identifier'}."'".
-			" WHERE agent_info='".$RAD_REQUEST->{'DHCP-Relay-Agent-Information'}.
+			" SECOND ), session='".$RAD_REQUEST->{'DHCP-Transaction-Id'}."', dhcp_vendor='".($RAD_REQUEST->{'DHCP-Vendor-Class-Identifier'}||'')."'".
+			" WHERE agent_info='".$RAD_REQUEST->{'DHCP-Agent-Circuit-Id'}.
 			"' and hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."'".
 			" and ip='".$cli_addr."'";
 			$rows_up = $dbm->do($Q_Request_up);
@@ -1901,9 +1904,7 @@ sub DHCP_post_auth {
 				    'NAS-Port-Type'                 => 'Virtual',
 				    'Service-Type'                  => 'Framed-User',
 				    'Acct-Session-Id'               => $ref_req->{'session'},
-				    #'DHCP-Client-Hardware-Address'  => $RAD_REQUEST->{'DHCP-Client-Hardware-Address'},
-				    #'DHCP-Hardware-Type'            => $RAD_REQUEST->{'DHCP-Hardware-Type'},
-				    #'DHCP-Relay-Agent-Information'  => $RAD_REQUEST->{'DHCP-Relay-Agent-Information'},
+				    'Connect-Info'                  => $RAD_REQUEST->{'DHCP-Client-Hardware-Address'},
 				);
 				if ($new_session) { 
 				    $acc_attr{'Acct-Status-Type'} = 'Start';
