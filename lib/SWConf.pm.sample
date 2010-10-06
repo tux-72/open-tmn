@@ -29,6 +29,7 @@ our %aaa_conf = (
     'pod_port'          => 1700,
     'pod_secret'        => 'secret',
 
+    'DHCP_HEAD_ID'      => 3,
     'DHCP_USE'          => 1,
     'DHCP_PRI'          => 1,
     'DHCP_WINDOW'       => 3600,
