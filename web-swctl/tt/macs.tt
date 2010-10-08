@@ -1,6 +1,6 @@
 [% INCLUDE header.tt %]
 
-<h3><center>Host: [% sw.hostname %]</center>
+<h3><center>Host: [% sw.hostname %]</center></h3>
 
 <table align=center border=0 celspasing=10>
 <tr valign=top><td>
@@ -13,11 +13,11 @@
     <td>macs</td>
 </tr>
     [% FOREACH vlan IN vlans %]
-        <tr valign=top><td> [% vlan.name %] </td><td></td><td></td></tr>
+        <tr valign=top><td> [% vlan.name %] </td><td></td><td>[% vlan.count %]</td></tr>
         [% FOREACH port IN vlan.ports %]
             <tr>
                 <td> </td>
-                <td valign=top>[% port.name %]</td>
+                <td valign=top><a title="[% port.port_descr %]">[% port.name %][%IF port.is_free%]&nbsp;(free)[%END%]</a></td>
 
                 <td>
                 [% FOREACH mac IN port.macs %]
@@ -39,7 +39,7 @@
     <td>count</td>
 </tr>
     [% FOREACH row IN stats %]
-        <tr valign=top><td>[% row.port %]</td><td>[% row.count %]</td></tr>
+        <tr valign=top><td><a title="[% row.port_descr %]">[% row.port %]</a></td><td>[% row.count %]</td></tr>
     [% END %]
     <tr valign=top><td colspan=2>
         <a title="[% FOREACH vlan IN vlans_list %][%vlan%]; [%END%]">

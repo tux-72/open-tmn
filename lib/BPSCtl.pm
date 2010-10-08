@@ -463,8 +463,8 @@ sub BPS_switch_params {
 
         sub vlans_by_port
         {
-            my $port = shift;
-            my %vlans = %{ {shift} };
+            my $port = $_[0];
+            my %vlans = %{$_[1]};
             my @vlans;
             for my $vlan ( keys %vlans )
             {
@@ -519,7 +519,7 @@ sub BPS_switch_params {
 
     {
         my $ports = {@arr}->{INTERFACE};
-        print $ports,$/;
+        #print $ports,$/;
 
         for my $line ( split/\s*\n\s*/, $ports )
         {

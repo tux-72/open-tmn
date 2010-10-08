@@ -23,7 +23,6 @@ my $pinfo='';
 my $now_string = strftime "%F-%H-%M", localtime;
 #system "mv $conf_nag/$fconfig $conf_nag/backups/$fconfig.$now_string" if (-e "$conf_nag/$fconfig");
 #system "mv $conf_nag/$finfo $conf_nag/backups/$finfo.$now_string" if (-e "$conf_nag/$finfo");
-
 open (CNFG, "> $conf_dir/$fconfig");
 open (INFO, "> $conf_dir/$finfo");
 open (PINFO, "> $conf_dir/$portinfo");
@@ -89,7 +88,7 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
     
     $sth2->finish();
 
-    my $sth3 = $dbh->prepare("SELECT h.sw_id, h.hostname, p.port_id, p.port, p.info, p.vlan_id, p.portpref, p.snmp_idx FROM hosts h, swports p where h.visible>0 and h.model_id>0 and h.grp='".$grp."' and h.sw_id=p.sw_id and p.ltype_id not in (0,20,19) and p.type=1 order by h.sw_id, p.portpref, p.port");
+    my $sth3 = $dbh->prepare("SELECT h.sw_id, h.hostname, p.port_id, p.port, p.info, p.vlan_id, p.portpref, p.snmp_idx, p.ltype_id FROM hosts h, swports p where h.visible>0 and h.model_id>0 and h.grp='".$grp."' and h.sw_id=p.sw_id and p.ltype_id not in (0,20,19) and p.type=1 order by h.sw_id, p.portpref, p.port");
     $sth3->execute();
     while (my $ref3 = $sth3->fetchrow_hashref()) {
 
@@ -99,6 +98,7 @@ while (my $grp_ref = $sth->fetchrow_arrayref()) {
 #        service_description             01-kv326_10-26-17-129
 #        check_command                   SNMP-1
 #        }
+	next if $grp eq '0-CORE' and $ref3->{ltype_id} == 14; #skip system on core hosts
 	$pinfo='';
 	$pinfo .= $ref3->{'portpref'} if (defined($ref3->{'portpref'}));
 	if ($ref3->{'port'}<10) {

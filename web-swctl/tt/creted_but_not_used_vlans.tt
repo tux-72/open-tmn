@@ -13,7 +13,7 @@
     [% FOREACH vlan IN free_vlans %]
     <tr valign=top>
         <td>[% vlan.zone_id %]</td>
-        <td> <a href="/swctl/?search_vlan=[% vlan.vlan_id %]&search_vlan_in_trunk=on" target=_blank>[% vlan.vlan_id %]</a> </td>
+        <td> <a href="/swctl/?search_vlan=[% vlan.vlan_id %]&search_vlan_in_trunk=on&do=1" target=_blank>[% vlan.vlan_id %]</a> </td>
         <td>[% vlan.info %]</td>
         <td>[% vlan.desc %]</td>
     </tr>

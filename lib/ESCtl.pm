@@ -800,7 +800,7 @@ sub ES_switch_params {
             {
                 if( $port_info{$p} && grep{!defined}@{$port_info{$p}} )
                 {
-                    $port_info{$p} = (grep/\d+/,@{$port_info{$p}})[0];
+                    $port_info{$p} = (grep{defined && /\d+/}@{$port_info{$p}})[0];
                 }else{
                     delete $port_info{$p};
                 }
@@ -809,14 +809,14 @@ sub ES_switch_params {
 
             if( $bandwidth_control )
             {
-                if( grep{exists $port_info{$_} && $port_info{$_} == undef} "bandwidth-limit ingress", "bandwidth-limit cir", "bandwidth-limit pir" )
+                if( grep{exists $port_info{$_} && !defined $port_info{$_}} "bandwidth-limit ingress", "bandwidth-limit cir", "bandwidth-limit pir" )
                 {
                     $port_info{flow_ctl}->{ds_speed} = 64;
                 }else{
                     $port_info{flow_ctl}->{ds_speed} = $port_info{"bandwidth-limit ingress"}||$port_info{"bandwidth-limit cir"}||$port_info{"bandwidth-limit pir"}||-1;
                 }
 
-                if( exists $port_info{"bandwidth-limit egress"} && $port_info{"bandwidth-limit egress"} == undef )
+                if( exists $port_info{"bandwidth-limit egress"} && !defined $port_info{"bandwidth-limit egress"} )
                 {
                     $port_info{flow_ctl}->{us_speed} = 64;
                 }else{

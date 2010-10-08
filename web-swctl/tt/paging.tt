@@ -1,0 +1,5 @@
+<div class="paging">
+    [%- FOREACH line IN pages -%]
+        <a href="[%line.href%]">[%line.name%]</a>
+    [%- END -%]
+</div>

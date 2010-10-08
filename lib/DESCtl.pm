@@ -594,7 +594,7 @@ sub DES_switch_params {
         $vlan_info{'current untagged ports'} ||= $vlan_info{'untagged ports'};
         $vlan_info{'current tagged ports'}   ||= $vlan_info{'tagged ports'};
 
-        $vlan_info{$_} = [ split/,/,$vlan_info{$_} ] for ( 'current untagged ports', 'forbidden ports', 'current tagged ports' );
+        $vlan_info{$_} = [ split/,/,($vlan_info{$_}||'') ] for ( 'current untagged ports', 'forbidden ports', 'current tagged ports' );
         $vlan_info{'forbidden ports'} = {map{$_=>1}@{$vlan_info{'forbidden ports'}}};
         $vlan_info{$_} = [ grep!$vlan_info{'forbidden ports'}{$_}, @{$vlan_info{$_}} ] for ( 'current untagged ports', 'current tagged ports' );
 
@@ -622,6 +622,7 @@ sub DES_switch_params {
         #print "portinfo=", $info,"end portinfo",$/;
         my @port_info = split/\s+/,$info;
 
+        $port_info[0] ||= '';
         warn("got unknown data($port_info[0]) while parsing port $port\n"), next if $port_info[0] !~ /^\s*$port/ || $port_info[0] =~ /CTRL+C/;
         my($autoneg,$speed,$duplex,$flow_ctl);
         {
@@ -683,6 +684,7 @@ sub DES_switch_params {
                     $flow_ctl = { ds_speed => -1, us_speed => -1 };
                     next;
                 }
+                $port_info[$_] = $port_info[$_]=~/^no_limit$/? 0 : $port_info[$_] for 1,2;
                 $flow_ctl->{ds_speed} = int($port_info[1])||-1;
                 $flow_ctl->{us_speed} = int($port_info[2])||-1;
                 $flow_ctl->{$_} =~ s/^\s*no_limit\s*$/-1/i for qw|ds_speed us_speed|;

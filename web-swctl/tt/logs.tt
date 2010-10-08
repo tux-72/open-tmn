@@ -1,6 +1,12 @@
 [% INCLUDE header.tt %]
 
-
+<div align=right>
+<form mode=get>
+<input name=mode value=logs type=hidden>
+<input name=str> <input type=submit value=Search>
+</form>
+</div>
+<div>[% INCLUDE paging.tt %]</div>
 
 <table align=center class=data border=1 width=50%>
 <tr class="bbheader3"> <td colspan=4>--Logs--</td></tr>
@@ -20,3 +26,4 @@
     [% END %]
 </table>
 
+[% INCLUDE paging.tt %]

@@ -8,6 +8,7 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use DESCtl qw(DES_switch_params);
 use ESCtl qw(ES_switch_params);
+use BPSCtl qw(BPS_switch_params);
 
 #sub SWFunc::dlog{print Dumper @_}
 sub SWFunc::dlog{}
@@ -21,11 +22,11 @@ $dbh->do("set names koi8r");
 END { $DB::dbh && $DB::dbh->disconnect(); }
 
 
-my $sth = $dbh->prepare( "SELECT clients_vlan, hostname, lastuserport, ip, def_trunk, lib, admin_login, admin_pass, sw_id, uplink_port, bw_free FROM hosts h, models m WHERE h.model_id=m.model_id and manage = 1 and h.visible > 0");
+my $sth = $dbh->prepare( "SELECT clients_vlan, hostname, lastuserport, ip, def_trunk, lib, admin_login, admin_pass, sw_id, uplink_port, bw_free, bw_ctl FROM hosts h, models m WHERE h.model_id=m.model_id and manage = 1 and h.visible > 0");
 $sth->execute();
 while( my $sw = $sth->fetchrow_hashref() )
 {
-    next unless $sw->{lib} eq 'ES' || $sw->{lib} eq 'GS' || $sw->{lib} eq 'DES';
+    next unless $sw->{lib} eq 'ES' || $sw->{lib} eq 'GS' || $sw->{lib} eq 'DES' || $sw->{lib} eq 'BPS';
     $sw->{lib} = 'ES' if $sw->{lib} eq 'GS';
     next if $ARGV[0] && $sw->{hostname} ne $ARGV[0];
     print "!!!!!!!!!!!!!!Looking on switch $sw->{hostname}!!!!!!!!!!!!!!!!!!\n";
@@ -47,10 +48,13 @@ while( my $sw = $sth->fetchrow_hashref() )
 
         if( !$sw_ports->{$port} || !$sw_ports->{$port}{ltype_id} || $sw_ports->{$port}{ltype_id} == 20 )
         {
-            for( qw|ds_speed us_speed| )
+            if( $sw->{bw_ctl} )
             {
-                $sw_real->{ports}{$port}{flow_ctl} && $sw_real->{ports}{$port}{flow_ctl}{$_} != $sw->{bw_free} &&
-                    print "port $port is free and $_ on switch = $sw_real->{ports}{$port}{flow_ctl}{$_}; in db bw_free = $sw->{bw_free}\n"
+                for( qw|ds_speed us_speed| )
+                {
+                    $sw_real->{ports}{$port}{flow_ctl} && $sw_real->{ports}{$port}{flow_ctl}{$_} != $sw->{bw_free} &&
+                        print "port $port is free and $_ on switch = $sw_real->{ports}{$port}{flow_ctl}{$_}; in db bw_free = $sw->{bw_free}\n"
+                }
             }
 
             if( $sw_real->{ports}{$port}{vlans} )
@@ -83,13 +87,16 @@ while( my $sw = $sth->fetchrow_hashref() )
         }
 
 #print Dumper $sw_ports->{$port}, $sw_real->{ports}{$port};
-        for( qw|ds_speed us_speed| )
+        if( $sw->{bw_ctl} )
         {
-            $sw_ports->{$port}{$_} = -1 if $sw_ports->{$port}{$_} == 100000 and $port <= $sw->{lastuserport};
-            $sw_real->{ports}{$port}{flow_ctl}{$_} = -1 if $sw_real->{ports}{$port}{flow_ctl}{$_} == 100000 and $port <= $sw->{lastuserport};
+            for( qw|ds_speed us_speed| )
+            {
+                $sw_ports->{$port}{$_} = -1 if $sw_ports->{$port}{$_} == 100000 and $port <= $sw->{lastuserport};
+                $sw_real->{ports}{$port}{flow_ctl}{$_} = -1 if $sw_real->{ports}{$port}{flow_ctl}{$_} == 100000 and $port <= $sw->{lastuserport};
 
-            $sw_real->{ports}{$port}{flow_ctl} && $sw_real->{ports}{$port}{flow_ctl}{$_} != $sw_ports->{$port}{$_} &&
-                print "port $port $_ on switch = $sw_real->{ports}{$port}{flow_ctl}{$_}; indb db $sw_ports->{$port}{$_}\n"
+                $sw_real->{ports}{$port}{flow_ctl} && $sw_real->{ports}{$port}{flow_ctl}{$_} != $sw_ports->{$port}{$_} &&
+                    print "port $port $_ on switch = $sw_real->{ports}{$port}{flow_ctl}{$_}; indb db $sw_ports->{$port}{$_}\n"
+            }
         }
 
         print "port $port maxhwaddr on switch = $sw_real->{ports}{$port}{maxhwaddr}; indb db $sw_ports->{$port}{maxhwaddr}\n"

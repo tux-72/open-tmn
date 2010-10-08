@@ -13,24 +13,24 @@ use autouse 'Data::Dumper' => 'Dumper';
 $| = 1;
 open(STDERR, ">>&=STDOUT");
 
-#img
-if( my $f = param("img") )
+#img,css,js
+if( my $f = ( param("img") || param("css") || param("js") ) )
 {
     $f =~ s/\/|\.\.//g;
-    exit if !$f || !-f ( $f = "$FindBin::Bin/img/$f" );
+    $f = -f "$FindBin::Bin/img/$f" ? "$FindBin::Bin/img/$f" : "$FindBin::Bin/tt/$f";
+    exit if !$f || !-f $f || $f !~ /(jpg|css|js|gif|png)$/;
     local $/;
     open(my $fh, "<", $f) || die $!;
-    print "Content-type: image/jpeg\n\n", <$fh>;
-    exit;
-}
-#css
-if( my $f = param("css") )
-{
-    $f =~ s/\/|\.\.//g;
-    exit if !$f || !-f ( $f = "$FindBin::Bin/tt/$f" );
-    local $/;
-    open(my $fh, "<", $f) || die $!;
-    print "Content-type: text/css\n\n", <$fh>;
+    print header(
+        -expires => '+24h',
+        -type =>
+        {
+            js  => 'text/javascript',
+            css => 'text/css',
+            jpg => 'image/jpeg',
+            gif => 'image/gif',
+            png => 'image/png',
+        }->{$1} ), <$fh>;
     exit;
 }
 my( $sth, $c );
@@ -80,11 +80,19 @@ sub mysql_error
     exit;
 }
 
+sub paging
+{
+    my $max_rows = $DB::dbh->selectall_arrayref( "SELECT FOUND_ROWS()" )->[0][0];
+    for( my($i,$p) = (0,1); $i <= $max_rows; $i+=$_[0], $p++ )
+    {
+        push @{$c->{pages}}, { name => $p , href => "$_[1]$i" };
+    }
+}
+
 ########################################################################
 package DB;
 
 use DBI;
-#my $dsn = "DBI:mysql:database=switchnet;host=192.168.29.20;port=3306";
 my $dsn = "DBI:mysql:database=vlancontrol;host=192.168.29.20;port=3306";
 our $dbh = DBI->connect( $dsn, "swweb", "CrarsEtsh5", {HandleError => \&main::mysql_error} );
 $dbh->do("set names koi8r");
@@ -127,11 +135,11 @@ sub host_utilisation
 
 unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} param() )
 {
-    $sth = $DB::dbh->prepare( "SELECT model_id, model_name FROM models order by model_name");
+    $sth = $DB::dbh->prepare( "SELECT distinct m.model_id, model_name FROM models m, hosts h where m.model_id = h.model_id order by model_name");
     $sth->execute();
     while( $_ = $sth->fetchrow_hashref() ){ push @{$c->{models}}, $_ }
 
-    $sth = $DB::dbh->prepare( "SELECT street_id, street_name FROM streets order by street_name");
+    $sth = $DB::dbh->prepare( "SELECT distinct s.street_id, street_name FROM streets s, hosts h where s.street_id=h.street_id order by street_name");
     $sth->execute();
     while( $_ = $sth->fetchrow_hashref() ){ push @{$c->{streets}}, $_ }
 
@@ -146,7 +154,6 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
         WHERE
         m.model_id=h.model_id and h.street_id = s.street_id };
     $sql .= " and h.hostname like ? ", push @p, param("search_hostname")."%" if param("search_hostname");
-    #$sql .= " and clients_vlan = ? ", push @p, param("search_vlan") if param("search_vlan");
 
     $sql .= " and ( clients_vlan = ? OR h.sw_id in (SELECT sw_id FROM swports WHERE vlan_id = ?) VLAN_TRUNK_QUERY  ) ",
             push @p, (param("search_vlan"))x2 if param("search_vlan");
@@ -200,7 +207,9 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
     ( my $search_mac1 = $search_mac ) =~ s|([a-f\d])(:)([a-f\d])|$1-$3|gi;
     $sql .= " and (h.hw_mac like ? OR h.hw_mac like ?
               OR h.sw_id in (SELECT sw_id FROM ap_login_info WHERE hw_mac like ?)
-              ) ", push @p, ($search_mac."%", $search_mac1."%"), $search_mac."%"  if $search_mac;
+              OR h.sw_id in (SELECT p.sw_id FROM head_link h, swports p WHERE h.port_id=p.port_id and h.hw_mac like ?)
+              OR h.sw_id in (SELECT p.sw_id FROM dhcp_addr d, swports p WHERE d.port_id=p.port_id and d.hw_mac like ?)
+              ) ", push @p, ($search_mac."%", $search_mac1."%"), ($search_mac."%")x3 if $search_mac;
     $sql .= " order by h.hostname ";
     #$sql .= " order by h.model_id, h.hostname ";
 
@@ -246,7 +255,7 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
             $ap ||= '';
             print header( { -location => "$host/swctl/?mode=host&action=view&hl_ap=$ap&sw_id=".$c->{sw}[0]{sw_id} } );
             exit;
-        }else{
+       }else{
             my $sw_ids = join(",",map{$_->{sw_id}}@{$c->{sw}}) || 0;
             $sth = $DB::dbh->prepare( "select ltype_id, communal from swports where type = 1 and sw_id in ( $sw_ids )" );
             $sth->execute();
@@ -268,9 +277,10 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
 
     print "Content-type: text/html\n\n";
     $c->{title} = "Search results";
+    $c->{tablesorter}++;
     $template->process("switches.tt", $c) || die $template->error();
-}elsif( param("mode") eq 'host' ){
-    if( param("action") eq 'view' )
+}elsif( param("mode") && param("mode") eq 'host' ){
+    if( param("action") && param("action") eq 'view' )
     {
         my $sql =
             qq{
@@ -308,8 +318,10 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
         my $last_portpref;
         while( $_ = $sth->fetchrow_hashref() )
         {
+            next if !$_->{type} && param("export");
+            next if $c->{sw}{grp} eq '0-CORE' && $_->{ltype_id} == 14 && !$c->{admin}; #skip system on core hosts
             $last_port = 0, $last_portpref = $_->{portpref} if $_->{port} && ( $last_port > $_->{port} || ( ($last_portpref||'') ne ($_->{portpref}||'') && 1 == @{[($_->{portpref}||'')=~/(\/)/g]} ) );
-            if( $last_port + 1 <= $_->{port} )
+            if( $last_port + 1 <= $_->{port} && !param("export") )
             {
                 $_->{portpref} ||= '';
                 $_->{portpref} !~ /-$/ && push @{$c->{ports}}, { portpref => $_->{portpref}, port => $last_port } while ++$last_port != $_->{port};
@@ -370,7 +382,7 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
                 }
 
                 #dhcp
-                $sth1 = $DB::dbh->prepare( "SELECT * FROM dhcp_pools p, dhcp_addr a WHERE a.pool_id=p.pool_id and port_id=? ORDER by end_lease desc" );
+                $sth1 = $DB::dbh->prepare( "SELECT *, (end_lease<NOW()) as expired FROM dhcp_pools p, dhcp_addr a WHERE a.pool_id=p.pool_id and port_id=? ORDER by end_lease desc" );
                 $sth1->execute( $_->{'port_id'} );
                 while( my $dhcp = $sth1->fetchrow_hashref() ){ $dhcp->{login}=~s/</&lt;/g; $dhcp->{vlan_desc} = &vlan_desc( $dhcp->{vlan_id} ); $dhcp->{oui} = &oui::oui($dhcp->{hw_mac}); push @{$_->{dhcp}}, $dhcp }
             }
@@ -422,10 +434,18 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
                     to_portpref => $c->{sw}{parent_portpref}
                 };
 
+            $_->{speed} = (!$_->{autoneg}&&!$_->{speed}&&!$_->{duplex}&&'----') || ( $_->{autoneg} ? 'auto' : $_->{speed}."/".($_->{duplex}?'Full':'Half') );
             push @{$c->{ports}}, $_;
         }
         $c->{err} = "no uplink in ports" unless grep{!$_->{downlink}} map{@{$_->{links}}} grep{$_->{links}} @{$c->{ports}};
-        $template->process("host.tt", $c) || die $template->error();
+        if( param("export") )
+        {
+            print header(-type=>'text/csv', -attachment=>'swctl_'.(time).'.csv', -charset=>'koi8-r');
+            $c->{date} = localtime;
+            $template->process("host_export.tt", $c) || die $template->error();
+        }else{
+            $template->process("host.tt", $c) || die $template->error();
+        }
     }elsif( param("action") =~ /^edit|add$/ ){
         &chk_acess(1);
         if( param("do") )
@@ -550,12 +570,20 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
 
         $template->process("edithost.tt", $c) || die $template->error();
     }
-}elsif( param("mode") eq 'mac' && param("action") eq 'view' && param('sw_id') ){
+}elsif( param('search_macs_in_vlan') || ( param("mode") && param("mode") eq 'mac' && param("action") eq 'view' && ( param('sw_id') ) ) ){
     use Net::SNMP;
     use oui;
 
+    my $vlan_id = param('search_macs_in_vlan') || '';
+    print( header({ -location => "$host/swctl/" }) ),exit if $vlan_id && $vlan_id !~ /^\d+$/;
+    print "Content-type: text/html\n\n" if param("do");
+    my $sw_id = $vlan_id ? 73 : param('sw_id');
+
+    open( my $lock, ">>/tmp/swctl_macs.lock" ) or die $!;
+    flock $lock, 2;
+
     $sth = $DB::dbh->prepare( "SELECT hostname, clients_vlan, lib, rocom, ip, snmp_ap_fix FROM models m, hosts h WHERE m.model_id=h.model_id and h.sw_id=?" );
-    $sth->execute( param('sw_id') );
+    $sth->execute( $sw_id );
     my $host_info = $c->{sw} = $sth->fetchrow_hashref();
     $c->{title} = $c->{sw}{hostname}." MAC's";
     &chk_acess(1) if !$c->{sw}{snmp_ap_fix};
@@ -591,10 +619,14 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
         $session->close;
         return $result;
     }
+    my $ports_db_descr = $DB::dbh->selectall_hashref( "SELECT info, ltype_id, concat(IFNULL(portpref,''),IFNULL(port,'')) as portname,
+    (SELECT login FROM ap_login_info a where port_id=p.port_id and last_date = (select max(last_date) from ap_login_info t where t.port_id=a.port_id and t.trust > 0)) as login
+    from swports p where sw_id='$sw_id'", "portname" );
 
     my $OID;
     my $result;
     my %stats;
+    $c->{total} = 0;
     if( !$host_info->{lib} || $host_info->{lib} !~ /^cat/i )
     {
         #dlink,zyxel
@@ -611,6 +643,7 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
         for my $vlan ( @{$c->{vlans_list}} = sort{$a<=>$b}keys%macs )
         {
             my @vlan;
+            my $count = 0;
             for my $port ( sort{$a<=>$b}keys%{$macs{$vlan}} )
             {
                 my @port;
@@ -618,15 +651,21 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
                 {
                     push@port, { value => $vlan, oui => &oui::oui($vlan) };
                     $stats{$port}++;
+                    $count++;
                 }
-                push@vlan, { name => $port, macs => \@port };
+                push@vlan, {
+                    name => $port,
+                    port_descr => $ports_db_descr->{$port}{info} || $ports_db_descr->{$port}{login},
+                    macs => \@port,
+                    is_free => ($port && (!$ports_db_descr->{$port} || !$ports_db_descr->{$port}{ltype_id} || $ports_db_descr->{$port}{ltype_id} == 20))? 1 : 0,
+                };
             }
-            push @{$c->{vlans}}, { name => $vlan, ports => \@vlan };
+            push @{$c->{vlans}}, { name => $vlan, ports => \@vlan, count => $count };
         }
-        push @{$c->{stats}}, { port => $_, count => $stats{$_} } for sort{$a<=>$b}keys%stats;
+        push @{$c->{stats}}, { port => $_, count => $stats{$_}, port_descr => $ports_db_descr->{$_}{info} || $ports_db_descr->{$_}{login} } for sort{$a<=>$b}keys%stats;
         $c->{vlans_current} = keys%macs;
     }else{
-        &chk_acess(1) if $host_info->{lib} !~ /^catioslt/i;
+        &chk_acess(1) if $host_info->{lib} !~ /^catioslt/i && !$vlan_id;
         #cisco
         #http://www.cisco.com/en/US/tech/tk648/tk362/technologies_tech_note09186a00801c9199.shtml
         my %ifDescr;
@@ -636,12 +675,8 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
             $result = snmp_get( $OID = '1.3.6.1.2.1.31.1.1.1.1' ); #ifName
             %ifDescr = map{ my$v = $result->{$_}; s/^$OID\.//; $_,$v }keys %$result;
         }
-        #my @vlans = values %{snmp_get( $OID = '1.3.6.1.4.1.9.5.1.9.2.1.1' )}; #VlanIndex
         $OID = '1.3.6.1.4.1.9.9.46.1.3.1.1.2.1';
-        my @vlans = map{s/^\.?$OID\.//;$_} keys %{snmp_get( $OID )};
-        #my @vlans = 1..1000;
-        #my @vlans = map$_->[0], @{$DB::dbh->selectall_arrayref( "SELECT distinct vlan_id FROM swports WHERE sw_id = '".(param('sw_id'))."'" )};
-        #push @vlans, $host_info->{clients_vlan} if $host_info->{clients_vlan} && !grep /^$host_info->{clients_vlan}$/, @vlans;
+        my @vlans = $vlan_id ? $vlan_id : map{s/^\.?$OID\.//;$_} keys %{snmp_get( $OID )};
 
         for my $vlan ( @{$c->{vlans_list}} = sort{$a<=>$b} @vlans )
         {
@@ -649,16 +684,18 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
             my %bridge_port_TO_bridge_port_number = %{snmp_get( $OID = '1.3.6.1.2.1.17.1.4.1.2', "\@$vlan" )};
             %bridge_port_TO_bridge_port_number = map{my$v=$bridge_port_TO_bridge_port_number{$_};s/^\.?$OID\.//;$_,$v} keys %bridge_port_TO_bridge_port_number;
             $result = snmp_get( $OID = '1.3.6.1.2.1.17.4.3.1.2', "\@$vlan" ); #dot1dTpFdbPort
+            my $count = 0;
 
             for my $mac( keys %$result )
             {
                 my $bridge_port = $result->{$mac};
-                my $port_idx = $bridge_port_TO_bridge_port_number{ $bridge_port };
+                my $port_idx = $bridge_port_TO_bridge_port_number{ $bridge_port } || '';
                 $mac =~ s/^$OID\.//;
                 $mac = join':',map{sprintf("%.2x",$_)}split/\./, $mac;
                 my $descr = exists $ifDescr{$port_idx} ? $ifDescr{$port_idx} : 'self';
                 push @{$port_mac{$descr}}, $mac;
                 $c->{total}++;
+                $count++;
             }
 
             my @vlan;
@@ -666,15 +703,20 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
                 no warnings;
                 for my $port ( sort{my@a=split/\//,$a;my@b=split/\//,$b;$a[0]cmp$b[0]||$a[-1]<=>$b[-1]} keys %port_mac )
                 {
-                    push@vlan, { name => $port, macs => [ map{$stats{$port}++;{ value => $_, oui => &oui::oui($_) }} sort @{$port_mac{$port}} ] };
+                    push@vlan, {
+                        name => $port,
+                        port_descr => $ports_db_descr->{$port}{info} || $ports_db_descr->{$port}{login},
+                        is_free => ($port ne 'self' && (!$ports_db_descr->{$port} || !$ports_db_descr->{$port}{ltype_id} || $ports_db_descr->{$port}{ltype_id} == 20))? 1 : 0,
+                        macs => [ map{$stats{$port}++;{ value => $_, oui => &oui::oui($_) }} sort @{$port_mac{$port}} ]
+                    };
                 }
             }
             next unless @vlan;
             $c->{vlans_current}++;
-            push @{$c->{vlans}}, { name => $vlan, ports => \@vlan };
+            push @{$c->{vlans}}, { name => $vlan, ports => \@vlan, count => $count };
         }
-        push @{$c->{stats}}, { port => $_, count => $stats{$_} } for sort{my@a=split/\//,$a;my@b=split/\//,$b;$a[0]cmp$b[0]||$a[-1]<=>$b[-1]}keys%stats;
-        $c->{vlans_total} = @vlans - 4;
+        push @{$c->{stats}}, { port => $_, count => $stats{$_}, port_descr => $ports_db_descr->{$_}{info} || $ports_db_descr->{$_}{login} } for sort{my@a=split/\//,$a;my@b=split/\//,$b;$a[0]cmp$b[0]||$a[-1]<=>$b[-1]}keys%stats;
+        $c->{vlans_total} = @vlans > 4 ? @vlans - 4 : @vlans;
     }
 
     $template->process("macs.tt", $c) || die $template->error();
@@ -728,7 +770,7 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
                         push @free_vlans1, $start;
                         undef $start;
                     }else{
-                        push @free_vlans1, "$start-$prev";
+                        push @free_vlans1, "[".($prev-$start)."] "."$start-$prev";
                         $start = $prev = $_;
                     }
                 }elsif( !defined $start ){
@@ -739,7 +781,7 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
             {
                 push @free_vlans1, $start;
             }else{
-                push @free_vlans1, "$start-$last";
+                push @free_vlans1, "[".($last-$start)."] "."$start-$last";
             }
             push @free_vlans, { zone => $zone, vlans => \@free_vlans1 };
         }else{
@@ -773,7 +815,7 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
                 my $rows = join "=?,", split/\s*,\s*/, $rows;
                 $DB::dbh->do( "UPDATE swports SET $rows =? WHERE port_id=?", undef, @$params{@vals}, param("port_id") ) or die $DB::dbh->errstr;
             }elsif( param("action") eq 'del' ){
-                $DB::dbh->do( "DELETE FROM swports WHERE port_id=?", undef, param("port_id") ) or die $DB::dbh->errstr;
+                ;#$DB::dbh->do( "DELETE FROM swports WHERE port_id=?", undef, param("port_id") ) or die $DB::dbh->errstr;
             }
             print header( { -location => "$host/swctl/?do=0&mode=host&action=view&sw_id=".param("sw_id") } );
             exit;
@@ -879,7 +921,7 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
             if( param("action") eq 'add' )
             {
                 my $rows = join ",", map{"`$_`"} split/\s*,\s*/, $rows;
-                $DB::dbh->do( "INSERT INTO vlan_list ($rows) VALUES ($phs)", undef, @$params{@vals} ) or die $DB::dbh->errstr;
+                #$DB::dbh->do( "INSERT INTO vlan_list ($rows) VALUES ($phs)", undef, @$params{@vals} ) or die $DB::dbh->errstr;
             }elsif( param("action") eq 'edit' ){
                 my $rows = join "=?,", map{"`$_`"} split/\s*,\s*/, $rows;
                 $DB::dbh->do( "UPDATE vlan_list SET $rows =? WHERE vlan_id=? and zone_id=?", undef, @$params{@vals}, param("vlan_id"), param("zone_id") ) or die $DB::dbh->errstr;
@@ -913,8 +955,8 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
     }
 }elsif( param("mode") eq 'jobs' ){
     &chk_acess(1);
-    $sth = $DB::dbh->prepare( "SELECT *,(CASE date_exec WHEN '0000-00-00 00:00:00' THEN 99999999999 ELSE date_exec END) as date_exec_sort,(CASE archiv WHEN 0 THEN 99999999999 ELSE 0 END) as archiv_sort FROM link_types t, bundle_jobs j, hosts h, swports p WHERE j.ltype_id=t.ltype_id and h.sw_id=p.sw_id and j.port_id=p.port_id ORDER by archiv_sort desc, date_exec_sort desc, date_insert limit 200" );
-    $sth->execute();
+    $sth = $DB::dbh->prepare( "SELECT SQL_CALC_FOUND_ROWS *,(CASE date_exec WHEN '0000-00-00 00:00:00' THEN 99999999999 ELSE date_exec END) as date_exec_sort,(CASE archiv WHEN 0 THEN 99999999999 ELSE 0 END) as archiv_sort FROM link_types t, bundle_jobs j, hosts h, swports p WHERE j.ltype_id=t.ltype_id and h.sw_id=p.sw_id and j.port_id=p.port_id ORDER by archiv_sort desc, date_exec_sort desc, date_insert limit ?, 200" );
+    $sth->execute( int( param("p") || 0 ) );
     while( $_ = $sth->fetchrow_hashref() )
     {
         $_->{done} = 0 + ( $_->{job_id}==$_->{archiv} );
@@ -931,20 +973,21 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
         };
         push @{$c->{jobs}}, $_;
     }
+    &paging( 200, "$host/swctl/?mode=jobs&amp;p=" );
     $c->{title} = 'Jobs list';
 
     $template->process("jobs.tt", $c) || die $template->error();
 }elsif( param("mode") eq 'delete_old_logs' ){
     &chk_acess(1);
     print "Calculating rows count...<br>";
-    my $cnt = $DB::dbh->selectall_arrayref( "select count(*) FROM `log` WHERE time < date_sub(now(),INTERVAL 2 month)" );
+    my $cnt = $DB::dbh->selectall_arrayref( "select count(*) FROM `log` WHERE time < date_sub(now(),INTERVAL 12 month)" );
     print "Deleting $cnt->[0][0] rows...<br>";
-    $DB::dbh->do( "delete FROM `log` WHERE time < date_sub(now(),INTERVAL 2 month)" );
+    $DB::dbh->do( "delete FROM `log` WHERE time < date_sub(now(),INTERVAL 12 month)" );
     print "done.";
 }elsif( param("mode") eq 'logs' ){
     &chk_acess(1);
-    $sth = $DB::dbh->prepare( "select `time`, `table`, `event`, group_concat(`changes` SEPARATOR '|') as changes  from `log` group by `time`, `table`, `event` order by `time` desc, `table`, `event` limit 300" );
-    $sth->execute();
+    $sth = $DB::dbh->prepare( "select SQL_CALC_FOUND_ROWS `time`, `table`, `event`, group_concat(`changes` SEPARATOR '|') as changes from `log` where changes like ? group by `time`, `table`, `event` order by `time` desc, `table`, `event` limit ?, 300" );
+    $sth->execute( '%'.(param('str')||'').'%', int( param("p") || 0 ) );
     while( $_ = $sth->fetchrow_hashref() )
     {
         my @changes;
@@ -964,17 +1007,78 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
                 @a
             } @changes;
 
-            $_->{link}="$host/swctl/?mode=host&action=view&sw_id=".$changes{sw_id} if $_->{table} eq 'hosts';
-            $_->{link}="$host/swctl/?do=1&amp;search_ap=".$changes{port_id} if $_->{table} eq 'swports';
-            $_->{link}="$host/swctl/?do=1&amp;search_ap=".$changes{port_id} if $_->{table} eq 'port_vlantag';
+            $_->{link}="$host/swctl/?mode=host&action=view&sw_id=".$changes{sw_id} if $_->{table} eq 'hosts' && $changes{sw_id};
+            $_->{link}="$host/swctl/?do=1&amp;search_ap=".$changes{port_id} if $_->{table} eq 'swports' && $changes{port_id};
+            $_->{link}="$host/swctl/?do=1&amp;search_ap=".$changes{port_id} if $_->{table} eq 'port_vlantag' && $changes{port_id};
         }
 
         $_->{changes} =~ s!(?:(?<=\s)|(?=^))(\S+)(?=\s*=\s*")!<b>$1</b>!g;
         push @{$c->{logs}}, $_
     }
+    &paging( 300, "$host/swctl/?mode=logs&amp;p=" );
     $c->{title} = 'Logs';
 
     $template->process("logs.tt", $c) || die $template->error();
+}elsif( param("mode") eq 'double_logins' ){
+    &chk_acess(1);
+    $sth = $DB::dbh->prepare( "
+        SELECT a1.login, a1.port_id as port_id1, a2.port_id as port_id2, a1.last_date, a2.last_date FROM ap_login_info a1, ap_login_info a2
+        where a1.login = a2.login and a1.port_id != a2.port_id and a1.trust>0 and a2.trust>0
+        and (select 1 from swports p where ltype_id not in (0,19,20,24) and p.port_id = a1.port_id) = 1
+        and (select 1 from swports p where ltype_id not in (0,19,20,24) and p.port_id = a2.port_id) = 1
+        and (select max(last_date) from ap_login_info t1 where t1.port_id=a1.port_id and t1.trust>0) = a1.last_date
+        and (select max(last_date) from ap_login_info t1 where t1.port_id=a2.port_id and t1.trust>0) = a2.last_date
+        order by login, a1.port_id, a2.port_id
+       " );
+    $sth->execute();
+    my %logins_info;
+    while( my $r = $sth->fetchrow_hashref() )
+    {
+        $logins_info{$r->{login}}{$r->{port_id1}} = 1;
+        $logins_info{$r->{login}}{$r->{port_id2}} = 1;
+    }
+    for my $l ( keys %logins_info )
+    {
+        my @ap;
+        push @ap, { value => $_ } for keys %{$logins_info{$l}};
+        push @{$c->{logins}}, { aps => \@ap, login => $l }
+    }
+    $c->{title} = 'Double logins';
+
+    $template->process("double_logins.tt", $c) || die $template->error();
+}elsif( param("mode") eq 'dead_logins' ){
+    &chk_acess(1);
+    $sth = $DB::dbh->prepare( "
+        select h.hostname, port_id, last_date, (select login from ap_login_info where port_id=t.port_id and t.last_date=last_date) as login
+            from
+                (SELECT p.sw_id, a.port_id, max(last_date) as last_date FROM ap_login_info a, swports p WHERE
+                    a.port_id=p.port_id and p.ltype_id not in (0,19,20,24) and trust > 0
+                    group by a.port_id having last_date < date_sub(NOW(), interval 5 month) ) as t,
+                hosts h
+            where
+                h.sw_id=t.sw_id
+            order by last_date asc
+       " );
+    $sth->execute();
+    while( $_ = $sth->fetchrow_hashref() )
+    {
+        push @{$c->{logins}}, $_
+    }
+    $c->{title} = 'You can see dead people';
+
+    $template->process("dead_logins.tt", $c) || die $template->error();
+}elsif( param("mode") eq 'sw_log' ){
+    &chk_acess(1);
+    $sth = $DB::dbh->prepare( "SELECT hostname FROM hosts WHERE sw_id = ?" );
+    $sth->execute( param('sw_id') );
+    my $hostname = $sth->fetchrow_hashref()->{hostname} || die 'Unknown switch';
+    my $logfile = '/var/log/switches/'.$hostname.'.log';
+    print("Log for this switch does not exists. $logfile"),exit unless -f $logfile;
+    open my $log, '<', $logfile or die $!;
+    $template->process("header.tt", $c);
+    #(my $log_s = join'<br>',reverse<$log>) =~ s|([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})\s+\1|$1|g;
+    (my $log_s = join'<br>',map{s!^(.*(?:HALF).*)$!<font color=gray>$1</font>!i;$_}map{s!^(.*(?:loop|error|storm).*)$!<font color=red>$1</font>!i;$_}reverse<$log>) =~ s|([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})\s+\1|$1|g;
+    print "$hostname<br>size: ",-s $logfile,"<br>",$log_s;
 }elsif( param("mode") eq 'create_trigger' ){
     &chk_acess(1);
 #CREATE TABLE `switchnet_dev`.`log` (

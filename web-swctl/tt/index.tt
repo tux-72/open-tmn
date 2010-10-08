@@ -5,6 +5,7 @@
 <tr><td> Hostname </td><td> <input name=search_hostname> </td></tr>
 <tr><td> MAC </td><td> <input name=search_mac> </td></tr>
 <tr><td> VLAN</td><td> <input name=search_vlan>&nbsp;&nbsp; include trunk's <input type=checkbox name=search_vlan_in_trunk> </td></tr>
+<tr><td> MAC's in Vlan </td><td> <input name=search_macs_in_vlan> </td></tr>
 <tr><td> AP </td><td> <input name=search_ap> </td></tr>
 <tr><td> Login </td><td> <input name=search_login> &nbsp;&nbsp; only last ap <input type=checkbox name=search_ap_only_last> </td></tr>
 <tr><td> Port desc </td><td> <input name=search_port_desc> </td></tr>
@@ -46,6 +47,8 @@
 <tr><td colspan=2 align=center><a href="/swctl/?mode=creted_but_not_used_vlans">Created but not used vlans</a></td></tr>
 <tr><td colspan=2 align=center><a href="/swctl/?search_sw_wo_up=1&amp;do=1">Swithches without uplink ports</a></td></tr>
 <tr><td colspan=2 align=center><a href="/swctl/?search_sw_wo_reg_vlan=1&amp;do=1">Swithches with ports that contain not registered vlans</a></td></tr>
+<tr><td colspan=2 align=center><a href="/swctl/?mode=double_logins">Double logins (commutation problems?)</a></td></tr>
+<tr><td colspan=2 align=center><a href="/swctl/?mode=dead_logins">Dead people</a></td></tr>
 [%END%]
 <tr><td> </td><td> </td></tr>
 <tr><td colspan=2>
@@ -55,3 +58,5 @@
 
 </form>
 </table>
+
+
