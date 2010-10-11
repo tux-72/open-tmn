@@ -6,6 +6,7 @@ use CGI qw/:standard/;
 use CGI::Carp 'fatalsToBrowser';
 use FindBin;
 use Net::Netmask;
+use NSNMP::Simple;
 use Template;
 use autouse 'Data::Dumper' => 'Dumper';
 
@@ -571,7 +572,6 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
         $template->process("edithost.tt", $c) || die $template->error();
     }
 }elsif( param('search_macs_in_vlan') || ( param("mode") && param("mode") eq 'mac' && param("action") eq 'view' && ( param('sw_id') ) ) ){
-    use Net::SNMP;
     use oui;
 
     my $vlan_id = param('search_macs_in_vlan') || '';
@@ -590,34 +590,37 @@ unless( grep{!/^do|search_vlan_in_trunk|search_ap_only_last$/ && param($_)} para
 
     sub snmp_get
     {
+        no warnings;
         my $OID = shift || die;
         my $comm_inf = shift || '';
-        my($session, $error) = Net::SNMP->session(
-            -hostname  => $host_info->{ip},
-            -version   => 1,
-            -community => $host_info->{rocom}.$comm_inf,
-            -timeout   => 3,
+
+        my @session = NSNMP::Simple->get_table(
+            $host_info->{ip},
+            $OID,
+            hostname   => $host_info->{ip},
+            port       => 161,
+            version    => 1,
+            #maxmsgsize => $maxmsgsize,
+            timeout    => 3,
+            community => $host_info->{rocom}.$comm_inf,
         );
 
-        if( !defined $session )
-        {
-            printf("ERROR: %s. Only control vlan shown.\n", $error);
-            return {};
+        if( !@session ){
+            if( $NSNMP::Simple::error_status && $NSNMP::Simple::error_status == NSNMP::Simple::noResponse ){
+                print("No response from remote host<br>");
+                exit;
+            }elsif( $NSNMP::Simple::error_status && $NSNMP::Simple::error_status == NSNMP::Simple::badHostName ){
+                print("Bad hostname<br>");
+                exit;
+            }else{
+                #print("Unknown error");
+                return {};
+            }
         }
-
         #my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2';
         #my $OID = '1.3.6.1.2.1.17.4.3.1.2';
 
-        my $result = $session->get_entries( -columns => [ $OID ] );
-
-        if( !defined $result )
-        {
-            #printf("ERROR: %s. Only control vlan shown.\n", $session->error);
-            $session->close;
-            return {};
-        }
-        $session->close;
-        return $result;
+        return {@session};
     }
     my $ports_db_descr = $DB::dbh->selectall_hashref( "SELECT info, ltype_id, concat(IFNULL(portpref,''),IFNULL(port,'')) as portname,
     (SELECT login FROM ap_login_info a where port_id=p.port_id and last_date = (select max(last_date) from ap_login_info t where t.port_id=a.port_id and t.trust > 0)) as login
