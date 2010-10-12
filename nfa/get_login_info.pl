@@ -9,12 +9,11 @@ use POSIX qw(strftime);
 use locale;
 
 use FindBin '$Bin';
-#use lib $Bin . '/../conf';
 use lib $Bin.'/../lib';
 use SWConf;
 use SWFunc;
 
-my $conf = \%SWConf::conf;
+my $nas_conf = \%SWConf::aaa_conf;
 
 my $dbm; my $res = DB_mysql_connect(\$dbm);
 if ($res < 1) {
@@ -33,7 +32,7 @@ while (my $ref0 = $stm0->fetchrow_hashref()) {
 $stm0->finish();
 
 $Querry = "SELECT a.ip, a.login FROM dhcp_addr a, head_link l, dhcp_pools p WHERE l.login=a.login and a.pool_id=p.pool_id ".
-" and p.pool_type>0 and (UNIX_TIMESTAMP(a.end_lease)+".$conf->{'DHCP_WINDOW'}.")>UNIX_TIMESTAMP(now()) ORDER by a.end_lease";
+" and p.pool_type>0 and (UNIX_TIMESTAMP(a.end_lease)+".$nas_conf->{'DHCP_WINDOW'}.")>UNIX_TIMESTAMP(now()) ORDER by a.end_lease";
 $stm0 = $dbm->prepare($Querry);
 $stm0->execute();
 while (my $ref0 = $stm0->fetchrow_hashref()) {
