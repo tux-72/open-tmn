@@ -1,0 +1,22 @@
+[% INCLUDE header.tt %]
+
+
+
+<table align=center class=data border=1>
+<tr class="bbheader3"> <td colspan=2>--Double logins--</td></tr>
+<tr class="bbheader3">
+    <td width=50%>login</td>
+    <td width=50%>ap</td>
+</tr>
+    [% FOREACH line IN logins %]
+    <tr valign=top>
+        <td>[% line.login   %]</td>
+        <td>
+        [% FOREACH ap IN line.aps %]
+            <a href="/swctl/?search_ap=[% ap.value %]&do=3">[% ap.value %]1</a><br>
+        [% END %]
+        </td>
+    </tr>
+    [% END %]
+</table>
+

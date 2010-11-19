@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+
+use strict;
+
+package SWConf;
+
+our $debug = 1;
+
+our %dbconf = (
+#    'MYSQL_host'        => '192.168.29.20',
+    'MYSQL_host'        => 'localhost',
+    'MYSQL_base'        => 'dbname',
+    'MYSQL_user'        => 'db_user',
+    'MYSQL_pass'        => 'db_pass',
+
+    'MSSQL_server'      => 'BILLING',
+    'MSSQL_base'        => 'db_name',
+    'MSSQL_user'        => 'user',
+    'MSSQL_pass'        => 'pass',
+);
+
+
+our %aaa_conf = (
+    'FAKE_QUOTE'        => 600,
+    'FAKE_DNS'          => '77.239.208.22',
+    'DNS_IP1'           => '77.239.208.17',
+    'DNS_IP2'           => '77.239.208.5',
+    'mail_server'       => 'MAIL18',
+    'pppoe_server'      => '192.168.100.30',
+    'pod_port'          => 1700,
+    'pod_secret'        => 'secret',
+
+    'SHAPER_SSHPROG'    => '/usr/bin/ssh',
+    'SHAPER_SSHHOST'    => '77.239.208.17',
+    'SHAPER_SSHUSER'    => 'datasync',
+    'SHAPER_IPFWTABLE'  => '10',
+    'SHAPER_REMOTECMD'  => '/etc/SHAPER/check_shape.pl ssh',
+
+    'DHCP_HEAD_ID'      => 3,
+    'DHCP_USE'          => 1,
+    'DHCP_PRI'          => 1,
+    'DHCP_WINDOW'       => 3600,
+    'DHCP_POOLTYPE'     => 2,
+
+    'DHCP_ACCOUNT'      => 0,
+    'DHCP_NAS_IP'       => '192.168.100.20',
+    'DHCP_ACC_HOST'     => '192.168.100.100',
+    'DHCP_ACC_PORT'     => 1813,
+    'DHCP_ACC_SECRET'   => 'DirWupEw123',
+    'DHCP_ACC_USERPREF' => 'DHCP-',
+
+);
+
+our %conf = (
+
+    'def_swip'          => '172.20.20.200',
+    'BLOCKPORT_VLAN'    => 4094,
+    'STARTPORTCONF'     => 10,
+    'STARTLINKCONF'     => 20,
+    'CLI_VLAN_LINKTYPE' => 21,
+    'MAXPARENTS'        => 10,
+    'CYCLE_SLEEP'       => 30,
+    'FIRST_ZONEVLAN'    => 4094,
+    'DEF_COMUNITY'      => 'RO_COM',
+    'CHECK_PPPOE_UP'    => 0,
+
+);
+
+our %checkmac = (
+    '1'                 => '00:a0:d1:e2:85:31',
+    '10'                => '00:a0:d1:e2:85:31',
+    '870'               => '00:a0:d1:e2:85:31',
+    '409'               => '00:a0:d1:e2:85:31',
+);
+
+our %conflog = (
+    'LOGDFLT'           => '/var/log/swctl/switch-control.log',
+    'LOGDISP'           => '/var/log/freeradius/ap_ctl.log',
+    'LOGAPFIX'          => '/var/log/freeradius/ap_fix.log',
+);
+
+1;

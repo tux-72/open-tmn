@@ -1,0 +1,889 @@
+#!/usr/bin/perl
+
+my $debug=1;
+
+package SWFunc;
+
+use strict;
+no strict qw(refs);
+
+#use locale;
+use POSIX qw(strftime);
+use DBI();
+use NSNMP::Simple;
+
+use DESCtl;
+use C73Ctl;
+use CATIOSCtl;
+use CATIOSLTCtl;
+use CATOSCtl;
+use ESCtl;
+use GSCtl;
+use BPSCtl;
+use TCOM4500Ctl;
+
+use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
+use Exporter ();
+
+
+$VERSION = 2.0;
+
+@ISA = qw(Exporter);
+
+@EXPORT_OK = qw ();
+%EXPORT_TAGS = ();
+
+@EXPORT = qw ( SW_AP_fix SW_ctl SW_VLAN_fix VLAN_VPN_get VLAN_get VLAN_remove SNMP_fix_macport SNMP_fix_macport_name
+	    dlog rspaced lspaced IOS_rsh SAVE_config GET_IP3 GET_pipeid PRI_calc DB_mysql_connect
+	    DB_trunk_vlan DB_trunk_update VLAN_link GET_Terminfo GET_GW_parms
+);
+
+my $start_conf	= \%SWConf::conf;
+my $conflog	= \%SWConf::conflog;
+my $dbi		= \%SWConf::dbconf;
+
+use Data::Dumper;
+
+my $Querry_start = '';
+my $Querry_end = '';
+my $res;
+my $dbm;
+
+#my $LIB_ACT ='';
+#my @RES = ( 'PASS', 'DENY', 'UNKNOWN' );
+
+our %link_type = ();
+our @link_types = ();
+our %headinfo = ();
+
+#GET_head_info ();
+
+DB_mysql_connect(\$dbm);
+
+my $stm01 = $dbm->prepare("SELECT ltype_id, ltype_name FROM link_types order by ltype_id");
+$stm01->execute();
+while (my $ref01 = $stm01->fetchrow_hashref()) {
+    $link_type{$ref01->{'ltype_name'}}=$ref01->{'ltype_id'} if defined($ref01->{'ltype_name'});
+    $link_types[$ref01->{'ltype_id'}]=$ref01->{'ltype_name'} if defined($ref01->{'ltype_name'});
+}
+$stm01->finish();
+
+my $stm = $dbm->prepare( "SELECT t.linked_head, t.term_ip, t.zone_id, t.term_grey_ip2, h.ip, m.lib, m.mon_login, m.mon_pass FROM heads t, hosts h, models m ".
+" WHERE t.ltype_id<>".$link_type{'l3net4'}." and h.model_id=m.model_id and t.l2sw_id=h.sw_id and t.term_ip is not NULL order by head_id desc" );
+$stm->execute();
+while (my $ref = $stm->fetchrow_hashref()) {
+    $headinfo{'L2LIB_'.   $ref->{'term_ip'}} = $ref->{'lib'};
+    $headinfo{'L2IP_'.    $ref->{'term_ip'}} = $ref->{'ip'};
+    $headinfo{'MONLOGIN_'.$ref->{'term_ip'}} = $ref->{'mon_login'};
+    $headinfo{'MONPASS_'. $ref->{'term_ip'}} = $ref->{'mon_pass'};
+    $headinfo{'ZONE_'.    $ref->{'term_ip'}} = $ref->{'zone_id'};
+    $headinfo{'LHEAD_'.   $ref->{'term_ip'}} = $ref->{'linked_head'} if $ref->{'linked_head'};
+}
+$stm->finish();
+
+
+############ SUBS ##############
+
+sub SW_ctl {
+	my $arg = shift;
+	my $swfunc = $arg->{'LIB'}.'_'.$arg->{'ACT'};
+	if ( defined &$swfunc ) {
+	    return &$swfunc( $arg );
+	} else {
+	    return 0;
+	}
+}
+
+sub DB_mysql_connect {
+	my $sqlconnect = shift;
+	${$sqlconnect} = DBI->connect_cached("DBI:mysql:database=".$dbi->{'MYSQL_base'}.";host=".$dbi->{'MYSQL_host'},$dbi->{'MYSQL_user'},$dbi->{'MYSQL_pass'})
+	or die "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr";
+	#or die dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Unable to connect MYSQL DB host ".$dbi->{'MYSQL_host'}."$DBI::errstr" );
+	${$sqlconnect}->do("SET NAMES 'koi8r'") or die return -1;
+	#dlog ( DBUG => 2, SUB => (caller(0))[3],  MESS => "Mysql connect ID = ".${$sqlconnect}->{'mysql_thread_id'} );
+	return 1;
+}
+
+sub rspaced {
+    my $str = shift;
+    my $len = shift;
+    return sprintf("%-${len}s",$str);
+}
+
+sub lspaced {
+    my $str = shift;
+    my $len = shift;
+    return sprintf("%${len}s",$str);
+}
+
+sub dlog {
+        my %arg = (
+	    'LOGTYPE' => 'LOGDFLT',
+            @_,
+        );
+        if ( $arg{'DBUG'} <= $SWConf::debug and defined($arg{'MESS'}) and $arg{'MESS'}."x" ne "x" ) {
+	    my $stderrout=1; my $LOGFILE;
+	    if ( defined($conflog->{$arg{'LOGTYPE'}}) ) {
+		open( $LOGFILE,">>",$conflog->{$arg{'LOGTYPE'}} ) or die "Can't open '".$conflog->{$arg{'LOGTYPE'}}."' $!";
+		$stderrout=0;
+	    }
+
+	    my $subchar = 30; my @lines = ();
+	    $arg{'PROMPT'} .= ' ';
+	    $arg{'PROMPT'} =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t\>\</ /cs;
+
+            my ($sec, $min, $hour, $day, $month, $year) = (localtime)[0,1,2,3,4,5];
+            my $timelog = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year+1900, $month + 1, $day, $hour, $min, $sec);
+            if ( ref($arg{'MESS'}) ne 'ARRAY' ) {
+                @lines = split /\n/,$arg{'MESS'};
+            } else {
+                @lines = @{$arg{'MESS'}};
+            }
+            foreach my $mess ( @lines ) {
+		if ( defined($arg{'NORMA'}) and $arg{'NORMA'} ) { $mess =~ tr/a-zA-Z0-9+-_:;,.?\(\)\/\|\'\"\t/ /cs; }
+                next if (not $mess =~ /\S+/);
+		my $logline = $timelog." ".rspaced("'".$arg{'SUB'}."'",$subchar).": ".$arg{'PROMPT'}.$mess."\n";
+		if ($stderrout) {
+            	    print STDERR $logline;
+		} else {
+            	    print $LOGFILE $logline;
+		}
+            }
+	    if (not $stderrout) { close $LOGFILE; }
+	}
+}
+
+{
+    #my $pid_decr = (($$ & 127) << 1 );
+    my $pid_decr = (($$ & 7) << 1 );
+    my $end_port = 20000 - 1024 * $pid_decr;
+    my $start_port = $end_port - 1024;
+    #dlog ( DBUG => 3, SUB => (caller(0))[3], MESS => "PID decr = $pid_decr, start_port = $start_port, end_port = $end_port"  );
+    my $src_port = $end_port ;
+
+    sub IOS_rsh {
+	#HOST CMD REMOTE_USER LOCAL_USER
+        my %arg = (
+            @_,
+        );
+	$arg{'LOCAL_USER'} = 'root'; $arg{'REMOTE_USER'} = 'admin';
+	dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => ' LOCAL USER = '.$arg{'LOCAL_USER'}.' REMOTE USER = '.$arg{'REMOTE_USER'} );
+	
+	$src_port -= 1;
+
+    	if ( $src_port < $start_port ) {
+	    $src_port = $end_port;
+	}
+	
+        my $try = 1;
+        my $socket;
+        while ($try) {
+                last if ( $src_port < $start_port - 1 );
+		dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => " PID=".$$.", HOST = ".$arg{'HOST'}." port = $src_port" );
+                eval {
+                        local $SIG{'__DIE__'};
+                        $socket = IO::Socket::INET->new(PeerAddr	=> $arg{'HOST'},
+                                                	PeerPort	=> '514',
+                                                        LocalPort	=> $src_port,
+                                                        Proto		=> 'tcp' );
+                };
+                ( $@ || ( not defined $socket )) ? ( $src_port -= 1 ) : ( $try = 0 );
+        }
+        if ($try) {
+		dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "All ports in use!" );
+                return ();
+        }
+        print $socket "0\0";
+        print $socket $arg{'LOCAL_USER'}."\0";
+        print $socket $arg{'REMOTE_USER'}."\0";
+        print $socket $arg{'CMD'}."\0";
+        my @c=<$socket>;
+	#$socket->shutdown(HOW);
+	$socket->shutdown();
+        return @c;
+    }
+}
+
+sub SW_VLAN_fix {
+	my $AP = shift;
+	####### Start FIX VLAN ID) ########### 
+	my %sw_arg = (
+	    LIB => $headinfo{'L2LIB_'.$AP->{'nas_ip'}}, ACT => 'fix_vlan', IP => $headinfo{'L2IP_'.$AP->{'nas_ip'}}, 
+	    LOGIN => $headinfo{'MONLOGIN_'.$AP->{'nas_ip'}},	PASS => $headinfo{'MONPASS_'.$AP->{'nas_ip'}}, MAC => $AP->{'hw_mac'},
+	);
+	$AP->{'vlan_id'} = SW_ctl ( \%sw_arg );
+}
+
+
+sub SAVE_config {
+    DB_mysql_connect(\$dbm);
+    # сохраняем конфиг на коммутаторе
+    my %argscfg = (
+	    @_,		# список пар аргументов
+    );
+    dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Save config in sw_id => '".$argscfg{'SWID'}."' IP => '".$argscfg{'IP'}."' (debug)" );
+    return 0 if $debug>1;
+    my $res=0;
+    my %sw_arg = (
+        LIB => $argscfg{'LIB'}, ACT => 'conf_save', IP => $argscfg{'IP'}, LOGIN => $argscfg{'LOGIN'}, PASS => $argscfg{'PASS'}, ENA_PASS => $argscfg{'ENA_PASS'},
+    );
+    $res = SW_ctl ( \%sw_arg ) if ( $argscfg{'LIB'} ne '');
+
+    $dbm->do("UPDATE swports p, bundle_jobs j SET j.archiv=j.job_id WHERE j.port_id=p.port_id and j.archiv=1 and p.sw_id=".$argscfg{'SWID'}) if ($res>0 and $argscfg{'SWID'} > 0);
+    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Save config in host '".$argscfg{'IP'}."' failed!" ) if $res < 1;
+    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Save config in host '".$argscfg{'IP'}."' complete" ) if $res > 0;
+    return $res;
+}
+
+
+sub GET_GW_parms {
+    dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => 'GET IP GW info (debug)' );
+
+    my %arg = (
+        @_,         # список пар аргументов
+    );
+    my $GW = ''; my $GW1 = ''; my $MASK ='';  my $CLI_IP ='';
+    my $Querry_start = ''; my $Querry_end = '';
+    # SUBNET TYPE
+    if ( $arg{'TYPE'} >= $start_conf->{'STARTLINKCONF'} ) {
+    my @ln = `/usr/local/bin/ipcalc $arg{SUBNET}`;
+        foreach (@ln) {
+	    #Netmask:   255.255.248.0 = 21   11111111.11111111.11111 000.00000000
+	    #HostMin:   10.13.64.1           00001010.00001101.01000 000.00000001
+	    if      ( /Netmask\:\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+/ ) {
+		$MASK = "$1";
+	    } elsif ( /HostMin\:\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+/  ) {
+		$GW = "$1";
+	    }
+	}
+	if ( $arg{'SUBNET'} =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/\d+/ and $GW ne $1 ) { $CLI_IP = $1; } 
+    }
+    return ( $CLI_IP, $GW, $MASK );
+}
+
+sub GET_Terminfo {
+
+    DB_mysql_connect(\$dbm);
+    dlog ( SUB => (caller(0))[3], DBUG => 2, MESS => 'GET Terminator info (debug)' );
+
+    my %arg = (
+        @_,         # список пар аргументов
+    );
+    # TYPE ZONE TERM_ID
+    my $res = 0;
+    $Querry_start = "SELECT * FROM heads WHERE ";
+    if ( defined($arg{'TERM_ID'}) and $arg{'TERM_ID'} > 0) {
+	$Querry_start .= " head_id=".$arg{'TERM_ID'};
+    } else {
+	$Querry_start .= " ltype_id=".$arg{'TYPE'};
+	$Querry_end = " and zone_id=".$arg{'ZONE'};
+    }
+    my $stm31 = $dbm->prepare($Querry_start.$Querry_end);
+    $stm31->execute();
+    if (not $stm31->rows) {
+	$stm31->finish();
+	$Querry_end = " and zone_id = 1";
+	$stm31 = $dbm->prepare($Querry_start.$Querry_end);
+	$stm31->execute();
+    }
+    if ($stm31->rows == 1) {
+	my $ref31 = $stm31->fetchrow_hashref();
+	my %head = %{$ref31};
+	$stm31->finish();
+	return \%head;
+    } elsif ($stm31->rows > 1)  {
+	dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "MULTI TERMINATOR! 8-), count = ".$stm31->rows );
+    } else {
+	dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => 'TERMINATOR NOT FOUND :-(' );
+    }
+    $stm31->finish();
+    return -1;
+}
+
+
+sub DB_trunk_update {
+	# Делаем запись об изменении влана в текущем транковом порту
+	DB_mysql_connect(\$dbm);
+        my %argdb = (
+            @_,         # список пар аргументов
+        );
+        $argdb{'PORTPREF'} ||= "";
+	# ACT SWID VLAN PORTPREF PORT
+        dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Save to DB change trunk VLAN => '".$argdb{'VLAN'}."', sw_id => '".$argdb{'SWID'}."' port => ".$argdb{'PORTPREF'}.$argdb{'PORT'}." (debug)" );
+	return 1 if $debug>1;
+	my $Qr_in = "SELECT port_id FROM swports WHERE sw_id=".$argdb{'SWID'}." and port=".$argdb{'PORT'};
+	if ( 'x'.$argdb{'PORTPREF'} ne 'x' ) {
+	    $Qr_in .= " and portpref='".$argdb{'PORTPREF'}."'";
+	} else {
+	    $Qr_in .= " and portpref is NULL";
+	}
+	my $stm33 = $dbm->prepare($Qr_in);
+	$stm33->execute();
+        while (my $ref33 = $stm33->fetchrow_hashref() and $stm33->rows == 1 ) {
+	    my $Qr_add = "INSERT INTO port_vlantag set port_id=".$ref33->{'port_id'}.", vlan_id=".$argdb{'VLAN'}." ON DUPLICATE KEY UPDATE vlan_id=".$argdb{'VLAN'};
+	    my $Qr_remove = "DELETE FROM port_vlantag WHERE port_id=".$ref33->{'port_id'}." and vlan_id=".$argdb{'VLAN'};
+
+	    if ( "x".$argdb{'ACT'} eq 'xadd') {
+		$dbm->do($Qr_add);
+	    }
+	    $dbm->do($Qr_remove) if ( "x".$argdb{'ACT'} eq 'xremove');
+	}
+	$stm33->finish();
+}
+
+sub DB_trunk_vlan {
+	# Делаем запись об изменении влана в текущем транковом порту
+	DB_mysql_connect(\$dbm);
+        my %argdb = (
+            @_,         # список пар аргументов
+        );
+        $argdb{'PORTPREF'} ||= "";
+	# ACT SWID VLAN PORTPREF PORT
+	my $res = 0;
+	# Умолчания для результата процедуры поиска
+	$res = -1 if ("x".$argdb{'ACT'} eq 'xadd');    #Прокидывание VLAN'а: нет в транке - добавить
+	$res =  1 if ("x".$argdb{'ACT'} eq 'xremove'); #Убирание     VLAN'а: нет в транке - не удалять
+        dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "Check Vlan in trunk port => '".$argdb{'VLAN'}."', sw_id => '".$argdb{'SWID'}."' portpref => '".$argdb{'PORTPREF'}."', port => ".$argdb{'PORT'}." (debug)" );
+
+	return 1 if $debug>1;
+	my $Qr_in = "SELECT port_id FROM swports WHERE sw_id=".$argdb{'SWID'}." and port=".$argdb{'PORT'};
+	if ( 'x'.$argdb{'PORTPREF'} ne 'x' ) {
+	    $Qr_in .= " and portpref='".$argdb{'PORTPREF'}."'";
+	} else {
+	    $Qr_in .= " and portpref is NULL";
+	}
+	my $stm33 = $dbm->prepare($Qr_in);
+	$stm33->execute();
+        while (my $ref33 = $stm33->fetchrow_hashref() and $stm33->rows == 1 ) {
+	    my $Qr_check = "SELECT port_id FROM port_vlantag WHERE port_id=".$ref33->{'port_id'}." and vlan_id=".$argdb{'VLAN'};
+	    my $stm331 = $dbm->prepare($Qr_check);
+	    $stm331->execute();
+	    # Temp 
+	    if ( $stm331->rows > 0 ) {
+		if ("x".$argdb{'ACT'} eq 'xadd')    { $res =  1; }   # VLAN найден в транке, не добавлять
+		#if ("x".$argdb{'ACT'} eq 'xremove') { $res = -1; } # VLAN найден в транке, удалить
+	    }
+	    if ("x".$argdb{'ACT'} eq 'xremove') { $res = -1; }  # VLAN в транке удалить
+
+	    $stm331->finish();
+	}
+	$stm33->finish();
+	return $res;
+}
+
+sub VLAN_remove {
+
+	DB_mysql_connect(\$dbm);
+        my %arg = (
+            @_,         # список пар аргументов
+        );
+	# PORT_ID VLAN HEAD
+	my $res = -1;
+	return if ( not defined($arg{'HEAD'}) || not defined($arg{'PORT_ID'}) || not defined($arg{'VLAN'}) );
+
+	return $res if $debug>1;
+	my $Qr_zone = "SELECT zone_id FROM heads where head_id=".$arg{'HEAD'};
+	my $stm341 = $dbm->prepare($Qr_zone);
+        $stm341->execute();
+	while (my $ref341 = $stm341->fetchrow_hashref()) {
+	    $arg{'ZONE'} = $ref341->{'zone_id'};
+	}
+	$stm341->finish();
+
+	my $Qr_in = "SELECT p.port_id FROM swports p, heads h WHERE h.head_id=p.head_id and p.port_id<>".$arg{'PORT_ID'}.
+	" and p.vlan_id=".$arg{'VLAN'}." and h.zone_id=".$arg{'ZONE'};
+
+	my $stm34 = $dbm->prepare($Qr_in);
+	$stm34->execute();
+	if ( $stm34->rows > 0 ) {
+	    $res =  0;
+	} else {
+	    dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "DELETE from vlan_list VLAN=".$arg{'VLAN'}." ZONE=".$arg{'ZONE'} );
+	    $dbm->do("DELETE from vlan_list WHERE vlan_id=".$arg{'VLAN'}." and zone_id=".$arg{'ZONE'});
+	    $res =  1;
+	}
+	$stm34->finish();
+	return $res;
+}
+
+
+sub VLAN_get {
+
+	DB_mysql_connect(\$dbm);
+        my %arg = (
+            @_,         # список пар аргументов
+        );
+	# PORT_ID LINK_TYPE ZONE
+	my $head = GET_Terminfo ( TYPE => $arg{'LINK_TYPE'}, ZONE => $arg{'ZONE'} );
+	my $increment = 1; my $res = -1;
+
+	my %vlanuse = ();
+	my $Qr_range = "SELECT vlan_id FROM vlan_list WHERE vlan_id>=".$head->{'vlan_min'}." and vlan_id<=".$head->{'vlan_max'}." and zone_id=".$head->{'zone_id'};
+        my $stm35 = $dbm->prepare($Qr_range);
+        $stm35->execute();
+	while (my $ref35 = $stm35->fetchrow_hashref()) {
+	    $vlanuse{$ref35->{'vlan_id'}} = 1;
+	}
+	$stm35->finish();
+		
+	my $vlan_id=0; 
+	if ($increment) {
+	    $vlan_id = $head->{'vlan_min'};
+	    while ( $res < 1 and $vlan_id <= $head->{'vlan_max'} ) {
+		dlog ( SUB => (caller(0))[3]||'', DBUG => 2, MESS =>  "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
+		$res = $vlan_id if not defined($vlanuse{$vlan_id});
+		$vlan_id += 1;
+	    }
+	} else {
+	    $vlan_id = $head->{'vlan_max'};
+	    while ( $res < 1 and $vlan_id >= $head->{'vlan_min'} ) {
+		dlog ( SUB => (caller(0))[3]||'', DBUG => 2, MESS => "PROBE VLAN N".$vlan_id." VLANDB -> '".( defined($vlanuse{$vlan_id}) ? 'found' : 'none' )."'" );
+		$res = $vlan_id if not defined($vlanuse{$vlan_id});
+		$vlan_id -= 1;
+	    }
+	}
+
+	if ($res > 0 and $debug < 2) {
+	    $dbm->do("INSERT into vlan_list SET info='AUTO INSERT VLAN record from vlan range', vlan_id=".$res.", zone_id=".$head->{'zone_id'}.
+	    ", port_id=".$arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}." ON DUPLICATE KEY UPDATE info='AUTO UPDATE VLAN record', port_id=".
+	    $arg{'PORT_ID'}.", link_type=".$arg{'LINK_TYPE'}); 
+	}
+	return ( $res, $head->{'head_id'} ) ;
+}
+
+sub GET_IP3 {
+    my $subip3 = shift;
+    my @ln = `/usr/local/bin/ipcalc $subip3`;
+    foreach (@ln) {
+        if ( /HostMax\:\s+(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\s+/ ) {
+            #dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Change '".$subip3."' to '$1.$2.$3.$4'" );
+            $subip3 = "$1.$2.$3.$4";
+        }
+    }
+    return $subip3;
+}
+
+sub GET_pipeid {
+    my $speed = shift;
+    my %pipeid = (
+	'64'	=> 1006,
+	'128'	=> 1010,
+	'256'	=> 1020,
+	'512'	=> 1050,
+	'1000'	=> 1100,
+	'2000'	=> 1200,
+	'3000'	=> 1300,
+	'4000'	=> 1400,
+	'5000'	=> 1500,
+	'6000'	=> 1600,
+	'7000'	=> 1700,
+	'8000'	=> 1800,
+	'9000'	=> 1900,
+	'10000'	=> 2000,
+	'11000'	=> 2100,
+	'12000'	=> 2200,
+	'13000'	=> 2300,
+	'14000'	=> 2400,
+	'15000'	=> 2500,
+	'16000'	=> 2600,
+	'17000'	=> 2700,
+	'18000'	=> 2800,
+	'19000'	=> 2900,
+	'20000'	=> 3000,
+    );
+    if ( defined($pipeid{$speed}) ) {
+	return $pipeid{$speed};
+    } else {
+	return 1010;
+    }
+}
+
+
+sub PRI_calc {
+    my $rate = shift;
+    my $pri  = shift;
+    my $priority = 20;
+    # Normalise megabits for rate > 999 Kbits
+    $rate = int($rate/1000)*1000 if ($rate > 999 );
+
+    if ($rate > 3100)      {
+        $priority = $pri*20+int($rate/1000)*5;
+    } elsif ($rate > 1100) {
+        $priority = $pri*20+int($rate/500)*4;
+    } elsif ($rate > 900)  {
+        $priority = $pri*20+int($rate/200)*3;
+    } elsif ($rate > 400)  {
+        $priority = $pri*20+int($rate/100)*2;
+    } elsif ($rate > 200)  {
+        $priority = $pri*20+int($rate/100)*4;
+    } else {
+        $priority = $pri*20+int($rate/100)*3;
+    }
+    $priority   = 80 if ($priority > 80 );
+    return ($rate, $priority)
+}
+
+sub SNMP_fix_macport {
+
+    #### IP MAC VLAN ROCOM
+    my $arg = shift;
+    my $getname = shift;
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+    my $pref; my $max = 2; my $count = 0; my $timeout = 1; my $index;
+
+    my $OID = '1.3.6.1.2.1.17.7.1.2.2.1.2.'.$arg->{'VLAN'}.".". (join".", map{hex} split/:/,$arg->{'MAC'});
+    my $port = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
+    #print STDERR " OID '".$OID."'\n" if $debug;
+    if ( not defined($port) ) {
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => "Error in SNMP get port index for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
+        $port = -1;
+    }
+    #print STDERR "NSNMP fix portindex = ".$port."\n" if $debug;
+    $index = $port;
+
+    if ($getname and $index > 0 ) {
+        $OID = '1.3.6.1.2.1.31.1.1.1.1.'.$index;
+        my $portname = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
+        if ( defined($portname) ) {
+            if ( $portname =~ /^(\d+)$/ ) {
+                $port = $1;
+            } elsif ( $portname =~ /^\d+\/(\d+)$/ ) {
+                $port = $1;
+            } elsif ( $portname =~ /^(\D+\/)(\d+)$/ ) {
+                $pref = $1;
+                $port = $2;
+            } elsif ( $portname =~ /^(\D+)(\d+)$/ ) {
+                $pref = $1;
+                $port = $2;
+            } else {
+                SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
+                #print STDERR "Unknown portname type '$portname'\n";
+            }
+            #print STDERR "NSNMP fix portname = '".$portname."', pref = '".$pref."', port = '".$port."'\n" if $debug > 1;
+        } else {
+            SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Error in SNMP get port name for index '$port'. MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
+            $port = -1;
+        }
+    }
+    return ($pref, $port, $index);
+}
+
+
+sub SNMP_fix_macport_name {
+
+    #### IP MAC VLAN ROCOM
+    my $arg = shift;
+    my $rocom = $arg->{'ROCOM'};
+    if ( $arg->{'LIB'} =~ /^CATI?OS/ ) {
+        $rocom .= '@'.$arg->{'VLAN'};
+    }
+    dlog ( DBUG => 2, SUB => (caller(0))[3], MESS => "SNMP FIX PORT in switch '".$arg->{'IP'}."', MAC '".$arg->{'MAC'}.", VLAN '".$arg->{'VLAN'}."'" );
+    my $pref; my $port = -1; my $max = 2; my $count = 0; my $timeout = 1; my $idx;
+
+    my $OID = '.1.3.6.1.2.1.17.4.3.1.2.'. (join".", map{hex} split/:/,$arg->{'MAC'});
+    my $idx1 = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $rocom );
+
+    if ( not defined($idx1) ) {
+        SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], LOGTYPE => 'LOGAPFIX', MESS => "Error in CISCO SNMP get idx1 for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
+        $port = -1;
+    } else {
+        #print STDERR "NSNMP fix port index1 = ".$idx1."\n" if $debug;
+
+        $OID = '.1.3.6.1.2.1.17.1.4.1.2.'.$idx1;
+        $idx = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $rocom );
+        #print STDERR "NSNMP fix port index = ".$idx."\n" if $debug;
+
+        if ( defined($idx) ) {
+            $OID = '1.3.6.1.2.1.31.1.1.1.1.'.$idx;
+            my $portname = NSNMP::Simple->get( $arg->{'IP'}, $OID, version => 1, retries => $max, timeout => $timeout, community => $arg->{'ROCOM'} );
+            if ( defined($portname) ) {
+                if      ( $portname =~ /^(\S+\/)(\d+\-\d+)$/ ) {
+                    $pref = $1;
+                    $port = $2;
+                } elsif ( $portname =~ /^(\d+\/)(\d+)$/ ) {
+                    $pref = $1;
+                    $port = $2;
+                } elsif ( $portname =~ /^(\S+\/)(\d+)$/ ) {
+                    $pref = $1;
+                    $port = $2;
+                } elsif ( $portname =~ /^(\D+)(\d+)$/ ) {
+                    $pref = $1;
+                    $port = $2;
+                } else {
+                    SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Unknown portname type '$portname'" );
+                    #print STDERR "Unknown portname type '$portname'\n" if $debug;
+                }
+                #print STDERR "NSNMP fix portname = '".$portname."', pref = '".$pref."', port = '".$port."'\n" if $debug > 1 ;
+            } else {
+                SWFunc::dlog ( DBUG => 0, SUB => (caller(0))[3], MESS => "Error in CISCO SNMP get idx for MAC '".$arg->{'MAC'}."' ".$NSNMP::Simple::error );
+                $port = -1;
+            }
+        }
+    }
+    return ($pref, $port, $idx);
+}
+
+
+sub VLAN_link {
+	DB_mysql_connect(\$dbm);
+	my %sw_arg = ();
+	dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "LINKING VLAN to HEAD (debug)" );
+	return -1 if $debug>2;
+	## Пробрасываем VLAN до головного свича
+	my %arglnk = (
+	    @_,
+	);
+
+	my $res=0; my $count = 0; my $LIB_action =''; my $LIB_action1 =''; my %PAR = ();
+	$PAR{'change'} = 0;
+	$PAR{'sw_id'} = $arglnk{'PARENT'};
+	$PAR{'low_port'} = $arglnk{'PARENTPORT'};
+	$PAR{'low_portpref'} = $arglnk{'PARENTPORTPREF'}; 
+	## Выбираем коммутаторы по цепочке вплоть до head_id или головного по зоне, центрального.
+	while ( defined($PAR{'sw_id'}) and $count < $start_conf->{'MAXPARENTS'} ) {
+	    $PAR{'low_portpref'}  ||= "";
+	    $PAR{'change'} = 0; 
+	    $count +=1;
+	    my $stm21 = $dbm->prepare("SELECT h.hostname, h.model_id, h.sw_id, h.ip, h.uplink_port, h.uplink_portpref, h.parent, h.parent_port, h.parent_portpref, ".
+	    "m.lib, m.admin_login, m.admin_pass, m.ena_pass FROM hosts h, models m WHERE h.model_id=m.model_id and h.sw_id=".$PAR{'sw_id'}." order by h.sw_id");
+	    $stm21->execute();
+	    while (my $ref21 = $stm21->fetchrow_hashref()) {
+		#$ref21->{'parent_portpref'} ||= "";
+		if ( 'x'.$ref21->{'lib'} eq 'x' ) {
+		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "LIB not defined for switch ".$ref21->{'hostname'}.", Vlan link break :-( !!!" );
+		    $stm21->finish;
+		    return -1;
+		}
+	      if ( $PAR{'low_port'} > 0 and DB_trunk_vlan(ACT => $arglnk{'ACT'}, SWID => $ref21->{'sw_id'}, VLAN => $arglnk{'VLAN'}, 
+		PORTPREF => $PAR{'low_portpref'}, PORT => $PAR{'low_port'}) < 1) {
+		## пробрасываем/убираем тэгированный VLAN на присоединённом порту вышестоящего коммутатора
+		dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "DOWNLINK vlan ".$arglnk{'ACT'}."\n LIB => .$ref21->{'lib'},  IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'}, VLAN => $arglnk{'VLAN'}, ".
+		"PORT => $PAR{'low_port'}, PORTPREF => $PAR{'low_portpref'}" );
+                %sw_arg = (
+                    LIB => $ref21->{'lib'}, ACT => 'vlan_trunk_'.$arglnk{'ACT'}, IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'}, 
+		    PASS => $ref21->{'admin_pass'},ENA_PASS => $ref21->{'ena_pass'},VLAN => $arglnk{'VLAN'}, PORT => $PAR{'low_port'}, 
+		    PORTPREF => $PAR{'low_portpref'}, UPLINKPORTPREF => $ref21->{'uplink_portpref'}, UPLINKPORT => $ref21->{'uplink_port'},
+                );
+                $res = SW_ctl ( \%sw_arg );
+		if ($res < 1) {
+		    $stm21->finish();
+		    return $res;
+		}
+		$PAR{'change'} += 1;
+		# DB Update 
+		DB_trunk_update(ACT => $arglnk{'ACT'}, SWID => $ref21->{'sw_id'}, PORTPREF => $PAR{'low_portpref'}, PORT => $PAR{'low_port'}, VLAN => $arglnk{'VLAN'});
+	      } elsif ( $PAR{'low_port'} < 1 ) {
+		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Trunking vlan chains skip parent link for switch ".$ref21->{'hostname'}.", PARENT_PORT not SET  :-(" );
+	      } else {
+		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Trunking vlan downlink in ".$ref21->{'hostname'}.", already ".$arglnk{'ACT'}." in DB :-)" );
+		    $res = 1;
+	      }	
+		if ( $PAR{'sw_id'} == $arglnk{'L2HEAD'} ) {
+		    if (defined($arglnk{'L2HEAD_PORT'}) and DB_trunk_vlan(ACT => $arglnk{'ACT'}, SWID => $ref21->{'sw_id'}, VLAN => $arglnk{'VLAN'}, PORTPREF => $arglnk{'L2HEAD_PORTPREF'}, PORT => $arglnk{'L2HEAD_PORT'}) < 1) {
+			# Пробрасываем/убираем VLAN на порту стыковки последнего свича с терминатором
+			dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "SWITCHTERM vlan ".$arglnk{'ACT'}."\n LIB => $ref21->{'lib'}, IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'}, VLAN => $arglnk{'VLAN'}, ".
+			"PORT => $arglnk{'L2HEAD_PORT'}, PORTPREF => $arglnk{'L2HEAD_PORTPREF'}" );
+            		%sw_arg = (
+			    LIB => $ref21->{'lib'}, ACT => 'vlan_trunk_'.$arglnk{'ACT'}, IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'},
+			    PASS => $ref21->{'admin_pass'}, ENA_PASS => $ref21->{'ena_pass'}, VLAN => $arglnk{'VLAN'}, PORT => $arglnk{'L2HEAD_PORT'}, 
+			    PORTPREF => $arglnk{'L2HEAD_PORTPREF'}, UPLINKPORTPREF => $ref21->{'uplink_portpref'}, UPLINKPORT => $ref21->{'uplink_port'},
+			);
+			$res = SW_ctl ( \%sw_arg );
+
+			if ($res < 1) {
+			    $stm21->finish();
+			    return $res;
+			}
+			$PAR{'change'} += 1;
+			DB_trunk_update(ACT => $arglnk{'ACT'}, SWID => $ref21->{'sw_id'}, PORTPREF => $arglnk{'L2HEAD_PORTPREF'}, PORT => $arglnk{'L2HEAD_PORT'}, VLAN => $arglnk{'VLAN'});
+		    }
+		    $count = $start_conf->{'MAXPARENTS'}; # завершаем  если добрались до головного коммутатора цепочки!
+		} elsif ( defined($ref21->{'uplink_port'}) and DB_trunk_vlan(ACT => $arglnk{'ACT'}, SWID => $ref21->{'sw_id'}, VLAN => $arglnk{'VLAN'}, PORT => $ref21->{'uplink_port'}, PORTPREF => $ref21->{'uplink_portpref'}) < 1 ) {
+		    ## пробрасываем/убираем тэгированный VLAN на UPLINK порту текущего коммутатора цепочки 
+		    dlog ( SUB => (caller(0))[3], DBUG => 1, MESS => "UPLINK vlan ".$arglnk{'ACT'}."\n LIB => $ref21->{'lib'}, IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'}, VLAN => $arglnk{'VLAN'}, ".
+		    "PORT => $ref21->{'uplink_port'}, PORTPREF => $ref21->{'uplink_portpref'}\n" );
+		    %sw_arg = (
+			LIB => $ref21->{'lib'}, ACT => 'vlan_trunk_'.$arglnk{'ACT'}, IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'},
+			PASS => $ref21->{'admin_pass'}, ENA_PASS => $ref21->{'ena_pass'}, VLAN => $arglnk{'VLAN'}, PORT => $ref21->{'uplink_port'}, 
+			PORTPREF => $ref21->{'uplink_portpref'}, UPLINKPORTPREF => $ref21->{'uplink_portpref'}, UPLINKPORT => $ref21->{'uplink_port'},
+		    );
+		    $res = SW_ctl ( \%sw_arg );
+		    if ($res < 1) {
+			$stm21->finish();
+			return $res;
+		    }
+		    $PAR{'change'} += 1;
+		    DB_trunk_update(ACT => $arglnk{'ACT'}, SWID => $ref21->{'sw_id'}, PORTPREF => $ref21->{'uplink_portpref'}, PORT => $ref21->{'uplink_port'}, VLAN => $arglnk{'VLAN'});
+		} elsif (not defined($ref21->{'uplink_port'})) {
+		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Trunking vlan chains skip uplink in ".$ref21->{'hostname'}.", UPLINK_PORT not SET  :-(" );
+		} else {
+		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Trunking vlan uplink in ".$ref21->{'hostname'}.", already ".$arglnk{'ACT'}." in DB :-)" );
+		    $res = 1;
+		}
+
+		if ($PAR{'change'}) {
+		    if ( $arglnk{'ACT'} eq 'remove' ) {
+			# Ппри убирании линка - убираем VLAN с текущего свича
+			%sw_arg = (
+			    LIB => $ref21->{'lib'}, ACT => 'vlan_remove', IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'}, PASS => $ref21->{'admin_pass'},
+			    ENA_PASS => $ref21->{'ena_pass'}, VLAN => $arglnk{'VLAN'},
+			);
+			$res = SW_ctl ( \%sw_arg );
+		    }
+		    # Сохраняем конфигурацию текущего коммутатора цепочки
+		    SAVE_config(LIB => $ref21->{'lib'}, SWID => $ref21->{'sw_id'}, IP => $ref21->{'ip'}, LOGIN => $ref21->{'admin_login'}, PASS => $ref21->{'admin_pass'}, 
+		    ENA_PASS => $ref21->{'ena_pass'});
+		}
+		# Прекращаем, если не найден вышестоящий коммутатор и текущий коммутатор не является головным свичём цепочки терминирования
+		if ( not defined($ref21->{'parent'}) and $PAR{'sw_id'} != $arglnk{'L2HEAD'} ) {
+		    dlog ( SUB => (caller(0))[3], DBUG => 0, MESS => "Trunking vlan chains lost in switch ".$ref21->{'hostname'}.", PARENT not SET  :-(" );
+		    $stm21->finish();
+		    return -1;
+		}
+		# Запоминаем параметры DOWNLINK на следующем коммутаторе цепочки
+		$PAR{'sw_id'}=$ref21->{'parent'};
+		$PAR{'low_port'} = $ref21->{'parent_port'};
+		$PAR{'low_portpref'} = $ref21->{'parent_portpref'};
+	    }
+	    $stm21->finish();
+	}
+	return $res;
+}
+
+sub SW_AP_fix {
+
+	DB_mysql_connect(\$dbm);
+	my $Query10 = ''; my $Query0 = ''; my $Query1 = ''; my %sw_arg = (); my $cli_vlan=0;
+	my $AP = shift;
+	#my %arg = (
+	#    @_,         # список пар аргументов
+	#);
+	# AP_INFO LOGIN LTYPE VLAN NAS_IP HW_MAC
+	if ( not defined($headinfo{'ZONE_'.$AP->{'nas_ip'}}) ) {
+	    dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "NAS '".$AP->{'nas_ip'}."'ZONE not exist, AP not fixed..." );
+	    return -1;
+	}
+
+	#my $AP = $arg{'AP_INFO'};
+	$AP->{'vlan_zone'} = $headinfo{'ZONE_'.$AP->{'nas_ip'}};
+	$AP->{'fix_vlan_type'} = " UNKNOWN ";
+	$AP->{'fix_ap_type'} = "";
+
+	############# GET Switch IP's
+	my $stm0 = $dbm->prepare("SELECT h.automanage, h.bw_ctl, h.sw_id, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit, m.lib, m.rocom, m.snmp_ap_fix, ".
+	"m.mon_login, m.mon_pass FROM hosts h, streets st, models m WHERE h.model_id=m.model_id and h.street_id=st.street_id and m.lib is not NULL and h.clients_vlan=".
+	$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'}." and h.visible>0" );
+	$stm0->execute();
+		if ($stm0->rows>1) { dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "More by one switch in Clients VLAN '".$AP->{'vlan_id'}."'!!!" ); }
+
+		while (my $ref = $stm0->fetchrow_hashref() and not $AP->{'id'}) {
+			$cli_vlan=1;
+			$AP->{'automanage'}=1 if ($ref->{'automanage'});
+			$AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'});
+
+			%sw_arg = (
+			    LIB => $ref->{'lib'}, ACT => 'fix_macport', IP => $ref->{'ip'}, LOGIN => $ref->{'mon_login'}, PASS => $ref->{'mon_pass'},
+			    MAC => $AP->{'hw_mac'}, VLAN => $AP->{'vlan_id'}, ROCOM => $ref->{'rocom'}, USE_SNMP => $ref->{'snmp_ap_fix'},
+			);
+			### Fix locate MAC in switch
+			( $AP->{'portpref'}, $AP->{'port'}, $AP->{'portindex'} ) = SW_ctl ( \%sw_arg );
+			    #print STDERR ($AP->{'portpref'}||"").", ".$AP->{'port'}.", ".$AP->{'portindex'}."\n" if $debug;
+
+			if ($AP->{'port'}>0 or $stm0->rows == 1) {
+				$AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
+                                $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
+				$AP->{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
+				$AP->{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
+			}
+			if ($AP->{'port'}>0) {
+				if ( defined($AP->{'portpref'}) and 'x'.$AP->{'portpref'} ne 'x' ) {
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
+				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref='".$AP->{'portpref'}."' and  port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query1 = "INSERT into swports  SET  status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref='".$AP->{'portpref'}."', port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
+				} else {
+				    $Query10 = "SELECT port_id FROM swports WHERE portpref is NULL and port=".$AP->{'port'}." and sw_id=".$AP->{'swid'};
+				    $Query0 = "SELECT port_id, communal, ds_speed, us_speed, ltype_id, vlan_id, autoneg, speed, duplex, maxhwaddr FROM swports WHERE portpref is NULL and port='".$AP->{'port'}."' and sw_id=".$AP->{'swid'};
+				    $Query1 = "INSERT into swports  SET status=1, ltype_id=".$link_type{'free'}.", type=1, ds_speed=64, us_speed=64, portpref=NULL, port='".$AP->{'port'}."', sw_id='".$AP->{'swid'}."', vlan_id=-1";
+				}
+				$Query1 .= ", snmp_idx=".$AP->{'portindex'} if ( defined($AP->{'portindex'}) and $AP->{'portindex'} != $AP->{'port'} );
+
+				my $stm10 = $dbm->prepare($Query10);
+				$stm10->execute();
+				if (not $stm10->rows) {
+					$dbm->do($Query1);
+					dlog ( SUB => (caller(0))[3]||'', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => "Insert New PORT record in swports" );
+				}
+				$stm10->finish;
+				my $stm1 = $dbm->prepare($Query0);
+				$stm1->execute();
+			    	while (my $refp = $stm1->fetchrow_hashref()) {
+					$AP->{'link_type'} = $link_type{'free'};
+					$AP->{'link_type'} = $refp->{'ltype_id'} if defined($refp->{'ltype_id'});
+					$AP->{'id'} = $refp->{'port_id'};
+					$AP->{'communal'} = $refp->{'communal'};
+					$AP->{'ds'} = $refp->{'ds_speed'} if defined($refp->{'ds_speed'});
+					$AP->{'us'} = $refp->{'us_speed'} if defined($refp->{'us_speed'});
+					#NEW Parameters    
+					$AP->{'portvlan'} = $refp->{'vlan_id'} if defined($refp->{'vlan_id'});
+
+				}
+                                        $AP->{'name'} .= ", порт ".( defined($AP->{'portpref'}) ? $AP->{'portpref'} : '' ).$AP->{'port'};
+					$stm1->finish;
+			}
+			$AP->{'fix_vlan_type'} = " CLI_VLAN";
+		}
+		$stm0->finish;
+		if ( ( not $AP->{'id'}) and ( not $cli_vlan ) ) {
+			dlog ( SUB => (caller(0))[3]||'', DBUG => 2, LOGTYPE => 'LOGAPFIX', MESS => "FIND PORT VLAN '".$AP->{'vlan_id'}."' User: '".$AP->{'login'}."', MAC:'".$AP->{'hw_mac'}."'" );
+			$AP->{'DB_portinfo'}=1;
+			$stm0 = $dbm->prepare( "SELECT h.automanage, h.bw_ctl, h.ip, h.model_id, h.hostname, st.street_name, h.dom, h.podezd, h.unit,".
+			" p.sw_id, p.port_id, p.ltype_id, p.communal, p.portpref, p.port, p.ds_speed, p.us_speed, ".
+			" p.vlan_id, p.autoneg, p.speed, p.duplex, p.maxhwaddr FROM hosts h, streets st, swports p ".
+			" WHERE h.street_id=st.street_id and p.sw_id=h.sw_id and p.vlan_id=".$AP->{'vlan_id'}." and h.zone_id=".$AP->{'vlan_zone'} );
+			$stm0->execute();
+			while (my $ref = $stm0->fetchrow_hashref()) {
+			    $AP->{'port'} = $ref->{'port'} if not defined($ref->{'portpref'});
+			    $AP->{'port'} = $ref->{'portpref'}.$ref->{'port'} if defined($ref->{'portpref'});
+                            $AP->{'swid'} = $ref->{'sw_id'}; $AP->{'podezd'} = $ref->{'podezd'};
+
+                            $AP->{'name'} = "ул. ".$ref->{'street_name'}.", д.".$ref->{'dom'};
+                            $AP->{'name'} .= ", п.".$ref->{'podezd'} if $ref->{'podezd'}>0;
+                            $AP->{'name'} .= ", unit N".$ref->{'unit'} if defined($ref->{'unit'});
+                            $AP->{'name'} .= ", порт ".$AP->{'port'};
+
+			    $AP->{'link_type'} = $link_type{'free'};
+			    $AP->{'link_type'} = $ref->{'ltype_id'} if defined($ref->{'ltype_id'});
+
+			    $AP->{'automanage'}=1 if ($ref->{'automanage'} == 1);
+			    $AP->{'bw_ctl'}=1 if ($ref->{'bw_ctl'} == 1);
+
+			    $AP->{'ds'} = $ref->{'ds_speed'} if defined($ref->{'ds_speed'});
+			    $AP->{'us'} = $ref->{'us_speed'} if defined($ref->{'us_speed'});
+			    #NEW Parameters
+			    $AP->{'portvlan'} = $ref->{'vlan_id'} if defined($ref->{'vlan_id'});
+
+			    if ($AP->{'id'}) {
+				dlog ( SUB => (caller(0))[3]||'', DBUG => 0, LOGTYPE => 'LOGAPFIX', MESS => "MULTI TD's!!! = '".$AP->{'id'}."' and '".$ref->{'port_id'}."'" );
+				$AP->{'id'} = 0; $AP->{'swid'} = 0; $AP->{'podezd'}=0; $AP->{'name'}=''; $AP->{'port'}=0;
+				last;
+			    }
+			    $AP->{'id'} = $ref->{'port_id'};
+			    $AP->{'communal'} = $ref->{'communal'};
+			    $AP->{'fix_vlan_type'} = "PORT_VLAN";
+			}
+			$stm0->finish;
+		}
+		if ( $AP->{'id'}) {
+		    
+		    $AP->{'fix_ap_type'} = ( $AP->{'id'} == $AP->{'trust_id'} ? "trust " : "Left!!!" ) if defined ($AP->{'trust_id'}) ;
+		    $AP->{'fix_dlog'} = '('. $dbm->{'mysql_thread_id'}.') '.$AP->{'fix_vlan_type'}." '".$AP->{'vlan_id'}."' MAC '".$AP->{'hw_mac'}."' User: '".
+		    rspaced($AP->{'login'}."'",18)." AP ".$AP->{'fix_ap_type'}." '".$AP->{'id'}."' - '".$AP->{'name'}."'";
+		    if ( $AP->{'fix_ap_type'} eq "Left!!!" ) {
+			$AP->{'fix_dlog'} .= " ( trust AP = '".$AP->{'trust_id'}."' )";
+		    }
+		    dlog ( SUB => $AP->{'callsub'}||(caller(0))[3]||'unknown', DBUG => 1, LOGTYPE => 'LOGAPFIX', MESS => $AP->{'fix_dlog'} );
+		}
+}
+
+
+1;

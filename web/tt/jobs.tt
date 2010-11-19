@@ -1,0 +1,38 @@
+[% INCLUDE header.tt %]
+
+
+[% INCLUDE paging.tt %]
+
+<table align=center class=data border=1 width=50%>
+<tr class="bbheader3"> <td colspan=9>--Jobs--</td></tr>
+<tr class="bbheader3">
+    <td>jid</td>
+    <td>state</td>
+    <td>Date</td>
+    <td>Switch</td>
+    <td>port</td>
+    <td>apid</td>
+    <td>type</td>
+    <td>params</td>
+    <td>date_exec</td>
+</tr>
+    [% FOREACH job IN jobs %]
+    <tr valign=top [%IF job.done%]class="data"[%ELSE%]class="body"[%END%]>
+        <td>[% job.job_id %]</td>
+        <td>[% job.state %]</td>
+        <td><nobr>[% job.date_insert %]</td>
+        <td><a href="/swctl/?mode=host&action=view&sw_id=[%job.sw_id%]&hlport=[%job.portpref%][%job.port%]#p[%job.portpref%][%job.port%]" target=_blank>[% job.hostname %]</a></td>
+        <td>[%job.portpref%][% job.port %]</td>
+        <td>[% job.port_id %]</td>
+        <td>[% job.ltype_name %]</td>
+        <td align=right>
+            [% FOREACH p IN job.parm %]
+                <nobr>[% p.name %]: [% p.value %]<br>
+            [% END %]
+        </td>
+        <td><nobr>[% job.date_exec %]</td>
+    </tr>
+    [% END %]
+</table>
+
+[% INCLUDE paging.tt %]
