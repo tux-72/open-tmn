@@ -1,0 +1,65 @@
+[% INCLUDE header.tt %]
+
+<form method=post>
+<table border=1 class=data>
+
+<tr><td> Model </td><td>
+    <select name="model_id">
+        [% FOR model IN models %]
+            <option [% IF model.selected %] selected [% END %] value="[% model.model_id %]"> [% model.model_name %] </option>
+        [% END %]
+    </select>
+</td> </tr>
+<tr><td> hw_mac          </td><td><input name="hw_mac"          value="[% host.hw_mac          %]"></td> </tr>
+<tr><td> hostname        </td><td><input name="hostname"        value="[% host.hostname        %]"></td> </tr>
+<tr><td> Visible         </td><td><input name="visible" type="checkbox" [% IF host.visible %] checked [% END %]></td> </tr>
+<tr><td> IP              </td><td><input name="ip"              value="[% host.ip              %]"></td> </tr>
+<tr><td> bw_ctl          </td><td><input name="bw_ctl" type="checkbox" [% IF host.bw_ctl %] checked [% END %]></td> </tr>
+<tr><td> automanage      </td><td><input name="automanage" type="checkbox" [% IF host.automanage %] checked [% END %]></td> </tr>
+<tr><td> uplink_portpref </td><td><input name="uplink_portpref"     value="[% host.uplink_portpref %]"></td> </tr>
+<tr><td> uplink_port     </td><td><input name="uplink_port"     value="[% host.uplink_port     %]"></td> </tr>
+<tr><td> Parent </td><td>
+    <select name="parent">
+        [% FOR parent IN parents %]
+            <option [% IF parent.selected %] selected [% END %] value="[% parent.sw_id %]"> [% parent.hostname %] </option>
+        [% END %]
+    </select>
+</td> </tr>
+<tr><td> parent_portpref </td><td><input name="parent_portpref" value="[% host.parent_portpref %]"></td> </tr>
+<tr><td> parent_port     </td><td><input name="parent_port"     value="[% host.parent_port     %]"></td> </tr>
+<tr><td> Street </td><td>
+    <select name="street_id">
+        [% FOR street IN streets %]
+            <option [% IF street.selected %] selected [% END %] value="[% street.street_id %]"> [% street.street_name %] </option>
+        [% END %]
+    </select>
+</td> </tr>
+<tr><td> dom             </td><td><input name="dom"             value="[% host.dom             %]"></td> </tr>
+<tr><td> podezd          </td><td><input name="podezd"          value="[% host.podezd          %]"></td> </tr>
+<tr><td> unit            </td><td><input name="unit"            value="[% host.unit            %]"></td> </tr>
+<tr><td> grp </td><td>
+    <select name="grp">
+        [% FOR grp IN groups %]
+            <option [% IF grp.selected %] selected [% END %] value="[% grp.grp %]"> [% grp.grp %] </option>
+        [% END %]
+    </select>
+</td> </tr>
+<tr><td> clients_vlan    </td><td><input name="clients_vlan"    value="[% host.clients_vlan    %]"></td> </tr>
+<tr><td> parent_ext      </td><td><input name="parent_ext"      value="[% host.parent_ext      %]"></td> </tr>
+<tr><td> vlan_zone </td><td>
+    <select name="zone_id">
+        [% FOR vlan_zone IN vlan_zones %]
+            <option [% IF vlan_zone.selected %] selected [% END %] value="[% vlan_zone.zone_id %]"> [% vlan_zone.name %] </option>
+        [% END %]
+    </select>
+</td> </tr>
+<tr><td> control_vlan    </td><td><input name="control_vlan"    value="[% host.control_vlan    %]"></td> </tr>
+
+[% IF host.stamp %]<input type=hidden name=stamp value="[%host.stamp%]">[%END%]
+<input type=hidden name=do value=1>
+<input type=hidden name=mode value=host>
+[% IF sw_id %] <input type=hidden name=sw_id value=[% sw_id %]> [% END %]
+<input type=hidden name=action value="[% action %]">
+</table>
+<input type=submit>
+</form>

@@ -59,7 +59,7 @@ while (<REAL_LIST>) {
 #    }
 #}
 
-my $dbh = DBI->connect("dbi:Sybase:server=StatServer;language=russian", "cisco", "cisco") or die "Unable to connect. $DBI::errstr";
+my $dbh = DBI->connect("dbi:Sybase:server=StatServer;language=russian", "user", "pass") or die "Unable to connect. $DBI::errstr";
 my $mydata = "";
 my $dberror = 0;
 

@@ -1,0 +1,26 @@
+;[% sw.hostname %];;;;[% date %]
+[%-IF admin %]
+ip      ;[% sw.ip %]
+mac     ;[% sw.hw_mac %]
+[%-END%]
+;-----Ports----
+port;phy_type;link_type;login;vl;info;
+
+[%-FOREACH port IN ports-%]
+[%-port.portpref-%][%-port.port-%];
+[%-port.phy_type-%];
+[%-port.ltype_name-%][%-IF port.free_but_used-%] free[%-END-%];
+[%-port.tds.0.login-%];
+[%-port.vlan_id-%];
+    [%-IF port.links-%]
+        [%-port.info-%]: ;
+        [%-FOR link IN port.links-%]
+            [%-IF link.downlink-%]D [%-ELSE-%]U [%-END-%]
+            [%-link.to_hostname-%] [%-IF link.visible-%][%-ELSE-%] hidden[%-END-%]. 
+        [%-END-%]
+    [%-ELSE-%]
+        [%-port.info-%]
+    [%-END-%]
+
+[%END%]
+

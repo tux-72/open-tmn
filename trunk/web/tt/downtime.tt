@@ -1,0 +1,55 @@
+[% INCLUDE header.tt %]
+
+<a href="/swctl/?mode=downtime&amp;dateA=[%dateA%]&amp;dateB=[%dateB%]&amp;export=1&amp;do=1">Export</a>
+
+<div align=right>
+<form mode=get>
+<input name=mode value=downtime type=hidden>
+<div id="multi">
+<input type="text" name="dateA" [%IF dateA%]value="[%dateA%]"[%END%]> <button type="button">Sel</button>
+<input type="text" name="dateB" [%IF dateB%]value="[%dateB%]"[%END%]> <button type="button">Sel</button>
+</div>
+<input type=submit value=Search>
+</form>
+</div>
+
+<script type="text/javascript">
+    jQuery(document).ready(function() {
+        jQuery("#multi input").dynDateTime({
+            ifFormat: "%d.%m.%y",
+            daFormat: "%l;%M %p, %e %m,  %Y",
+            firstDay: 1,
+            button: ".next()" //next sibling
+        });
+    });
+</script>
+
+
+<table align=center class=data border=1>
+<tr class="bbheader3"> <td colspan=9>--Downtime--</td></tr>
+<tr class="bbheader3">
+    <td>Hostname</td>
+    <td>Филиал</td>
+    <td>Город</td>
+    <td>Описание  ситуации</td>
+    <td>Услуга</td>
+    <td>Абоненты</td>
+    <td>Время начала</td>
+    <td>Время окончания</td>
+    <td>Длительность</td>
+</tr>
+    [% FOREACH line IN lines %]
+    <tr valign=top>
+        <td>[%IF line.link%]<a href="[%line.link%]" target=_blank>[% line.hostname %]</a>[%ELSE%][% line.hostname %][%END%]</td>
+        <td>ООО "Коминтел"</td>
+        <td>г. Тюмень</td>
+        <td>[%IF line.street%]Нет Интернета по адресу [% line.street %].[%END%]</td>
+        <td>Интернет</td>
+        <td>[% line.count %] аб.</td>
+        <td>[% line.begin %]</td>
+        <td>[% line.end %]</td>
+        <td>[% line.duration %]</td>
+    </tr>
+    [% END %]
+</table>
+
