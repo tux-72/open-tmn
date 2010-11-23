@@ -7,7 +7,7 @@ use strict;
 use vars qw(%RAD_REQUEST %RAD_REPLY %RAD_CHECK);
 
 use FindBin '$Bin';
-use lib $Bin.'/../lib';
+use lib $Bin.'/../../lib';
 use SWConf;
 use SWFuncAAA;
 
