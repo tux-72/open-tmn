@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 
+if ( (defined($ARGV[0]) and "$ARGV[0]" ne 'real') or (not defined($ARGV[0])) ) { exit; }
 
 use strict;
 use DBI;

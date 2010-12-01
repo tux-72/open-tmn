@@ -9,6 +9,7 @@ use strict;
 #use locale;
 use POSIX qw(strftime);
 use DBI();
+use SWFunc;
 use SWFuncAAA;
 
 use Authen::Radius;
@@ -113,7 +114,7 @@ sub DHCP_post_auth {
 	    my $Q_check_macport = "SELECT l.port_id, l.head_id, l.white_static_ip, l.status, l.login, l.dhcp_use, h.term_ip, l.pppoe_up ".
 	    " FROM head_link l, heads h WHERE l.head_id=h.head_id and l.inet_priority<=".$nas_conf->{'DHCP_PRI'}." and l.communal=0 ".
 	    " and ( h.dhcp_relay_ip='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."' or h.dhcp_relay_ip2='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."' )".
-	    " and l.status=1 and l.hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan;
+	    " and l.status=1 and l.hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."' and l.vlan_id=".$vlan." and DATE_FORMAT(l.stamp,'%Y%m')=DATE_FORMAT(now(),'%Y%m')";
 	    my $stm_port = $dbm->prepare($Q_check_macport);
 	    $stm_port->execute();
 	    if  ( $stm_port->rows == 1 ) {
@@ -231,7 +232,7 @@ sub DHCP_post_auth {
 		" and l.communal=0"." and ( h.dhcp_relay_ip='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."'".
 		" or h.dhcp_relay_ip2='".$RAD_REQUEST->{'DHCP-Gateway-IP-Address'}."' )".
 		" and l.dhcp_use=1 and a.ip='".$cli_addr."' and a.agent_info='".$RAD_REQUEST->{'DHCP-Agent-Circuit-Id'}."'".
-		" and a.hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."'";
+		" and a.hw_mac='".$RAD_REQUEST->{'DHCP-Client-Hardware-Address'}."' and DATE_FORMAT(l.stamp,'%Y%m')=DATE_FORMAT(now(),'%Y%m') ";
 		#&radiusd::radlog(1, $Q_Request) if $debug;
 
 		my $stm_req = $dbm->prepare($Q_Request);

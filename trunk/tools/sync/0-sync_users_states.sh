@@ -1,7 +1,6 @@
 #!/bin/sh
 
-exit 0
-tooldir=/usr/local/open-tmn/tools/sync
+tooldir="/usr/local/open-tmn/tools/sync"
 
 ${tooldir}/update_dhcplist.pl
 

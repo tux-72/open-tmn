@@ -3,6 +3,12 @@
 use strict;
 no strict qw(refs);
 
+use FindBin '$Bin';
+use lib $Bin.'/../../lib';
+
+use SWConf;
+use SWFunc;
+use SWFuncAAA;
 use SWFuncDisp;
 
 my $VER = 0.92;
