@@ -4,7 +4,7 @@ use FindBin '$Bin';
 
 $exec_file	= "cycle_check.pl";
 $LOGDIR		= "/var/log/swctl";
-$run_user	= "billsync";
+$run_user	= "datasync";
 
 my @processes = ( 	"checkterm",
 			"checkjobs",

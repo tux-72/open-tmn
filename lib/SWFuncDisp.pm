@@ -9,8 +9,8 @@ use strict;
 #use locale;
 use POSIX qw(strftime);
 use DBI();
-use FindBin '$Bin';
-use lib $Bin.'/../../lib';
+#use FindBin '$Bin';
+#use lib $Bin.'/../../lib';
 
 use SWConf;
 use SWFunc;
