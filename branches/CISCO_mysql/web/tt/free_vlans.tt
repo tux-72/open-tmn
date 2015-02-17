@@ -1,0 +1,27 @@
+[% INCLUDE header.tt %]
+
+
+<a href="/swctl/?mode=free_vlans&print_ranges=1">aggregated</a>
+|
+<a href="/swctl/?mode=free_vlans">list</a>
+
+<table align=center class=data border=1 width=20%>
+<tr class="bbheader3"> <td colspan=2>--Free vlans for zone 1--</td></tr>
+<tr class="bbheader3">
+    <td width=5%>Zone</td>
+    <td>Vlan</td>
+</tr>
+    [% FOREACH zones IN free_vlans %]
+    <tr valign=top>
+        <td>[% zones.zone %]</td>
+        <td>    </td>
+    </tr>
+    [% FOREACH vlan IN zones.vlans %]
+    <tr valign=top>
+        <td> </td>
+        <td>[% vlan %]</td>
+    </tr>
+    [% END %]
+    [% END %]
+</table>
+

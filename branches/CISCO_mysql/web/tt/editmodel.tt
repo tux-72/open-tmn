@@ -1,0 +1,33 @@
+[% INCLUDE header.tt %]
+
+<form method=post>
+<table border=1 class=data>
+
+<tr><td> model         </td><td><input name="model_name" value="[% model.model_name %]"></td> </tr>
+<tr><td> template      </td><td><input name="template" value="[% model.template     %]"></td> </tr>
+<tr><td> extra         </td><td><input name="extra" value="[% model.extra        %]"></td> </tr>
+<tr><td> comment       </td><td><input name="comment" value="[% model.comment      %]"></td> </tr>
+<tr><td> image         </td><td><input name="image" value="[% model.image        %]"></td> </tr>
+<tr><td> lastuserport  </td><td><input name="lastuserport" value="[% model.lastuserport %]"></td> </tr>
+<tr><td> def_trunk     </td><td><input name="def_trunk" value="[% model.def_trunk    %]"></td> </tr>
+<tr><td> manage        </td><td><input name="manage" type="checkbox" [% IF model.manage %] checked [% END %]></td> </tr>
+<tr><td> lib           </td><td><input name="lib" value="[% model.lib          %]"></td> </tr>
+<tr><td> admin_login   </td><td><input name="admin_login" value="[% model.admin_login  %]"></td> </tr>
+<tr><td> admin_pass    </td><td><input name="admin_pass" value="[% model.admin_pass   %]"></td> </tr>
+<tr><td> ena_pass      </td><td><input name="ena_pass" value="[% model.ena_pass     %]"></td> </tr>
+<tr><td> mon_login     </td><td><input name="mon_login" value="[% model.mon_login    %]"></td> </tr>
+<tr><td> mon_pass      </td><td><input name="mon_pass" value="[% model.mon_pass     %]"></td> </tr>
+<tr><td> bw_free       </td><td><input name="bw_free" value="[% model.bw_free      %]"></td> </tr>
+<tr><td> rocom         </td><td><input name="rocom" value="[% model.rocom        %]"></td> </tr>
+<tr><td> rwcom         </td><td><input name="rwcom" value="[% model.rwcom        %]"></td> </tr>
+<tr><td> old_admin     </td><td><input name="old_admin" value="[% model.old_admin    %]"></td> </tr>
+<tr><td> old_pass      </td><td><input name="old_pass" value="[% model.old_pass     %]"></td> </tr>
+<tr><td> sysDescr      </td><td><input name="sysDescr" value="[% model.sysDescr     %]"></td> </tr>
+<tr><td> snmp_ap_fix   </td><td><input name="snmp_ap_fix" type="checkbox" [% IF model.snmp_ap_fix %] checked [% END %]></td> </tr>
+[% IF model_id %] <input type=hidden name=model_id value=[% model_id %]> [% END %]
+<input type=hidden name=do value=1>
+<input type=hidden name=mode value=model>
+<input type=hidden name=action value="[% action %]">
+</table>
+<input type=submit>
+</form>

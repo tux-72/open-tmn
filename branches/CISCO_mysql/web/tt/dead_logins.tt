@@ -1,0 +1,22 @@
+[% INCLUDE header.tt %]
+
+
+
+<table align=center class=data border=1>
+<tr class="bbheader3"> <td colspan=4>--Dead people--</td></tr>
+<tr class="bbheader3">
+    <td>ap</td>
+    <td>host</td>
+    <td>login</td>
+    <td>last_date</td>
+</tr>
+    [% FOREACH line IN logins %]
+    <tr valign=top>
+        <td><a href="/swctl/?search_ap=[% line.port_id %]&do=1">[% line.port_id %]</a></td>
+        <td align=left>[% line.hostname   %]</td>
+        <td>[% line.login   %]</td>
+        <td>[% line.last_date %]</td>
+    </tr>
+    [% END %]
+</table>
+

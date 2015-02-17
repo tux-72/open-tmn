@@ -1,0 +1,63 @@
+[% INCLUDE header.tt %]
+
+<form method=get>
+<table border=1 class=data>
+
+<tr><td> snmp_portindex </td><td><input name="snmp_idx" value="[% port.snmp_idx %]"></td> </tr>
+<tr><td> link_type </td><td>
+        <select name="ltype_id">
+            [% FOR type IN link_types %]
+                <option [% IF type.selected %] selected [% END %] value="[% type.ltype_id %]">[% IF type.ltype_name %][% type.ltype_id %] - [% type.ltype_name %] [% IF type.desc %] [[%type.desc%]] [% END %][% END %]</option>
+            [% END %]
+        </select>
+</td> </tr>
+<tr><td> portpref </td><td><input name="portpref" value="[% port.portpref %]"></td> </tr>
+<tr><td> port </td><td><input name="port" value="[% port.port %]"></td> </tr>
+<tr><td> communal_port </td><td><input name="communal" type="checkbox" [% IF port.communal %] checked [% END %]></td> </tr>
+<tr><td> type </td><td>
+        <select name="type">
+            [% FOR type IN port_types %]
+                <option [% IF type.selected %] selected [% END %] value="[% type.id %]"> [% type.name %]</option>
+            [% END %]
+        </select>
+</td> </tr>
+<tr><td> status </td><td>
+        <select name="status">
+            [% FOR type IN status_types %]
+                <option [% IF type.selected %] selected [% END %] value="[% type.id %]"> [% type.name %]</option>
+            [% END %]
+        </select>
+</td> </tr>
+<tr><td> ds_speed </td><td><input name="ds_speed" value="[% IF port.ds_speed %][% port.ds_speed %][% ELSE %]-1[%END%]"></td> </tr>
+<tr><td> us_speed </td><td><input name="us_speed" value="[% IF port.us_speed %][% port.us_speed %][% ELSE %]-1[%END%]"></td> </tr>
+<tr><td> start_date </td><td><input name="start_date" value="[% port.start_date %]"></td> </tr>
+<tr><td> portvlan </td><td><input name="vlan_id" value="[% port.vlan_id %]"></td> </tr>
+<tr><td> tag </td><td><input name="tag" type="checkbox" [% IF port.tag %] checked [% END %]></td> </tr>
+<tr><td> maxhwaddr </td><td><input name="maxhwaddr" value="[% IF port.maxhwaddr %][% port.maxhwaddr %][% ELSE %]-1[%END%]"></td> </tr>
+<tr><td> head_id </td><td>
+        <select name="head_id">
+            <option value=""> </option>
+            [% FOR type IN head_types %]
+                <option [% IF type.selected %] selected [% END %] value="[% type.head_id %]"> [% type.desc %] </option>
+            [% END %]
+        </select>
+</td> </tr>
+<tr><td> phy_type </td><td>
+        <select name="phy_id">
+            [% FOR type IN phy_types %]
+                <option [% IF type.selected %] selected [% END %] value="[% type.phy_id %]"> [% type.phy_name %] </option>
+            [% END %]
+        </select>
+</td> </tr>
+<tr><td> autoneg </td><td><input name="autoneg" type="checkbox" [% IF port.autoneg %] checked [% END %]></td> </tr>
+<tr><td> speed </td><td><input name="speed" value="[% port.speed %]"></td> </tr>
+<tr><td> duplex </td><td><input name="duplex" type="checkbox" [% IF port.duplex %] checked [% END %]></td> </tr>
+<tr><td> info </td><td><input name="info" value="[% port.info %]"></td> </tr>
+</table>
+[% IF sw_id %] <input type=hidden name=sw_id value="[%sw_id%]"> [% END %]
+[% IF port_id %] <input type=hidden name=port_id value="[%port_id%]"> [% END %]
+<input type=hidden name=mode value="port">
+<input type=hidden name=action value="[% IF action %][%action%][% ELSE %]edit[% END %]">
+<input type=hidden name=do value="1">
+<input type=submit>
+</form>
